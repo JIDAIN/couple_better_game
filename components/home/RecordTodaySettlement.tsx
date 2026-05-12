@@ -228,7 +228,7 @@ export function RecordTodaySettlement() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="relative w-full overflow-hidden rounded-full border border-white/60 bg-gradient-to-r from-rose-400 via-pink-400 to-amber-300 px-6 py-3.5 text-base font-bold text-white shadow-lg shadow-rose-200/50 ring-2 ring-rose-200/30 transition will-change-transform hover:shadow-xl hover:shadow-rose-300/35 active:scale-[0.97] active:brightness-[1.02] sm:py-4"
+          className="ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-bold text-white ring-2 ring-rose-200/30 will-change-transform sm:py-4"
         >
           <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
             <span className="text-lg" aria-hidden>

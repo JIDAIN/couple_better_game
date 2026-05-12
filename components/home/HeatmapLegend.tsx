@@ -10,9 +10,9 @@ export function HeatmapLegend() {
   ] as const;
 
   return (
-    <div className="flex flex-col items-center gap-2.5 text-[10px] font-medium text-stone-500 sm:text-[11px]">
+    <div className="flex flex-col items-center gap-2.5 text-[10px] font-semibold text-stone-500 sm:text-[11px]">
       <div className="flex w-full min-w-0 flex-nowrap items-center justify-center gap-x-2 overflow-x-auto sm:gap-x-3">
-        <span className="shrink-0 text-stone-400">热量缺口</span>
+        <span className="shrink-0 text-stone-400/95">热量缺口</span>
         {items.map((it) => (
           <span
             key={it.label}

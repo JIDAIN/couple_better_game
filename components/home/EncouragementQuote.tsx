@@ -20,13 +20,13 @@ export function EncouragementQuote() {
 
   return (
     <section
-      className="rounded-2xl border border-rose-100/70 bg-gradient-to-r from-rose-50/90 via-white/70 to-amber-50/80 px-4 py-4 text-center shadow-sm shadow-rose-100/40"
+      className="ui-card-soft bg-gradient-to-r from-rose-50/80 via-white/65 to-amber-50/75 px-4 py-4 text-center"
       aria-label="今日鼓励"
     >
-      <p className="text-[11px] font-semibold tracking-wide text-rose-400/90">
+      <p className="text-[10px] font-semibold tracking-[0.16em] text-rose-400/90">
         今日小纸条
       </p>
-      <p className="mt-2 text-sm font-semibold leading-relaxed text-stone-700">
+      <p className="mt-2 text-[14px] font-semibold leading-relaxed text-stone-700">
         {text}
       </p>
     </section>

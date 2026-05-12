@@ -24,26 +24,26 @@ export function DualMonthlyHeatmaps() {
 
   return (
     <section
-      className="relative overflow-hidden rounded-[1.4rem] border border-emerald-100/70 bg-gradient-to-b from-emerald-50/50 via-white/60 to-amber-50/40 p-4 shadow-xl shadow-emerald-100/40 ring-1 ring-white/60 backdrop-blur-md sm:p-5"
+      className="ui-card-hero relative overflow-hidden p-4 sm:p-5"
       aria-label="当月成就"
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-8 top-6 h-24 w-24 rounded-full bg-emerald-200/25 blur-2xl"
+        className="pointer-events-none absolute -right-8 top-6 h-24 w-24 rounded-full bg-emerald-200/30 blur-2xl"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute bottom-4 left-0 h-20 w-20 rounded-full bg-amber-200/20 blur-2xl"
+        className="pointer-events-none absolute bottom-4 left-0 h-20 w-20 rounded-full bg-amber-200/24 blur-2xl"
       />
 
       <div className="relative text-center">
-        <h2 className="text-base font-bold text-stone-800 sm:text-lg">当月成就</h2>
-        <p className="mt-2 text-xs leading-relaxed text-stone-500">
+        <h2 className="text-lg font-extrabold tracking-tight text-stone-800 sm:text-[1.28rem]">当月成就</h2>
+        <p className="mt-1.5 text-[12px] leading-relaxed text-stone-500">
           五月的小格子，装的是一起变好的勇气；慢慢来，也很厉害 💌
         </p>
       </div>
 
-      <div className="relative mt-4 space-y-4">
+      <div className="relative mt-4 space-y-3.5">
         <PlayerHeatmap
           title="🐟 的成长热力图"
           subtitle="小鱼也在努力闪闪发光"
@@ -58,7 +58,7 @@ export function DualMonthlyHeatmaps() {
         />
       </div>
 
-      <div className="relative mt-4 rounded-2xl border border-white/60 bg-white/40 px-2 py-3">
+      <div className="ui-card-soft relative mt-3.5 px-2 py-3">
         <HeatmapLegend />
       </div>
     </section>

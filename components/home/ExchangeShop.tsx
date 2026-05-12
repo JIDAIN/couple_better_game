@@ -44,6 +44,14 @@ const REDEEM_ITEMS: RedeemItem[] = [
   },
 ];
 
+const ITEM_HINT: Record<string, string> = {
+  hotpot: "热乎乎的约会晚餐",
+  bbq: "快乐暴击补给",
+  dq: "甜甜续航一下",
+  milk2: "双人份加倍开心",
+  family: "周末放松仪式感",
+};
+
 export function ExchangeShop() {
   const { gemStock, coinStock, tryRedeem } = useHomeResources();
   const [open, setOpen] = useState(false);
@@ -104,13 +112,16 @@ export function ExchangeShop() {
     return gemStock >= g && coinStock >= c;
   };
 
+  const coinItems = REDEEM_ITEMS.filter((item) => item.priceCoins != null);
+  const gemItems = REDEEM_ITEMS.filter((item) => item.priceGems != null);
+
   return (
     <>
       <div className="flex justify-center pt-1">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-full border border-rose-100/90 bg-white/55 px-4 py-2 text-sm font-semibold text-stone-600 shadow-sm backdrop-blur-sm transition hover:border-rose-200 hover:bg-white/80 hover:text-stone-800 active:scale-[0.98]"
+          className="ui-button-secondary inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-stone-600"
         >
           <span aria-hidden>🎁</span>
           兑换商店
@@ -118,11 +129,11 @@ export function ExchangeShop() {
       </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+        <div className="fixed inset-0 z-[55] flex items-end justify-center p-2.5 sm:items-center sm:p-4">
           <button
             type="button"
             aria-label="关闭兑换"
-            className={`absolute inset-0 bg-stone-900/25 backdrop-blur-[2px] transition-opacity duration-300 ${
+            className={`absolute inset-0 bg-stone-900/30 backdrop-blur-[2px] transition-opacity duration-300 ${
               sheetEnter ? "opacity-100" : "opacity-0"
             }`}
             onClick={() => setOpen(false)}
@@ -131,90 +142,138 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`relative max-h-[min(88dvh,560px)] w-full rounded-t-[1.35rem] border border-white/80 bg-gradient-to-b from-rose-50/95 to-amber-50/90 px-4 pt-3 shadow-[0_-8px_40px_rgba(251,207,232,0.35)] transition-transform duration-300 ease-out will-change-transform ${
-              sheetEnter ? "translate-y-0" : "translate-y-full"
+            className={`relative flex h-[78dvh] w-full max-w-lg flex-col overflow-hidden rounded-[1.45rem] border border-white/80 bg-gradient-to-b from-rose-50/98 via-white/90 to-amber-50/85 px-4 pt-3 shadow-2xl shadow-rose-200/40 transition-all duration-300 ease-out will-change-transform ${
+              sheetEnter
+                ? "translate-y-0 opacity-100 sm:scale-100"
+                : "translate-y-full opacity-90 sm:translate-y-2 sm:scale-95"
             } pb-[max(1.25rem,env(safe-area-inset-bottom))]`}
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300/70" aria-hidden />
 
-            <div className="flex items-start justify-between gap-3 border-b border-rose-100/60 pb-3">
-              <div>
-                <h2
-                  id={titleId}
-                  className="text-base font-bold text-stone-800"
+            <div className="relative overflow-hidden rounded-[1.15rem] border border-white/75 bg-gradient-to-r from-rose-100/70 via-amber-50/80 to-rose-50/70 px-3.5 py-3 shadow-sm shadow-rose-100/50">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/40 blur-xl"
+              />
+              <div className="relative flex items-start justify-between gap-3">
+                <div>
+                  <h2
+                    id={titleId}
+                    className="mt-0.5 text-base font-bold text-stone-800"
+                  >
+                    🎁 恋爱宝库
+                  </h2>
+                  <p className="mt-0.5 text-[11px] font-medium text-stone-500">
+                    用攒下的亮晶晶，换一点点甜头
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold text-stone-500"
                 >
-                  小小兑换角
-                </h2>
-                <p className="mt-0.5 text-[11px] text-stone-500">
-                  用攒下的亮晶晶，换一点点甜头
-                </p>
+                  收起
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-full px-2 py-1 text-sm font-medium text-stone-400 transition hover:bg-white/60 hover:text-stone-600"
-              >
-                收起
-              </button>
-            </div>
 
-            <div className="mt-3 flex gap-2 rounded-2xl border border-white/70 bg-white/50 px-3 py-2.5 text-xs backdrop-blur-sm">
-              <span className="flex flex-1 items-center gap-1.5 font-semibold text-stone-700">
-                <span aria-hidden>💎</span>
-                宝石
-                <span className="tabular-nums text-stone-500">
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/90 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
+                  <span aria-hidden>💎</span>
                   {gemStock}/{GEM_CAP}
                 </span>
-              </span>
-              <span className="w-px shrink-0 bg-rose-100/80" aria-hidden />
-              <span className="flex flex-1 items-center gap-1.5 font-semibold text-stone-700">
-                <span aria-hidden>🪙</span>
-                金币
-                <span className="tabular-nums text-stone-500">{coinStock}</span>
-              </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                  <span aria-hidden>🪙</span>
+                  {coinStock}
+                </span>
+              </div>
             </div>
 
-            <div className="mt-3 max-h-[min(52vh,360px)] space-y-2 overflow-y-auto overscroll-contain pb-2 pt-1">
-              {REDEEM_ITEMS.map((item) => {
-                const affordable = canAfford(item);
-                return (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-white/70 bg-white/55 p-3 shadow-sm backdrop-blur-sm"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-100/90 to-amber-100/80 text-lg"
-                        aria-hidden
-                      >
-                        {item.icon}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold leading-snug text-stone-800">
-                          {item.title}
-                        </p>
-                        <p className="mt-1 text-[11px] font-medium text-stone-500">
-                          {item.priceGems != null && item.priceCoins != null
-                            ? `需要 ${item.priceGems} 颗宝石 · ${item.priceCoins} 枚金币`
-                            : item.priceGems != null
-                              ? `需要 ${item.priceGems} 颗宝石`
-                              : item.priceCoins != null
-                                ? `需要 ${item.priceCoins} 枚金币`
-                                : null}
-                        </p>
+            <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pb-1">
+              <section className="space-y-2">
+                <p className="px-1 text-[11px] font-semibold tracking-wide text-amber-700/80">
+                  🪙 金币大餐
+                </p>
+                {coinItems.map((item) => {
+                  const affordable = canAfford(item);
+                  return (
+                    <div key={item.id} className="ui-card-soft p-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-gradient-to-br from-amber-100/90 to-orange-100/80 text-lg"
+                          aria-hidden
+                        >
+                          {item.icon}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-semibold text-stone-800">
+                            {item.title}
+                          </p>
+                          <p className="text-[10px] font-medium text-stone-500">
+                            {ITEM_HINT[item.id]}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/85 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                            <span aria-hidden>🪙</span>
+                            {item.priceCoins}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={!affordable}
+                            onClick={() => onRedeem(item)}
+                            className="ui-button-secondary px-3 py-1 text-[11px] font-semibold text-stone-600 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            {affordable ? "兑换" : "差一点"}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      disabled={!affordable}
-                      onClick={() => onRedeem(item)}
-                      className="mt-2.5 w-full rounded-xl border border-rose-100/80 bg-rose-50/60 py-2 text-xs font-bold text-rose-700 transition enabled:hover:border-rose-200 enabled:hover:bg-rose-100/50 enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      {affordable ? "兑换" : "资源不够啦"}
-                    </button>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </section>
+
+              <section className="space-y-2">
+                <p className="px-1 text-[11px] font-semibold tracking-wide text-fuchsia-700/80">
+                  💎 宝石小甜头
+                </p>
+                {gemItems.map((item) => {
+                  const affordable = canAfford(item);
+                  return (
+                    <div key={item.id} className="ui-card-soft p-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/80 bg-gradient-to-br from-fuchsia-100/90 to-rose-100/80 text-lg"
+                          aria-hidden
+                        >
+                          {item.icon}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-semibold text-stone-800">
+                            {item.title}
+                          </p>
+                          <p className="text-[10px] font-medium text-stone-500">
+                            {ITEM_HINT[item.id]}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/85 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
+                            <span aria-hidden>💎</span>
+                            {item.priceGems}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={!affordable}
+                            onClick={() => onRedeem(item)}
+                            className="ui-button-secondary px-3 py-1 text-[11px] font-semibold text-stone-600 disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            {affordable ? "兑换" : "差一点"}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
             </div>
           </div>
         </div>

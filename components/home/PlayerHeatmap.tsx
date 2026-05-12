@@ -40,51 +40,61 @@ export function PlayerHeatmap({
   playerShort: string;
   grid: MonthGrid;
 }) {
-  const colCount = grid.length;
-
   return (
-    <div className="rounded-2xl border border-emerald-100/60 bg-white/55 p-3 shadow-md shadow-emerald-100/30 backdrop-blur-sm sm:p-4">
+    <div className="ui-card-soft p-3 sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-sm font-bold text-stone-800">{title}</h3>
-          <p className="text-[11px] text-stone-500">{subtitle}</p>
+          <h3 className="text-[13px] font-bold tracking-wide text-stone-800">{title}</h3>
+          <p className="text-[11px] font-medium text-stone-500">{subtitle}</p>
         </div>
-        <span className="text-lg opacity-90" aria-hidden>
+        <span className="text-base opacity-90" aria-hidden>
           {playerShort}
         </span>
       </div>
 
-      <div
-        className="mt-3 grid w-full gap-x-1 gap-y-1 sm:gap-x-1.5 sm:gap-y-1.5"
-        style={{
-          gridTemplateColumns: `0.65rem repeat(${colCount}, minmax(0, 1fr))`,
-        }}
-      >
-        {weekdayLabels.map((label, rowIndex) => (
-          <div key={label} className="contents">
-            <div className="flex items-center justify-end pr-0.5 text-[9px] font-semibold leading-none text-stone-400 sm:text-[10px]">
+      <div className="mt-3 space-y-1.5 sm:space-y-2">
+        <div
+          className="grid items-center gap-x-1 sm:gap-x-1.5"
+          style={{ gridTemplateColumns: "2.9rem repeat(7, minmax(0, 1fr))" }}
+        >
+          <div className="text-[10px] font-semibold text-stone-400"> </div>
+          {weekdayLabels.map((label) => (
+            <div
+              key={`weekday-${label}`}
+              className="text-center text-[10px] font-semibold text-stone-400 sm:text-[11px]"
+            >
               {label}
             </div>
-            {grid.map((week, wi) => {
-              const cell = week[rowIndex];
-              return cell ? (
-                <HeatmapCell
-                  key={`${wi}-${rowIndex}`}
-                  level={cell.level}
-                  exercise={cell.exercise}
-                  title={buildCellTitle(
+          ))}
+        </div>
+
+        {grid.map((week, weekIndex) => (
+          <div
+            key={`week-${weekIndex}`}
+            className="grid items-center gap-x-1 sm:gap-x-1.5"
+            style={{ gridTemplateColumns: "2.9rem repeat(7, minmax(0, 1fr))" }}
+          >
+            <div className="pr-1 text-[10px] font-semibold text-stone-400 sm:text-[11px]">
+              第{weekIndex + 1}周
+            </div>
+            {week.map((cell, dayIndex) => {
+              const level = cell?.level ?? "none";
+              const exercise = cell?.exercise ?? "none";
+              const title = cell
+                ? buildCellTitle(
                     playerShort,
-                    wi,
-                    rowIndex,
+                    weekIndex,
+                    dayIndex,
                     cell.level,
                     cell.exercise !== "none",
-                  )}
-                />
-              ) : (
-                <div
-                  key={`${wi}-${rowIndex}`}
-                  className="mx-auto h-3 w-full max-w-[18px] rounded-[3px] sm:h-4 sm:max-w-[22px]"
-                  aria-hidden
+                  )
+                : `${playerShort} · 补齐日期 · 周${weekdayLabels[dayIndex]} · 热量缺口未完成 · 未记录运动`;
+              return (
+                <HeatmapCell
+                  key={`${weekIndex}-${dayIndex}`}
+                  level={level}
+                  exercise={exercise}
+                  title={title}
                 />
               );
             })}
