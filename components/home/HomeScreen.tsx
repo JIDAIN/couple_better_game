@@ -3,6 +3,7 @@ import { DualMonthlyHeatmaps } from "./DualMonthlyHeatmaps";
 import { EncouragementQuote } from "./EncouragementQuote";
 import { ExchangeShop } from "./ExchangeShop";
 import { GameTitle } from "./GameTitle";
+import { GrowthLog } from "./GrowthLog";
 import { HomeResourcesProvider } from "./HomeResourcesProvider";
 import { RecordTodayButton } from "./RecordTodayButton";
 
@@ -34,7 +35,11 @@ export function HomeScreen() {
 
           <RecordTodayButton />
 
-          <ExchangeShop />
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <GrowthLog />
+
+            <ExchangeShop />
+          </div>
         </div>
       </div>
     </HomeResourcesProvider>

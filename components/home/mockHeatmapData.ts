@@ -18,10 +18,6 @@ export type WeekColumn = (HeatmapDay | null)[];
 /** 每列 = 一周（周六→周五），共 6 列 */
 export type MonthGrid = WeekColumn[];
 
-function pick<T>(arr: T[], i: number): T {
-  return arr[i % arr.length]!;
-}
-
 /** 将按 5 月 1 日→31 日顺序的 31 个格子，填入周六起始的月历网格 */
 function scatterIntoMay2026Grid(daysMay1To31: HeatmapDay[]): MonthGrid {
   const cols: MonthGrid = MAY_2026_SAT_START_DAY_GRID.map((column) =>
@@ -38,42 +34,13 @@ function scatterIntoMay2026Grid(daysMay1To31: HeatmapDay[]): MonthGrid {
   return cols;
 }
 
-/** 31 天示例：🐟 偏稳、绿色多 */
-const fishDays31: HeatmapDay[] = Array.from({ length: 31 }, (_, i) => {
-  const cycle: HeatmapDay[] = [
-    { level: "ok", exercise: "run" },
-    { level: "good", exercise: "none" },
-    { level: "good", exercise: "run" },
-    { level: "ok", exercise: "none" },
-    { level: "perfect", exercise: "run" },
-    { level: "good", exercise: "intense" },
-    { level: "ok", exercise: "run" },
-    { level: "none", exercise: "none" },
-    { level: "good", exercise: "run" },
-    { level: "ok", exercise: "none" },
-  ];
-  return pick(cycle, i + 2);
-});
+const emptyDays31: HeatmapDay[] = Array.from({ length: 31 }, () => ({
+  level: "none",
+  exercise: "none",
+}));
 
-/** 31 天示例：🐱 波动大、金色略多 */
-const catDays31: HeatmapDay[] = Array.from({ length: 31 }, (_, i) => {
-  const cycle: HeatmapDay[] = [
-    { level: "good", exercise: "run" },
-    { level: "perfect", exercise: "intense" },
-    { level: "ok", exercise: "none" },
-    { level: "good", exercise: "none" },
-    { level: "perfect", exercise: "run" },
-    { level: "good", exercise: "intense" },
-    { level: "none", exercise: "none" },
-    { level: "ok", exercise: "run" },
-    { level: "good", exercise: "run" },
-    { level: "good", exercise: "intense" },
-  ];
-  return pick(cycle, i + 5);
-});
-
-export const fishMonthGrid: MonthGrid = scatterIntoMay2026Grid(fishDays31);
-export const catMonthGrid: MonthGrid = scatterIntoMay2026Grid(catDays31);
+export const fishMonthGrid: MonthGrid = scatterIntoMay2026Grid(emptyDays31);
+export const catMonthGrid: MonthGrid = scatterIntoMay2026Grid(emptyDays31);
 
 export function may2026DayLabel(weekIndex: number, rowIndex: number): string | null {
   const dom = MAY_2026_SAT_START_DAY_GRID[weekIndex]?.[rowIndex];

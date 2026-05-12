@@ -61,18 +61,18 @@ type ProviderProps = {
 
 export function HomeResourcesProvider({
   children,
-  initialGems = 24,
-  initialCoins = 156,
+  initialGems = 0,
+  initialCoins = 0,
 }: ProviderProps) {
   const [wallet, setWallet] = useState<Wallet>({
     gems: initialGems,
     coins: initialCoins,
   });
-  const [streakDays, setStreakDays] = useState(5);
-  const [todayFishGems, setTodayFishGems] = useState(2);
-  const [todayCatGems, setTodayCatGems] = useState(1);
-  const [weekGemTotal, setWeekGemTotal] = useState(12);
-  const [weekCoinTotal, setWeekCoinTotal] = useState(8);
+  const [streakDays, setStreakDays] = useState(0);
+  const [todayFishGems, setTodayFishGems] = useState(0);
+  const [todayCatGems, setTodayCatGems] = useState(0);
+  const [weekGemTotal, setWeekGemTotal] = useState(0);
+  const [weekCoinTotal, setWeekCoinTotal] = useState(0);
   const [fishHeatmapOverrides, setFishHeatmapOverrides] =
     useState<HeatmapDayOverrides>({});
   const [catHeatmapOverrides, setCatHeatmapOverrides] =
