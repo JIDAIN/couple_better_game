@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fff7f5;
+  --foreground: #44403c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-nunito), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+@keyframes card-breathe {
+  0%,
+  100% {
+    box-shadow: 0 10px 28px rgba(251, 207, 232, 0.28);
+  }
+  50% {
+    box-shadow: 0 14px 36px rgba(253, 224, 200, 0.42);
+  }
+}
+
+.animate-card-breathe {
+  animation: card-breathe 5.5s ease-in-out infinite;
+}
