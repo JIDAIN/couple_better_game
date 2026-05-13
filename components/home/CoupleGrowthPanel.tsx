@@ -75,10 +75,11 @@ export function CoupleGrowthPanel() {
     streakDays,
     todayFishGems,
     todayCatGems,
+    todayBonusGems,
     weekGemTotal,
     weekCoinTotal,
   } = useHomeResources();
-  const todayGemSum = todayFishGems + todayCatGems;
+  const todayGemSum = todayFishGems + todayCatGems + todayBonusGems;
 
   return (
     <section

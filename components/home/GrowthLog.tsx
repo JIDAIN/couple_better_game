@@ -1,58 +1,12 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import {
+  useHomeResources,
+  type DailyRecord,
+} from "./HomeResourcesProvider";
 
-type GrowthLogEntry = {
-  id: string;
-  date: string;
-  fish: {
-    deficit: number;
-    minutes: number;
-    gems: number;
-  };
-  cat: {
-    deficit: number;
-    minutes: number;
-    gems: number;
-  };
-  bonus: number;
-  coins: number;
-};
-
-const MOCK_LOGS: GrowthLogEntry[] = [
-  {
-    id: "may-12",
-    date: "5月12日",
-    fish: { deficit: 420, minutes: 35, gems: 4 },
-    cat: { deficit: 360, minutes: 28, gems: 4 },
-    bonus: 2,
-    coins: 2,
-  },
-  {
-    id: "may-11",
-    date: "5月11日",
-    fish: { deficit: 310, minutes: 20, gems: 3 },
-    cat: { deficit: 260, minutes: 18, gems: 2 },
-    bonus: 0,
-    coins: 1,
-  },
-  {
-    id: "may-10",
-    date: "5月10日",
-    fish: { deficit: 520, minutes: 45, gems: 5 },
-    cat: { deficit: 410, minutes: 32, gems: 4 },
-    bonus: 2,
-    coins: 3,
-  },
-  {
-    id: "may-09",
-    date: "5月9日",
-    fish: { deficit: 180, minutes: 12, gems: 1 },
-    cat: { deficit: 220, minutes: 16, gems: 2 },
-    bonus: 0,
-    coins: 0,
-  },
-];
+type GrowthLogEntry = DailyRecord;
 
 function totalGems(entry: GrowthLogEntry) {
   return entry.fish.gems + entry.cat.gems + entry.bonus;
@@ -207,6 +161,14 @@ function DetailSheet({
 }
 
 export function GrowthLog() {
+  const { dailyRecords } = useHomeResources();
+  const sortedRecords = useMemo(
+    () =>
+      [...dailyRecords].sort((a, b) =>
+        (b.recordDate ?? "").localeCompare(a.recordDate ?? ""),
+      ),
+    [dailyRecords],
+  );
   const [open, setOpen] = useState(false);
   const [sheetEnter, setSheetEnter] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<GrowthLogEntry | null>(
@@ -321,9 +283,9 @@ export function GrowthLog() {
             </div>
 
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
-              {MOCK_LOGS.length > 0 ? (
+              {sortedRecords.length > 0 ? (
                 <div className="space-y-2">
-                  {MOCK_LOGS.map((entry) => (
+                  {sortedRecords.map((entry) => (
                     <LogCard
                       key={entry.id}
                       entry={entry}

@@ -1,13 +1,28 @@
 import type { ExerciseTag, HeatLevel, HeatmapDay } from "./types";
 
-/** 单侧当日输入（用于预览与结算） */
+export const GEM_CAP = 50;
+
+export type PersonKey = "fish" | "cat";
+
 export type SideLogInput = {
-  /** 有填体重则为数字，未填为 null */
   weightKg: number | null;
-  /** 热量缺口 kcal，允许 0 */
   deficit: number;
-  /** 运动时长（分钟） */
   minutes: number;
+};
+
+export type PreviousDailyRecord = {
+  day: number;
+  fish: Pick<SideLogInput, "deficit" | "minutes">;
+  cat: Pick<SideLogInput, "deficit" | "minutes">;
+};
+
+export type CoinRuleContext = {
+  fish: SideLogInput;
+  cat: SideLogInput;
+  todayDay: number;
+  todayGemTotal: number;
+  currentWeekGemTotal: number;
+  dailyRecords: PreviousDailyRecord[];
 };
 
 export function parseOptionalWeight(raw: string): number | null {
@@ -23,7 +38,60 @@ export function parseNonNegativeInt(raw: string, fallback = 0): number {
   return Math.floor(n);
 }
 
-/** 热力图：缺口完成度 */
+export function hasDeficit(input: SideLogInput) {
+  return input.deficit > 0;
+}
+
+export function gemsFromDeficit(person: PersonKey, deficit: number): number {
+  if (person === "fish") {
+    if (deficit >= 500) return 4;
+    if (deficit >= 300) return 2;
+    if (deficit >= 200) return 1;
+    return 0;
+  }
+
+  if (deficit >= 200) return 2;
+  if (deficit >= 100) return 1;
+  return 0;
+}
+
+export function gemsFromExercise(
+  person: PersonKey,
+  minutes: number,
+  personHasDeficit: boolean,
+): number {
+  if (person === "fish") {
+    return minutes >= 30 ? 1 : 0;
+  }
+
+  if (!personHasDeficit) return 0;
+  if (minutes >= 60) return 2;
+  if (minutes >= 30) return 1;
+  return 0;
+}
+
+export function computeRecoveryBonus(
+  person: PersonKey,
+  todayInput: SideLogInput,
+  yesterdayRecord?: PreviousDailyRecord | null,
+): number {
+  if (!hasDeficit(todayInput) || !yesterdayRecord) return 0;
+  return yesterdayRecord[person].minutes >= 30 ? 1 : 0;
+}
+
+export function gemsForPerson(
+  person: PersonKey,
+  input: SideLogInput,
+  yesterdayRecord?: PreviousDailyRecord | null,
+): number {
+  const personHasDeficit = hasDeficit(input);
+  return (
+    gemsFromDeficit(person, input.deficit) +
+    gemsFromExercise(person, input.minutes, personHasDeficit) +
+    computeRecoveryBonus(person, input, yesterdayRecord)
+  );
+}
+
 export function heatLevelFromDeficit(deficit: number): HeatLevel {
   if (deficit <= 0) return "none";
   if (deficit < 280) return "ok";
@@ -31,7 +99,6 @@ export function heatLevelFromDeficit(deficit: number): HeatLevel {
   return "perfect";
 }
 
-/** 热力图：运动角标 */
 export function exerciseTagFromMinutes(minutes: number): ExerciseTag {
   if (minutes <= 0) return "none";
   if (minutes < 40) return "run";
@@ -45,23 +112,6 @@ export function buildHeatmapDay(input: SideLogInput): HeatmapDay {
   };
 }
 
-/**
- * 单人宝石：缺口档 + 运动档 + 可选体重打卡
- * （轻量游戏规则，便于以后替换为真实算法）
- */
-export function gemsForPerson(input: SideLogInput): number {
-  let g = 0;
-  if (input.deficit > 0) {
-    if (input.deficit < 220) g += 1;
-    else if (input.deficit < 420) g += 2;
-    else g += 3;
-  }
-  if (input.minutes >= 1) g += input.minutes < 28 ? 1 : 2;
-  if (input.weightKg != null) g += 1;
-  return g;
-}
-
-/** 五月结算日：真实日历在 2026/5 时用当天；否则用 11 号 demo */
 export function getMaySettlementDay(): number {
   const d = new Date();
   if (d.getFullYear() === 2026 && d.getMonth() === 4) return d.getDate();
@@ -70,54 +120,103 @@ export function getMaySettlementDay(): number {
 
 export type CoupleBonusResult = {
   gems: number;
-  /** 展示用标签 */
   reasons: string[];
 };
 
-/** 满足「一起动」或「双人缺口达标」其一即给一次情侣加成 */
 export function computeCoupleBonus(
   fish: SideLogInput,
   cat: SideLogInput,
 ): CoupleBonusResult {
-  const moveTogether = fish.minutes >= 20 && cat.minutes >= 20;
-  const deficitTogether = fish.deficit >= 300 && cat.deficit >= 300;
-  if (!moveTogether && !deficitTogether) {
+  if (fish.minutes < 30 || cat.minutes < 30) {
     return { gems: 0, reasons: [] };
   }
-  const reasons: string[] = [];
-  if (moveTogether) reasons.push("一起运动");
-  if (deficitTogether) reasons.push("双人达标");
-  return { gems: 2, reasons };
+
+  return {
+    gems: 2,
+    reasons: ["一起运动：双方各 +1，共 +2"],
+  };
 }
 
 export type CoinPreview = {
   delta: number;
-  /** 简短提示文案 */
   hint: string;
 };
 
-export function computeCoinPreview(
-  fish: SideLogInput,
-  cat: SideLogInput,
-  coupleBonusActive: boolean,
-): CoinPreview {
+function bothHaveDeficit(record: PreviousDailyRecord) {
+  return record.fish.deficit > 0 && record.cat.deficit > 0;
+}
+
+function bothExercised(record: PreviousDailyRecord) {
+  return record.fish.minutes >= 30 && record.cat.minutes >= 30;
+}
+
+function recordsInCurrentWeek(
+  records: PreviousDailyRecord[],
+  todayDay: number,
+) {
+  const weekStartDay = todayDay - ((todayDay - 1) % 7);
+  return records.filter(
+    (record) => record.day >= weekStartDay && record.day < todayDay,
+  );
+}
+
+function countDeficitStreakBeforeToday(
+  records: PreviousDailyRecord[],
+  todayDay: number,
+) {
+  let streak = 0;
+  for (let day = todayDay - 1; day >= 1; day -= 1) {
+    const record = records.find((item) => item.day === day);
+    if (!record || !bothHaveDeficit(record)) break;
+    streak += 1;
+  }
+  return streak;
+}
+
+export function computeCoinPreview({
+  fish,
+  cat,
+  todayDay,
+  todayGemTotal,
+  currentWeekGemTotal,
+  dailyRecords,
+}: CoinRuleContext): CoinPreview {
   let delta = 0;
   const bits: string[] = [];
-  if (coupleBonusActive) {
+  const nextWeekGemTotal = currentWeekGemTotal + todayGemTotal;
+
+  if (currentWeekGemTotal < 30 && nextWeekGemTotal >= 30) {
     delta += 1;
-    bits.push("同频小彩头 +1");
+    bits.push("本周新增宝石达到 30：+1");
   }
-  const doubleSpark =
-    fish.deficit >= 520 &&
-    cat.deficit >= 520 &&
-    fish.minutes >= 32 &&
-    cat.minutes >= 32;
-  if (doubleSpark) {
+
+  if (currentWeekGemTotal < 50 && nextWeekGemTotal >= 50) {
     delta += 1;
-    bits.push("双星闪耀 +1");
+    bits.push("本周新增宝石达到 50：再 +1");
   }
+
+  const todayBothHaveDeficit = fish.deficit > 0 && cat.deficit > 0;
+  const deficitStreak = todayBothHaveDeficit
+    ? countDeficitStreakBeforeToday(dailyRecords, todayDay) + 1
+    : 0;
+  if (deficitStreak === 5) {
+    delta += 1;
+    bits.push("双人连续 5 天热量缺口打卡：+1");
+  }
+
+  const weekRecords = recordsInCurrentWeek(dailyRecords, todayDay);
+  const previousTogetherExerciseCount = weekRecords.filter(bothExercised).length;
+  const todayTogetherExercise = fish.minutes >= 30 && cat.minutes >= 30;
+  const nextTogetherExerciseCount =
+    previousTogetherExerciseCount + (todayTogetherExercise ? 1 : 0);
+  if (previousTogetherExerciseCount < 2 && nextTogetherExerciseCount >= 2) {
+    delta += 1;
+    bits.push("本周一起运动达到 2 次：+1");
+  }
+
   if (delta === 0) {
-    return { delta: 0, hint: "本日暂无额外金币触发" };
+    return { delta: 0, hint: "本日暂未触发金币规则" };
   }
+
   return { delta, hint: bits.join(" · ") };
 }

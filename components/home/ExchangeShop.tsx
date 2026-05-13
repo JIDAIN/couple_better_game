@@ -1,28 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { GEM_CAP, useHomeResources } from "./HomeResourcesProvider";
-
-type ResourceKind = "gem" | "coin";
-
-type ExchangeCategory = {
-  id: string;
-  title: string;
-  icon: string;
-  description: string;
-  resourceKind: ResourceKind;
-  price: number;
-};
-
-type ExchangeRecord = {
-  id: string;
-  date: string;
-  category: string;
-  remark: string;
-  resourceKind: ResourceKind;
-  price: number;
-  icon: string;
-};
+import {
+  GEM_CAP,
+  useHomeResources,
+  type ExchangeCategory,
+  type ResourceKind,
+} from "./HomeResourcesProvider";
 
 type CategoryFormState = {
   title: string;
@@ -37,87 +21,6 @@ type OverlayState =
   | { kind: "history" }
   | { kind: "category"; categoryId: string | null }
   | null;
-
-const DEFAULT_CATEGORIES: ExchangeCategory[] = [
-  {
-    id: "snack",
-    title: "零食",
-    icon: "🍦",
-    description: "小口甜甜，轻轻奖励一下",
-    resourceKind: "gem",
-    price: 5,
-  },
-  {
-    id: "drink",
-    title: "饮料",
-    icon: "🧋",
-    description: "想喝点喜欢的，就记这一笔",
-    resourceKind: "gem",
-    price: 8,
-  },
-  {
-    id: "double-drink",
-    title: "双份饮料",
-    icon: "🧋",
-    description: "双人份快乐，备注里写清楚就好",
-    resourceKind: "gem",
-    price: 15,
-  },
-  {
-    id: "dinner",
-    title: "大餐",
-    icon: "🍲",
-    description: "热乎乎的一顿，适合记账",
-    resourceKind: "coin",
-    price: 4,
-  },
-  {
-    id: "deluxe-dinner",
-    title: "豪华大餐",
-    icon: "🍖",
-    description: "更丰盛一点，像周末的小奖励",
-    resourceKind: "coin",
-    price: 8,
-  },
-  {
-    id: "family",
-    title: "家庭放纵餐",
-    icon: "🏡",
-    description: "给特殊时刻留一笔温柔的奖励",
-    resourceKind: "gem",
-    price: 15,
-  },
-];
-
-const MOCK_REDEEM_RECORDS: ExchangeRecord[] = [
-  {
-    id: "record-1",
-    date: "5月12日",
-    category: "零食",
-    remark: "雪糕",
-    resourceKind: "gem",
-    price: 5,
-    icon: "🍦",
-  },
-  {
-    id: "record-2",
-    date: "5月11日",
-    category: "大餐",
-    remark: "火锅",
-    resourceKind: "coin",
-    price: 4,
-    icon: "🍲",
-  },
-  {
-    id: "record-3",
-    date: "5月10日",
-    category: "双份饮料",
-    remark: "DQ 暴风雪",
-    resourceKind: "gem",
-    price: 15,
-    icon: "🧋",
-  },
-];
 
 const SHOP_SUBTITLE_OPTIONS = [
   "把努力变成一起期待的小快乐",
@@ -171,13 +74,19 @@ function getCategoryChipClass(kind: ResourceKind) {
 }
 
 export function ExchangeShop() {
-  const { gemStock, coinStock, tryRedeem } = useHomeResources();
+  const {
+    gemStock,
+    coinStock,
+    redeemExchange,
+    exchangeRecords,
+    exchangeCategories: categories,
+    upsertExchangeCategory,
+    deleteExchangeCategory,
+  } = useHomeResources();
   const [open, setOpen] = useState(false);
   const [sheetEnter, setSheetEnter] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mode, setMode] = useState<"browse" | "manage">("browse");
-  const [categories, setCategories] =
-    useState<ExchangeCategory[]>(DEFAULT_CATEGORIES);
   const [overlay, setOverlay] = useState<OverlayState>(null);
   const [overlayEnter, setOverlayEnter] = useState(false);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(
@@ -313,37 +222,33 @@ export function ExchangeShop() {
       price: Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : 1,
     };
 
-    setCategories((prev) => {
-      if (overlay?.kind === "category" && overlay.categoryId) {
-        return prev.map((item) =>
-          item.id === overlay.categoryId ? nextCategory : item,
-        );
-      }
-      return [nextCategory, ...prev];
-    });
+    upsertExchangeCategory(nextCategory);
     closeOverlay();
-  }, [categoryForm, closeOverlay, overlay]);
+  }, [categoryForm, closeOverlay, overlay, upsertExchangeCategory]);
 
   const deleteCategory = useCallback((categoryId: string) => {
-    setCategories((prev) => prev.filter((item) => item.id !== categoryId));
-  }, []);
+    deleteExchangeCategory(categoryId);
+  }, [deleteExchangeCategory]);
 
   const confirmRedeem = useCallback(() => {
     if (!selectedCategory) return;
-    const ok = tryRedeem({
-      gems: selectedCategory.resourceKind === "gem" ? selectedCategory.price : 0,
-      coins: selectedCategory.resourceKind === "coin" ? selectedCategory.price : 0,
+    const note = remark.trim();
+    const ok = redeemExchange({
+      category: selectedCategory.title,
+      remark: note,
+      resourceKind: selectedCategory.resourceKind,
+      price: selectedCategory.price,
+      icon: selectedCategory.icon,
     });
     if (!ok) return;
 
-    const note = remark.trim();
     setToast(
       note
         ? `已兑换：${selectedCategory.title} · ${note} ✨`
         : `已兑换：${selectedCategory.title} ✨`,
     );
     closeOverlay();
-  }, [closeOverlay, remark, selectedCategory, tryRedeem]);
+  }, [closeOverlay, redeemExchange, remark, selectedCategory]);
 
   const canAfford = useCallback(
     (category: ExchangeCategory) => {
@@ -550,22 +455,29 @@ export function ExchangeShop() {
             </div>
 
             <div className="mt-3 space-y-2">
-              {MOCK_REDEEM_RECORDS.map((record) => (
-                <article
-                  key={record.id}
-                  className="rounded-[1.1rem] border border-white/75 bg-white/58 px-3 py-3 shadow-sm shadow-stone-100/30"
-                >
-                  <p className="text-[11px] font-semibold tracking-wide text-stone-400">
-                    {record.date}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-stone-700">
-                    {record.icon} {record.category} · {record.remark}
-                  </p>
-                  <p className="mt-1 text-[11px] font-semibold text-stone-500">
-                    消耗 {record.price} {resourceLabel(record.resourceKind)}
-                  </p>
-                </article>
-              ))}
+              {exchangeRecords.length > 0 ? (
+                exchangeRecords.map((record) => (
+                  <article
+                    key={record.id}
+                    className="rounded-[1.1rem] border border-white/75 bg-white/58 px-3 py-3 shadow-sm shadow-stone-100/30"
+                  >
+                    <p className="text-[11px] font-semibold tracking-wide text-stone-400">
+                      {record.date}
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-stone-700">
+                      {record.icon} {record.category}
+                      {record.remark ? ` · ${record.remark}` : ""}
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold text-stone-500">
+                      消耗 {record.price} {resourceLabel(record.resourceKind)}
+                    </p>
+                  </article>
+                ))
+              ) : (
+                <div className="rounded-[1.1rem] border border-white/75 bg-white/58 px-3 py-5 text-center text-xs font-semibold text-stone-500 shadow-sm shadow-stone-100/30">
+                  还没有兑换记录，攒到喜欢的奖励再来换一笔。
+                </div>
+              )}
             </div>
           </div>
         </div>
