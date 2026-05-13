@@ -35,7 +35,7 @@ export function HomeScreen() {
 
           <RecordTodayButton />
 
-          <div className="flex flex-col items-center gap-2 pt-1">
+          <div className="flex w-full flex-col gap-2 pt-1">
             <GrowthLog />
 
             <ExchangeShop />

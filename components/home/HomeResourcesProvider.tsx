@@ -111,7 +111,7 @@ type ExchangeRedeemPayload = {
   icon: string;
 };
 
-type HomeResourcesState = {
+export type HomeResourcesState = {
   wallet: Wallet;
   streakDays: number;
   todayFishGems: number;
@@ -201,6 +201,46 @@ const DEFAULT_EXCHANGE_CATEGORIES: ExchangeCategory[] = [
   },
 ];
 
+const MAY_HISTORY_ROWS = [
+  {
+    day: 6,
+    fish: { deficit: 525, minutes: 0 },
+    cat: { deficit: 284, minutes: 0 },
+  },
+  {
+    day: 7,
+    fish: { deficit: 501, minutes: 60 },
+    cat: { deficit: 236, minutes: 60 },
+  },
+  {
+    day: 8,
+    fish: { deficit: 871, minutes: 0 },
+    cat: { deficit: 405, minutes: 0 },
+  },
+  {
+    day: 9,
+    fish: { deficit: 565, minutes: 0 },
+    cat: { deficit: 89, minutes: 0 },
+  },
+  {
+    day: 10,
+    fish: { deficit: 681, minutes: 0 },
+    cat: { deficit: 405, minutes: 0 },
+  },
+  {
+    day: 11,
+    fish: { deficit: 508, minutes: 0 },
+    cat: { deficit: 200, minutes: 0 },
+  },
+  {
+    day: 12,
+    fish: { deficit: 317, minutes: 0 },
+    cat: { deficit: 244, minutes: 0 },
+  },
+] as const;
+
+const MAY_HISTORY_IMPORT_PREFIX = "seed-may-history";
+
 const HomeResourcesContext = createContext<HomeResourcesContextValue | null>(
   null,
 );
@@ -257,10 +297,14 @@ function readLocalState(
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fallback;
+    if (!raw) {
+      const imported = importMayHistoryRecords(fallback);
+      writeLocalState(imported);
+      return imported;
+    }
     const parsed = JSON.parse(raw) as Partial<HomeResourcesState>;
 
-    return {
+    const restored: HomeResourcesState = {
       wallet: {
         gems: safeNumber(parsed.wallet?.gems, fallback.wallet.gems),
         coins: safeNumber(parsed.wallet?.coins, fallback.wallet.coins),
@@ -285,8 +329,13 @@ function readLocalState(
         ? parsed.exchangeCategories
         : fallback.exchangeCategories,
     };
+    const imported = importMayHistoryRecords(restored);
+    writeLocalState(imported);
+    return imported;
   } catch {
-    return fallback;
+    const imported = importMayHistoryRecords(fallback);
+    writeLocalState(imported);
+    return imported;
   }
 }
 
@@ -428,6 +477,106 @@ function sumRecordGems(records: DailyRecord[]) {
 
 function sumRecordCoins(records: DailyRecord[]) {
   return records.reduce((total, record) => total + record.coins, 0);
+}
+
+export function importMayHistoryRecords(
+  state: HomeResourcesState,
+): HomeResourcesState {
+  const importDates = new Set(
+    MAY_HISTORY_ROWS.map((row) => isoDateFromMayDay(row.day)),
+  );
+  const baseRecords = state.dailyRecords.filter(
+    (record) => !importDates.has(recordIsoDate(record)),
+  );
+  const oldImportRecords = state.dailyRecords.filter((record) =>
+    importDates.has(recordIsoDate(record)),
+  );
+
+  let workingRecords = orderDailyRecords(baseRecords);
+  const importedRecords: DailyRecord[] = [];
+
+  for (const row of MAY_HISTORY_ROWS) {
+    const recordDate = isoDateFromMayDay(row.day);
+    const previousDate = previousIsoDate(recordDate);
+    const yesterdayRecord = previousDate
+      ? findRecordByIso(workingRecords, previousDate)
+      : null;
+    const fishInput: SideLogInput = {
+      weightKg: null,
+      deficit: row.fish.deficit,
+      minutes: row.fish.minutes,
+    };
+    const catInput: SideLogInput = {
+      weightKg: null,
+      deficit: row.cat.deficit,
+      minutes: row.cat.minutes,
+    };
+    const fishGems = gemsForPerson("fish", fishInput, yesterdayRecord);
+    const catGems = gemsForPerson("cat", catInput, yesterdayRecord);
+    const couple = computeCoupleBonus(fishInput, catInput);
+    const todayGemTotal = fishGems + catGems + couple.gems;
+    const coin = computeCoinPreview({
+      fish: fishInput,
+      cat: catInput,
+      todayDay: row.day,
+      todayGemTotal,
+      currentWeekGemTotal: sumRecordGems(workingRecords),
+      dailyRecords: workingRecords,
+    });
+
+    const record: DailyRecord = {
+      id: `${MAY_HISTORY_IMPORT_PREFIX}-${recordDate}`,
+      date: formatRecordDateFromIso(recordDate),
+      recordDate,
+      createdAt: `${recordDate}T12:00:00.000Z`,
+      day: row.day,
+      fish: {
+        ...fishInput,
+        gems: fishGems,
+      },
+      cat: {
+        ...catInput,
+        gems: catGems,
+      },
+      bonus: couple.gems,
+      coins: coin.delta,
+      fishHeat: buildHeatmapDay(fishInput),
+      catHeat: buildHeatmapDay(catInput),
+    };
+
+    importedRecords.push(record);
+    workingRecords = orderDailyRecords([record, ...workingRecords]);
+  }
+
+  const nextRecords = orderDailyRecords([...importedRecords, ...baseRecords]);
+  const oldGemTotal = sumRecordGems(oldImportRecords);
+  const newGemTotal = sumRecordGems(importedRecords);
+  const oldCoinTotal = sumRecordCoins(oldImportRecords);
+  const newCoinTotal = sumRecordCoins(importedRecords);
+  const todayRecord = findRecordByIso(
+    nextRecords,
+    isoDateFromMayDay(getMaySettlementDay()),
+  );
+
+  return {
+    ...state,
+    wallet: {
+      gems: Math.min(
+        GEM_CAP,
+        Math.max(0, state.wallet.gems - oldGemTotal + newGemTotal),
+      ),
+      coins: Math.max(0, state.wallet.coins - oldCoinTotal + newCoinTotal),
+    },
+    todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
+    todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
+    todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
+    weekGemTotal: sumRecordGems(nextRecords),
+    weekCoinTotal: sumRecordCoins(nextRecords),
+    streakDays: deficitStreakEndingAt(nextRecords, getMaySettlementDay()),
+    fishHeatmapOverrides: buildHeatmapOverrides(nextRecords, "fish"),
+    catHeatmapOverrides: buildHeatmapOverrides(nextRecords, "cat"),
+    dailyRecords: nextRecords,
+  };
 }
 
 export function HomeResourcesProvider({

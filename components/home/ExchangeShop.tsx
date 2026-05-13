@@ -766,14 +766,21 @@ export function ExchangeShop() {
 
   return (
     <>
-      <div className="flex justify-center pt-1">
+      <div className="w-full">
         <button
           type="button"
           onClick={openShop}
-          className="ui-button-secondary inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-stone-600"
+          className="ui-button-secondary group flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-stone-600 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:translate-y-0"
         >
-          <span aria-hidden>🎁</span>
-          兑换商店
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <span className="text-base" aria-hidden>
+              🎁
+            </span>
+            <span className="truncate">兑换商店</span>
+          </span>
+          <span className="shrink-0 text-[11px] font-semibold text-stone-400 transition group-hover:text-rose-500">
+            进入
+          </span>
         </button>
       </div>
 
