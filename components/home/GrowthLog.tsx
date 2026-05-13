@@ -5,7 +5,6 @@ import { useEffect, useId, useState } from "react";
 type GrowthLogEntry = {
   id: string;
   date: string;
-  rating: string;
   fish: {
     deficit: number;
     minutes: number;
@@ -22,42 +21,42 @@ type GrowthLogEntry = {
 
 const MOCK_LOGS: GrowthLogEntry[] = [
   {
-    id: "may-11",
-    date: "5月11日",
-    rating: "闪闪发光",
+    id: "may-12",
+    date: "5月12日",
     fish: { deficit: 420, minutes: 35, gems: 4 },
     cat: { deficit: 360, minutes: 28, gems: 4 },
     bonus: 2,
     coins: 2,
   },
   {
-    id: "may-10",
-    date: "5月10日",
-    rating: "稳稳前进",
+    id: "may-11",
+    date: "5月11日",
     fish: { deficit: 310, minutes: 20, gems: 3 },
     cat: { deficit: 260, minutes: 18, gems: 2 },
     bonus: 0,
     coins: 1,
   },
   {
-    id: "may-09",
-    date: "5月9日",
-    rating: "并肩完成",
+    id: "may-10",
+    date: "5月10日",
     fish: { deficit: 520, minutes: 45, gems: 5 },
     cat: { deficit: 410, minutes: 32, gems: 4 },
     bonus: 2,
     coins: 3,
   },
   {
-    id: "may-08",
-    date: "5月8日",
-    rating: "轻盈打卡",
+    id: "may-09",
+    date: "5月9日",
     fish: { deficit: 180, minutes: 12, gems: 1 },
     cat: { deficit: 220, minutes: 16, gems: 2 },
     bonus: 0,
     coins: 0,
   },
 ];
+
+function totalGems(entry: GrowthLogEntry) {
+  return entry.fish.gems + entry.cat.gems + entry.bonus;
+}
 
 function PartnerLine({
   emoji,
@@ -72,24 +71,20 @@ function PartnerLine({
 }) {
   return (
     <div className="rounded-2xl border border-stone-100/80 bg-white/55 px-3 py-2 shadow-inner shadow-stone-100/45">
-      <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-stone-600">
+      <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-stone-500">
         <span>{emoji} 热量缺口</span>
-        <span className="tabular-nums text-stone-800">{deficit} kcal</span>
+        <span className="tabular-nums text-stone-700">{deficit} kcal</span>
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-semibold text-stone-600">
+      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium text-stone-500">
         <span>运动时长</span>
-        <span className="tabular-nums text-stone-800">{minutes} 分钟</span>
+        <span className="tabular-nums text-stone-700">{minutes} 分钟</span>
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-semibold text-rose-500">
+      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium text-stone-500">
         <span>获得宝石</span>
-        <span className="tabular-nums">+{gems}</span>
+        <span className="tabular-nums text-rose-500">+{gems}</span>
       </div>
     </div>
   );
-}
-
-function totalGems(entry: GrowthLogEntry) {
-  return entry.fish.gems + entry.cat.gems + entry.bonus;
 }
 
 function LogCard({
@@ -100,26 +95,24 @@ function LogCard({
   onView: (entry: GrowthLogEntry) => void;
 }) {
   return (
-    <article className="rounded-2xl border border-white/80 bg-white/58 px-3 py-3 shadow-sm shadow-rose-100/35 backdrop-blur-sm">
+    <article className="rounded-[1.2rem] border border-white/70 bg-white/58 px-3 py-3 shadow-sm shadow-rose-100/30 backdrop-blur-sm">
       <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold tracking-wide text-stone-400">
-            {entry.date}
-          </p>
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-            <h3 className="truncate text-sm font-bold text-stone-800">
-              {entry.rating}
-            </h3>
-            <span className="rounded-full border border-amber-200/70 bg-amber-50/70 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-              今日评级
-            </span>
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="h-10 w-1.5 shrink-0 rounded-full bg-gradient-to-b from-rose-100/80 via-stone-200/70 to-amber-100/80" />
+          <div className="min-w-0">
+            <p className="text-[15px] font-semibold tracking-tight text-stone-600">
+              {entry.date}
+            </p>
+            <p className="mt-0.5 text-[11px] font-medium text-stone-400">
+              轻轻记下一笔成长
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <span className="rounded-full border border-rose-100/80 bg-rose-50/65 px-2 py-1 text-[10px] font-bold text-rose-600">
+          <span className="rounded-full border border-rose-100/70 bg-rose-50/70 px-2 py-1 text-[10px] font-semibold text-rose-500">
             💎 +{totalGems(entry)}
           </span>
-          <span className="rounded-full border border-amber-200/75 bg-amber-50/75 px-2 py-1 text-[10px] font-bold text-amber-700">
+          <span className="rounded-full border border-amber-200/70 bg-amber-50/75 px-2 py-1 text-[10px] font-semibold text-amber-500">
             🪙 {entry.coins > 0 ? `+${entry.coins}` : "0"}
           </span>
           <button
@@ -155,14 +148,14 @@ function DetailSheet({
       >
         <div className="flex items-start justify-between gap-3 border-b border-stone-100/80 pb-3">
           <div>
-            <p className="text-[11px] font-bold tracking-wide text-stone-400">
-              {entry.date}
+            <p className="text-[11px] font-semibold tracking-wide text-stone-400">
+              成长记录
             </p>
             <h3
               id={detailTitleId}
-              className="mt-0.5 text-base font-bold text-stone-800"
+              className="mt-0.5 text-lg font-bold tracking-tight text-stone-800"
             >
-              {entry.rating}
+              {entry.date}
             </h3>
           </div>
           <button
@@ -180,15 +173,15 @@ function DetailSheet({
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-2xl border border-rose-100/80 bg-rose-50/55 px-3 py-2">
-            <p className="text-[10px] font-bold text-stone-500">情侣 bonus</p>
-            <p className="mt-1 text-sm font-bold tabular-nums text-stone-800">
+          <div className="rounded-2xl border border-rose-100/75 bg-rose-50/55 px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-500">情侣 bonus</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
               +{entry.bonus}
             </p>
           </div>
-          <div className="rounded-2xl border border-amber-200/75 bg-amber-50/60 px-3 py-2">
-            <p className="text-[10px] font-bold text-stone-500">金币变化</p>
-            <p className="mt-1 text-sm font-bold tabular-nums text-stone-800">
+          <div className="rounded-2xl border border-amber-200/70 bg-amber-50/60 px-3 py-2">
+            <p className="text-[10px] font-semibold text-stone-500">金币变化</p>
+            <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
               {entry.coins > 0 ? `+${entry.coins}` : "0"}
             </p>
           </div>
@@ -197,13 +190,13 @@ function DetailSheet({
         <div className="mt-4 flex gap-2">
           <button
             type="button"
-            className="flex-1 rounded-2xl border border-stone-200/70 bg-white/55 py-2.5 text-xs font-bold text-stone-500 transition hover:bg-white/80"
+            className="flex-1 rounded-2xl border border-stone-200/70 bg-white/55 py-2.5 text-xs font-semibold text-stone-500 transition hover:bg-white/80"
           >
             编辑这一天
           </button>
           <button
             type="button"
-            className="flex-1 rounded-2xl border border-rose-100/80 bg-rose-50/45 py-2.5 text-xs font-bold text-rose-400 transition hover:bg-rose-50/80"
+            className="flex-1 rounded-2xl border border-rose-100/75 bg-rose-50/45 py-2.5 text-xs font-semibold text-stone-500 transition hover:bg-rose-50/80"
           >
             删除记录
           </button>
@@ -220,7 +213,6 @@ export function GrowthLog() {
     null,
   );
   const titleId = useId();
-  const logs = MOCK_LOGS;
 
   const closeSheet = () => {
     setSelectedEntry(null);
@@ -329,9 +321,9 @@ export function GrowthLog() {
             </div>
 
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
-              {logs.length > 0 ? (
+              {MOCK_LOGS.length > 0 ? (
                 <div className="space-y-2">
-                  {logs.map((entry) => (
+                  {MOCK_LOGS.map((entry) => (
                     <LogCard
                       key={entry.id}
                       entry={entry}
@@ -344,7 +336,7 @@ export function GrowthLog() {
                   <span className="text-3xl" aria-hidden>
                     ✨
                   </span>
-                  <p className="mt-3 text-sm font-bold text-stone-700">
+                  <p className="mt-3 text-sm font-semibold text-stone-600">
                     还没有成长日志，今天开始攒第一颗星吧 ✨
                   </p>
                 </div>
