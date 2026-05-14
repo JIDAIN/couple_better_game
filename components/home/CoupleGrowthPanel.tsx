@@ -1,6 +1,6 @@
 "use client";
 
-import { GEM_CAP, useHomeResources } from "./HomeResourcesProvider.fixed";
+import { GEM_CAP, useHomeResources } from "./HomeResourcesProvider.safe";
 
 function StatBubble({
   label,
