@@ -50,7 +50,7 @@ export function PlayerHeatmap({
     : "repeat(7, minmax(0, 1fr))";
 
   return (
-    <div className="ui-card-soft p-3 sm:p-4">
+    <div className="ui-card-soft ui-card-item sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <h3 className="text-[13px] font-bold tracking-wide ui-text-main">

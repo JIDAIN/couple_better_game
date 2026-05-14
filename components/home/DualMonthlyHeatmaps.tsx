@@ -100,7 +100,7 @@ export function DualMonthlyHeatmaps() {
 
   return (
     <section
-      className="ui-card-hero relative overflow-hidden p-4 sm:p-5"
+      className="ui-card-hero ui-card-main relative overflow-hidden sm:p-5"
       aria-label="当月成就"
     >
       <div
@@ -113,12 +113,12 @@ export function DualMonthlyHeatmaps() {
       />
 
       <div className="relative mx-auto max-w-[28rem]">
-        <div className="ui-soft-panel px-4 py-4 text-center sm:px-5">
+        <div className="ui-soft-panel ui-card-main text-center sm:px-5">
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="ui-button-secondary inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
+              className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
               aria-label="查看上个月"
             >
               ‹
@@ -129,7 +129,7 @@ export function DualMonthlyHeatmaps() {
             <button
               type="button"
               onClick={handleNextMonth}
-              className="ui-button-secondary inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
+              className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
               aria-label="查看下个月"
             >
               ›
@@ -141,7 +141,7 @@ export function DualMonthlyHeatmaps() {
         </div>
       </div>
 
-      <div className="ui-soft-panel relative mt-3 px-3 py-2.5">
+      <div className="ui-soft-panel ui-card-compact relative mt-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold ui-text-muted">作战开始日</p>
@@ -173,7 +173,7 @@ export function DualMonthlyHeatmaps() {
         />
       </div>
 
-      <div className="ui-card-soft relative mt-3.5 px-2 py-3">
+      <div className="ui-card-soft ui-card-compact relative mt-3.5">
         <HeatmapLegend />
       </div>
     </section>

@@ -34,9 +34,9 @@ function SoftField({
 }) {
   return (
     <label className="block min-w-0">
-      <span className="text-[11px] font-semibold ui-text-muted">{label}</span>
+      <span className="ui-field-label">{label}</span>
       {hint ? (
-        <span className="mt-0.5 block text-[10px] ui-text-soft">{hint}</span>
+        <span className="ui-field-hint">{hint}</span>
       ) : null}
       <div className="ui-input-shell mt-1 flex items-center gap-1.5 px-3 py-2">
         <input
@@ -76,7 +76,7 @@ function PartnerColumn({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="ui-soft-panel flex min-w-0 flex-col gap-2.5 p-3">
+    <div className="ui-soft-panel ui-card-item flex min-w-0 flex-col gap-2.5">
       <div className="flex items-center gap-2 pb-1.5">
         <span className="text-xl" aria-hidden>
           {emoji}
@@ -128,7 +128,7 @@ function HistoryPartnerCard({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="ui-soft-panel p-3">
+    <div className="ui-soft-panel ui-card-item">
       <div className="mb-2 flex items-center gap-2">
         <span aria-hidden>{emoji}</span>
         <p className="text-xs font-bold ui-text-main">{title}</p>
@@ -620,7 +620,7 @@ export function RecordTodaySettlement({
                 : "translate-y-6 opacity-0 sm:translate-y-0 sm:scale-95"
             }`}
           >
-            <div className="shrink-0 px-4 pb-3 pt-4 text-center">
+            <div className="ui-modal-header shrink-0">
               <p className="text-[10px] font-bold tracking-[0.2em] ui-text-primary">
                 {mode === "today" ? "今日收工啦" : "补记一颗星"}
               </p>
@@ -634,7 +634,7 @@ export function RecordTodaySettlement({
               </p>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
+            <div className="ui-modal-body">
               {mode === "today" ? (
                 <>
                   <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
@@ -660,7 +660,7 @@ export function RecordTodaySettlement({
                     />
                   </div>
 
-                  <div className="ui-soft-panel mt-4 p-3.5">
+                  <div className="ui-soft-panel ui-card-item mt-4">
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       结算预览
                     </p>
@@ -713,7 +713,7 @@ export function RecordTodaySettlement({
                     </ul>
                   </div>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="ui-modal-footer">
                     <button
                       type="button"
                       onClick={() => setOpen(false)}
@@ -734,7 +734,7 @@ export function RecordTodaySettlement({
               ) : (
                 <div className="space-y-3">
                   <label className="block">
-                    <span className="text-[11px] font-semibold ui-text-muted">
+                    <span className="ui-field-label">
                       日期
                     </span>
                     <input
@@ -755,17 +755,17 @@ export function RecordTodaySettlement({
                   </label>
 
                   <div>
-                    <p className="text-[11px] font-semibold ui-text-muted">
+                    <p className="ui-field-label">
                       编辑方式
                     </p>
                     <div className="mt-1 grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => setHistoryMode("single")}
-                        className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                        className={`ui-tab flex text-sm transition ${
                           historyMode === "single"
-                            ? "ui-chip-primary"
-                            : "ui-chip-plain"
+                            ? "ui-tab-active"
+                            : "ui-tab-idle"
                         }`}
                       >
                         单人
@@ -773,10 +773,10 @@ export function RecordTodaySettlement({
                       <button
                         type="button"
                         onClick={() => setHistoryMode("both")}
-                        className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                        className={`ui-tab flex text-sm transition ${
                           historyMode === "both"
-                            ? "ui-chip-primary"
-                            : "ui-chip-plain"
+                            ? "ui-tab-active"
+                            : "ui-tab-idle"
                         }`}
                       >
                         双人
@@ -787,17 +787,17 @@ export function RecordTodaySettlement({
                   {historyMode === "single" ? (
                     <>
                       <div>
-                        <p className="text-[11px] font-semibold ui-text-muted">
+                        <p className="ui-field-label">
                           用户
                         </p>
                         <div className="mt-1 grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() => setHistoryPerson("fish")}
-                            className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                            className={`ui-tab flex text-sm transition ${
                               historyPerson === "fish"
-                                ? "ui-chip-primary"
-                                : "ui-chip-plain"
+                                ? "ui-tab-active"
+                                : "ui-tab-idle"
                             }`}
                           >
                             🐟 鱼鱼
@@ -805,10 +805,10 @@ export function RecordTodaySettlement({
                           <button
                             type="button"
                             onClick={() => setHistoryPerson("cat")}
-                            className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                            className={`ui-tab flex text-sm transition ${
                               historyPerson === "cat"
-                                ? "ui-chip-primary"
-                                : "ui-chip-plain"
+                                ? "ui-tab-active"
+                                : "ui-tab-idle"
                             }`}
                           >
                             🐱 猫猫
@@ -866,7 +866,7 @@ export function RecordTodaySettlement({
                     </div>
                   )}
 
-                  <div className="ui-soft-panel p-3.5">
+                  <div className="ui-soft-panel ui-card-item">
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       历史结算预览
                     </p>
@@ -924,7 +924,7 @@ export function RecordTodaySettlement({
                     ) : null}
                   </div>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="ui-modal-footer">
                     <button
                       type="button"
                       onClick={() => setOpen(false)}

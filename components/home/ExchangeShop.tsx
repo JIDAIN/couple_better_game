@@ -346,7 +346,7 @@ export function ExchangeShop() {
       return (
         <article
           key={category.id}
-          className={`ui-card-soft px-2.5 py-2.5 transition ${cardClass}`}
+          className={`ui-card-soft ui-card-compact transition ${cardClass}`}
         >
           <div className="flex min-w-0 items-start gap-2">
             <span
@@ -364,7 +364,7 @@ export function ExchangeShop() {
               </p>
               <div className="mt-1.5 flex items-center justify-between gap-1.5">
                 <span
-                  className={`inline-flex shrink-0 items-center px-2 py-0.5 text-[10px] font-semibold tabular-nums ${priceClass}`}
+                  className={`ui-badge shrink-0 py-0.5 text-[10px] tabular-nums ${priceClass}`}
                 >
                   {categoryPriceLabel(category)}
                 </span>
@@ -397,7 +397,7 @@ export function ExchangeShop() {
         {items.length > 0 ? (
           <div className="space-y-1.5">{items.map(renderCategoryCard)}</div>
         ) : (
-          <div className="ui-soft-panel px-3 py-5 text-center text-[11px] font-semibold ui-text-soft">
+          <div className="ui-soft-panel ui-card-item py-5 text-center text-[11px] font-semibold ui-text-soft">
             {title.includes("宝石") ? "还没有宝石商品" : "还没有金币商品"}
           </div>
         )}
@@ -424,7 +424,7 @@ export function ExchangeShop() {
               查看记录
             </button>
           </div>
-          <div className="ui-soft-panel px-3 py-2.5 text-[11px] font-medium ui-text-soft">
+          <div className="ui-soft-panel ui-card-compact text-[11px] font-medium ui-text-soft">
             每一笔小奖励，都是认真生活的痕迹。
           </div>
         </section>
@@ -443,11 +443,11 @@ export function ExchangeShop() {
     const renderCategoryCard = (category: ExchangeCategory) => (
       <article
         key={category.id}
-        className="ui-card-soft px-3 py-2.5"
+        className="ui-card-soft ui-card-compact"
       >
         <div className="flex items-center gap-2.5">
           <span
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${categoryTone(
+            className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${categoryTone(
               category.resourceKind,
             )}`}
             aria-hidden
@@ -463,13 +463,13 @@ export function ExchangeShop() {
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1">
               <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getCategoryChipClass(
+                className={`ui-badge py-0.5 text-[10px] ${getCategoryChipClass(
                   category.resourceKind,
                 )}`}
               >
                 {resourceLabel(category.resourceKind)}
               </span>
-              <span className="ui-chip-plain inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold">
+              <span className="ui-badge ui-chip-plain py-0.5 text-[10px]">
                 消耗 {categoryPriceLabel(category)}
               </span>
             </div>
@@ -550,7 +550,7 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={overlayTitleId}
-            className={`ui-dialog relative w-full max-w-md p-3.5 transition-all duration-300 ease-out ${
+            className={`ui-dialog ui-dialog-content relative w-full max-w-md transition-all duration-300 ease-out ${
               overlayEnter
                 ? "translate-y-0 opacity-100"
                 : "translate-y-4 opacity-0"
@@ -582,7 +582,7 @@ export function ExchangeShop() {
                 exchangeRecords.map((record) => (
                   <article
                     key={record.id}
-                    className="ui-soft-panel px-3 py-3"
+                    className="ui-soft-panel ui-card-item"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -620,7 +620,7 @@ export function ExchangeShop() {
                   </article>
                 ))
               ) : (
-                <div className="ui-soft-panel px-3 py-5 text-center text-xs font-semibold ui-text-muted">
+                <div className="ui-soft-panel ui-card-item py-5 text-center text-xs font-semibold ui-text-muted">
                   还没有兑换记录，攒到喜欢的奖励再来换一笔。
                 </div>
               )}
@@ -658,7 +658,7 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={overlayTitleId}
-            className={`ui-dialog relative w-full max-w-md p-3.5 transition-all duration-300 ease-out ${
+            className={`ui-dialog ui-dialog-content relative w-full max-w-md transition-all duration-300 ease-out ${
               overlayEnter
                 ? "translate-y-0 opacity-100"
                 : "translate-y-4 opacity-0"
@@ -687,19 +687,19 @@ export function ExchangeShop() {
 
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getCategoryChipClass(
+                className={`ui-badge py-1 text-[11px] ${getCategoryChipClass(
                   displayResource,
                 )}`}
               >
                 {resourceLabel(displayResource)}
               </span>
-              <span className="ui-chip-plain inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold">
+              <span className="ui-badge ui-chip-plain py-1 text-[11px]">
                 消耗 {displayPrice} {resourceLabel(displayResource)}
               </span>
             </div>
 
             <label className="mt-3 block">
-              <span className="text-[11px] font-semibold ui-text-muted">
+              <span className="ui-field-label">
                 时间
               </span>
               <input
@@ -716,7 +716,7 @@ export function ExchangeShop() {
             </label>
 
             <label className="mt-3 block">
-              <span className="text-[11px] font-semibold ui-text-muted">
+              <span className="ui-field-label">
                 备注
               </span>
               <input
@@ -769,7 +769,7 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={overlayTitleId}
-            className={`ui-dialog relative w-full max-w-md p-3.5 transition-all duration-300 ease-out ${
+            className={`ui-dialog ui-dialog-content relative w-full max-w-md transition-all duration-300 ease-out ${
               overlayEnter
                 ? "translate-y-0 opacity-100"
                 : "translate-y-4 opacity-0"
@@ -798,7 +798,7 @@ export function ExchangeShop() {
 
             <div className="mt-3 space-y-3">
               <label className="block">
-                <span className="text-[11px] font-semibold ui-text-muted">
+                <span className="ui-field-label">
                   类别名称
                 </span>
                 <input
@@ -816,7 +816,7 @@ export function ExchangeShop() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
                 <label className="block">
-                  <span className="text-[11px] font-semibold ui-text-muted">
+                  <span className="ui-field-label">
                     图标
                   </span>
                   <input
@@ -833,7 +833,7 @@ export function ExchangeShop() {
                 </label>
 
                 <label className="block">
-                  <span className="text-[11px] font-semibold ui-text-muted">
+                  <span className="ui-field-label">
                     消耗资源
                   </span>
                   <div className="mt-1 flex gap-2">
@@ -845,10 +845,10 @@ export function ExchangeShop() {
                           resourceKind: "gem",
                         }))
                       }
-                      className={`flex-1 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                      className={`ui-tab flex-1 text-sm transition ${
                         categoryForm.resourceKind === "gem"
-                          ? "ui-chip-primary"
-                          : "ui-chip-plain"
+                          ? "ui-tab-active"
+                          : "ui-tab-idle"
                       }`}
                     >
                       宝石
@@ -861,10 +861,10 @@ export function ExchangeShop() {
                           resourceKind: "coin",
                         }))
                       }
-                      className={`flex-1 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                      className={`ui-tab flex-1 text-sm transition ${
                         categoryForm.resourceKind === "coin"
-                          ? "ui-chip-reward"
-                          : "ui-chip-plain"
+                          ? "ui-tab-active"
+                          : "ui-tab-idle"
                       }`}
                     >
                       金币
@@ -874,7 +874,7 @@ export function ExchangeShop() {
               </div>
 
               <label className="block">
-                <span className="text-[11px] font-semibold ui-text-muted">
+                <span className="ui-field-label">
                   消耗数量
                 </span>
                 <div className="ui-input-shell mt-1 flex items-center gap-2 px-3 py-2.5">
@@ -897,7 +897,7 @@ export function ExchangeShop() {
               </label>
 
               <label className="block">
-                <span className="text-[11px] font-semibold ui-text-muted">
+                <span className="ui-field-label">
                   描述
                 </span>
                 <textarea
@@ -974,7 +974,7 @@ export function ExchangeShop() {
           >
             <div className="ui-sheet-handle mx-auto mb-3 h-1 w-10 rounded-full" aria-hidden />
 
-            <div className="ui-soft-panel relative overflow-hidden px-3.5 py-2.5">
+            <div className="ui-soft-panel ui-card-compact relative overflow-hidden">
               <div
                 aria-hidden
                 className="ui-ambient-white pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full blur-xl"
@@ -1020,11 +1020,11 @@ export function ExchangeShop() {
               </div>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="ui-chip-primary inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold">
+                <span className="ui-badge ui-chip-primary py-1 text-[11px]">
                   <span aria-hidden>💎</span>
                   {gemStock}/{GEM_CAP}
                 </span>
-                <span className="ui-chip-reward inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold">
+                <span className="ui-badge ui-chip-reward py-1 text-[11px]">
                   <span aria-hidden>🪙</span>
                   {coinStock}
                 </span>

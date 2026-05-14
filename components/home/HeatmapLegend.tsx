@@ -5,10 +5,10 @@ import { useHomeResources } from "./HomeResourcesProvider";
 export function HeatmapLegend() {
   const { visualRules } = useHomeResources();
   const items = [
-    { cls: "heat-cell-none", label: "未完成" },
-    { cls: "heat-cell-ok", label: "一般" },
+    { cls: "heat-cell-empty", label: "未完成" },
+    { cls: "heat-cell-normal", label: "一般" },
     { cls: "heat-cell-good", label: "较好" },
-    { cls: "heat-cell-perfect", label: "超棒" },
+    { cls: "heat-cell-great", label: "超棒" },
   ] as const;
 
   return (
@@ -21,7 +21,7 @@ export function HeatmapLegend() {
             className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"
           >
             <span
-              className={`h-2.5 w-2.5 shrink-0 rounded-[4px] border ${it.cls}`}
+              className={`heat-cell h-2.5 w-2.5 shrink-0 ${it.cls}`}
               aria-hidden
             />
             {it.label}

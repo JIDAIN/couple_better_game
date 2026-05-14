@@ -1,10 +1,10 @@
 import type { ExerciseTag, HeatLevel } from "./types";
 
 const levelClass: Record<HeatLevel, string> = {
-  none: "heat-cell-none",
-  ok: "heat-cell-ok",
+  none: "heat-cell-empty",
+  ok: "heat-cell-normal",
   good: "heat-cell-good",
-  perfect: "heat-cell-perfect",
+  perfect: "heat-cell-great",
 };
 
 const exerciseIcon: Record<ExerciseTag, string> = {
@@ -28,7 +28,7 @@ export function HeatmapCell({
     <div
       title={title}
       className={[
-        "heat-cell relative mx-auto h-3 w-full max-w-[18px] rounded-[5px] border sm:h-4 sm:max-w-[22px] sm:rounded-md",
+        "heat-cell relative mx-auto",
         "hover:z-10 hover:scale-125",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1",
         levelClass[level],

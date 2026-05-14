@@ -44,7 +44,7 @@ function formatCoinDelta(value: number) {
 
 function LogCard({ entry }: { entry: GrowthLogEntry }) {
   return (
-    <article className="ui-card-soft h-12 px-3 transition active:scale-[0.995]">
+    <article className="ui-card-soft ui-card-compact h-12 transition active:scale-[0.995]">
       <div className="grid h-full grid-cols-[4.4rem_minmax(0,1fr)_minmax(0,1fr)_3.45rem_3rem] items-center gap-2">
         <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-bold leading-4 tabular-nums tracking-tight ui-text-primary">
           {formatMonthDay(entry.recordDate)}
@@ -148,7 +148,7 @@ export function GrowthLog() {
           >
             <div className="ui-sheet-handle mx-auto mb-3 h-1 w-10 rounded-full" aria-hidden />
 
-            <div className="ui-soft-panel px-3.5 py-2.5">
+            <div className="ui-soft-panel ui-card-compact">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-lg font-bold leading-6 tracking-tight ui-text-main">
@@ -172,7 +172,7 @@ export function GrowthLog() {
                   <button
                     type="button"
                     onClick={onPrevMonth}
-                    className="text-lg font-bold leading-none ui-text-soft transition active:scale-95"
+                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-lg font-bold leading-none"
                     aria-label="查看上个月"
                   >
                     ‹
@@ -186,7 +186,7 @@ export function GrowthLog() {
                   <button
                     type="button"
                     onClick={onNextMonth}
-                    className="text-lg font-bold leading-none ui-text-soft transition active:scale-95"
+                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-lg font-bold leading-none"
                     aria-label="查看下个月"
                   >
                     ›
@@ -203,7 +203,7 @@ export function GrowthLog() {
                   ))}
                 </div>
               ) : (
-                <div className="ui-soft-panel px-4 py-6 text-center text-sm font-semibold ui-text-muted">
+                <div className="ui-soft-panel ui-card-main py-6 text-center text-sm font-semibold ui-text-muted">
                   这个月还没有成长记录
                 </div>
               )}

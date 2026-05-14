@@ -20,7 +20,7 @@ function CampaignProgressBadge() {
 
   if (!hasStartDate) {
     return (
-      <div className="ui-card-soft mx-auto w-full max-w-[28rem] px-4 py-3 text-center text-[12px] font-semibold ui-text-muted">
+      <div className="ui-card-soft ui-card-compact mx-auto w-full max-w-[28rem] text-center text-[12px] font-semibold ui-text-muted">
         设置作战开始日后，就能记录我们的第几天啦 ✨
       </div>
     );
@@ -28,15 +28,15 @@ function CampaignProgressBadge() {
 
   if (!hasStarted) {
     return (
-      <div className="ui-card-soft mx-auto w-full max-w-[28rem] px-4 py-3 text-center text-[12px] font-semibold ui-text-main">
+      <div className="ui-card-soft ui-card-compact mx-auto w-full max-w-[28rem] text-center text-[12px] font-semibold ui-text-main">
         变美变瘦大作战即将开启 ✨
       </div>
     );
   }
 
   return (
-    <div className="ui-card-soft mx-auto w-full max-w-[28rem] px-4 py-3 text-center">
-      <span className="text-[12px] font-semibold ui-text-primary">
+    <div className="ui-card-soft ui-card-compact mx-auto w-full max-w-[28rem] text-center">
+      <span className="ui-badge ui-chip-primary">
         变美变瘦大作战已开启
       </span>
       <span className="ml-2 text-[1.03rem] font-black tabular-nums ui-text-main">
