@@ -14,15 +14,16 @@ import {
   snapshotFromHomeResourcesState,
   type AppDataStore,
 } from "@/lib/home/app-data-store";
+import { formatRecordDateFromIso, parseIsoDate, previousIsoDate, todayIsoDate } from "@/lib/home/date-utils";
 import {
-  formatExchangeDateLabel,
-  formatExchangeTimeLabel,
-  formatRecordDateFromIso,
-  normalizeExchangeDateTime,
-  parseIsoDate,
-  previousIsoDate,
-  todayIsoDate,
-} from "@/lib/home/date-utils";
+  createExchangeRecordFromPayload,
+  deleteExchangeCategoryFromList,
+  normalizeExchangeCategories,
+  normalizeExchangeRecord,
+  orderExchangeRecords,
+  type ExchangeRedeemPayload,
+  upsertExchangeCategoryInList,
+} from "@/lib/home/exchange-service";
 import {
   buildHeatmapOverrides,
   findRecordByIso,
@@ -54,7 +55,6 @@ import type {
   ExchangeRecord,
   HeatmapDay,
   HeatmapDayOverrides,
-  ResourceKind,
   TodayRecordSidePayload,
   Wallet,
 } from "@/lib/home/types";
@@ -107,15 +107,6 @@ export type HistoricalRecordResult = {
   ok: boolean;
   updatedExisting: boolean;
   reason?: "future-date" | "invalid-date";
-};
-
-type ExchangeRedeemPayload = {
-  category: string;
-  remark: string;
-  resourceKind: ResourceKind;
-  price: number;
-  icon: string;
-  occurredAt?: string;
 };
 
 export type HomeResourcesState = {
@@ -178,19 +169,6 @@ type HomeResourcesContextValue = {
   upsertExchangeCategory: (category: ExchangeCategory) => void;
   deleteExchangeCategory: (categoryId: string) => void;
 };
-
-function normalizeExchangeCategories(
-  categories: ExchangeCategory[],
-): ExchangeCategory[] {
-  const byId = new Map(categories.map((category) => [category.id, category]));
-  const mergedDefaults = DEFAULT_EXCHANGE_CATEGORIES.map((category) => {
-    const existing = byId.get(category.id);
-    return existing ? { ...category, ...existing } : category;
-  });
-  const defaultIds = new Set(DEFAULT_EXCHANGE_CATEGORIES.map((item) => item.id));
-  const extras = categories.filter((category) => !defaultIds.has(category.id));
-  return [...mergedDefaults, ...extras];
-}
 
 const HomeResourcesContext = createContext<HomeResourcesContextValue | null>(
   null,
@@ -362,21 +340,6 @@ function writeLocalState(state: HomeResourcesState, dataStore: AppDataStore) {
   dataStore.save(snapshotFromHomeResourcesState(state));
 }
 
-function normalizeExchangeRecord(record: ExchangeRecord): ExchangeRecord {
-  const normalized = normalizeExchangeDateTime(
-    record.occurredAt ?? record.createdAt,
-  );
-  return {
-    ...record,
-    occurredAt: normalized.occurredAt,
-    time: record.time || formatExchangeTimeLabel(normalized.date),
-    date:
-      record.date ||
-      `${formatExchangeDateLabel(normalized.date)} ${formatExchangeTimeLabel(
-        normalized.date,
-      )}`,
-  };
-}
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -388,16 +351,6 @@ function zeroSide(): DailyRecordSide {
     minutes: 0,
     gems: 0,
   };
-}
-
-function exchangeRecordSortKey(record: ExchangeRecord) {
-  return record.occurredAt || record.createdAt || record.date;
-}
-
-function orderExchangeRecords(records: ExchangeRecord[]) {
-  return [...records].sort((a, b) =>
-    exchangeRecordSortKey(b).localeCompare(exchangeRecordSortKey(a)),
-  );
 }
 
 export function HomeResourcesProvider({
@@ -449,21 +402,10 @@ export function HomeResourcesProvider({
         return false;
       }
 
-      const occurred = normalizeExchangeDateTime(
-        payload.occurredAt,
+      const record: ExchangeRecord = createExchangeRecordFromPayload(
+        payload,
         new Date(),
       );
-      const createdAt = new Date().toISOString();
-      const record: ExchangeRecord = {
-        id: makeId("exchange"),
-        date: `${formatExchangeDateLabel(occurred.date)} ${formatExchangeTimeLabel(
-          occurred.date,
-        )}`,
-        createdAt,
-        occurredAt: occurred.occurredAt,
-        time: formatExchangeTimeLabel(occurred.date),
-        ...payload,
-      };
 
       commitHomeState((state) => ({
         ...state,
@@ -487,17 +429,9 @@ export function HomeResourcesProvider({
         );
         if (!existing) return state;
 
-        const occurred = normalizeExchangeDateTime(
-          patch.occurredAt ?? existing.occurredAt,
-          new Date(existing.createdAt),
-        );
         const nextRecord: ExchangeRecord = normalizeExchangeRecord({
           ...existing,
-          occurredAt: occurred.occurredAt,
-          time: formatExchangeTimeLabel(occurred.date),
-          date: `${formatExchangeDateLabel(occurred.date)} ${formatExchangeTimeLabel(
-            occurred.date,
-          )}`,
+          occurredAt: patch.occurredAt ?? existing.occurredAt,
           remark: patch.remark ?? existing.remark,
         });
 
@@ -853,16 +787,12 @@ export function HomeResourcesProvider({
   const upsertExchangeCategory = useCallback(
     (category: ExchangeCategory) => {
       commitHomeState((state) => {
-        const exists = state.exchangeCategories.some(
-          (item) => item.id === category.id,
-        );
         return {
           ...state,
-          exchangeCategories: exists
-            ? state.exchangeCategories.map((item) =>
-                item.id === category.id ? category : item,
-              )
-            : [category, ...state.exchangeCategories],
+          exchangeCategories: upsertExchangeCategoryInList(
+            state.exchangeCategories,
+            category,
+          ),
         };
       });
     },
@@ -873,8 +803,9 @@ export function HomeResourcesProvider({
     (categoryId: string) => {
       commitHomeState((state) => ({
         ...state,
-        exchangeCategories: state.exchangeCategories.filter(
-          (item) => item.id !== categoryId,
+        exchangeCategories: deleteExchangeCategoryFromList(
+          state.exchangeCategories,
+          categoryId,
         ),
       }));
     },
