@@ -1,6 +1,6 @@
 "use client";
 
-import { useHomeResources } from "./HomeResourcesProvider";
+import { useHomeResources } from "./HomeResourcesProvider.fixed";
 
 export function HeatmapLegend() {
   const { visualRules } = useHomeResources();
