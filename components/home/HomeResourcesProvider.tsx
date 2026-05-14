@@ -9,6 +9,23 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  homeStatePatchFromSnapshot,
+  snapshotFromHomeResourcesState,
+  type AppDataStore,
+} from "@/lib/home/app-data-store";
+import { createLocalStorageAppDataStore } from "@/lib/home/local-storage-app-data-store";
+import type {
+  DailyRecord,
+  DailyRecordSide,
+  ExchangeCategory,
+  ExchangeRecord,
+  HeatmapDay,
+  HeatmapDayOverrides,
+  ResourceKind,
+  TodayRecordSidePayload,
+  Wallet,
+} from "@/lib/home/types";
 import { defaultHeatmapStartDate } from "./mockHeatmapData";
 import {
   buildHeatmapDay,
@@ -25,67 +42,14 @@ import {
   type SettlementVisualRules,
   type SideLogInput,
 } from "./settlement-rules";
-import type { HeatmapDay } from "./types";
 
 export { GEM_CAP } from "./settlement-rules";
-
-const STORAGE_KEY = "couple-better-game:home-resources:v1";
-
-type Wallet = { gems: number; coins: number };
-
-export type ResourceKind = "gem" | "coin";
-
-export type HeatmapDayOverrides = Partial<Record<number, HeatmapDay>>;
-
-export type ExchangeCategory = {
-  id: string;
-  title: string;
-  icon: string;
-  description: string;
-  resourceKind: ResourceKind;
-  price: number;
-};
-
-export type ExchangeRecord = {
-  id: string;
-  date: string;
-  createdAt: string;
-  occurredAt: string;
-  time: string;
-  category: string;
-  remark: string;
-  resourceKind: ResourceKind;
-  price: number;
-  icon: string;
-};
-
-type DailyRecordSide = {
-  weightKg: number | null;
-  deficit: number;
-  minutes: number;
-  gems: number;
-};
-
-export type DailyRecord = {
-  id: string;
-  date: string;
-  recordDate: string;
-  createdAt: string;
-  day: number;
-  fish: DailyRecordSide;
-  cat: DailyRecordSide;
-  bonus: number;
-  coins: number;
-  fishHeat: HeatmapDay;
-  catHeat: HeatmapDay;
-};
-
-type TodayRecordSidePayload = {
-  weightKg: number | null;
-  deficit: number;
-  minutes: number;
-};
-
+export type {
+  DailyRecord,
+  ExchangeCategory,
+  ExchangeRecord,
+  ResourceKind,
+} from "@/lib/home/types";
 export type TodayRecordPayload = {
   /** 5 月日期：1-31 */
   day: number;
@@ -384,20 +348,20 @@ function normalizeCoinRules(
 function readLocalState(
   initialGems: number,
   initialCoins: number,
+  dataStore: AppDataStore,
 ): HomeResourcesState {
   const fallback = createDefaultState(initialGems, initialCoins);
-  if (typeof window === "undefined") return fallback;
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
+    const snapshot = dataStore.load();
+    if (!snapshot) {
       const next = recalculateCoinsWithCurrentRules(
         importMayHistoryRecords(fallback),
       );
-      writeLocalState(next);
+      writeLocalState(next, dataStore);
       return next;
     }
-    const parsed = JSON.parse(raw) as Partial<HomeResourcesState>;
+    const parsed = homeStatePatchFromSnapshot(snapshot);
 
     const restored: HomeResourcesState = {
       wallet: {
@@ -446,20 +410,19 @@ function readLocalState(
     const next = recalculateCoinsWithCurrentRules(
       importMayHistoryRecords(restored),
     );
-    writeLocalState(next);
+    writeLocalState(next, dataStore);
     return next;
   } catch {
     const next = recalculateCoinsWithCurrentRules(
       importMayHistoryRecords(fallback),
     );
-    writeLocalState(next);
+    writeLocalState(next, dataStore);
     return next;
   }
 }
 
-function writeLocalState(state: HomeResourcesState) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function writeLocalState(state: HomeResourcesState, dataStore: AppDataStore) {
+  dataStore.save(snapshotFromHomeResourcesState(state));
 }
 
 function pad2(value: number) {
@@ -958,8 +921,9 @@ export function HomeResourcesProvider({
   initialGems = 0,
   initialCoins = 0,
 }: ProviderProps) {
+  const dataStore = useMemo(() => createLocalStorageAppDataStore(), []);
   const [homeState, setHomeState] = useState<HomeResourcesState>(() =>
-    readLocalState(initialGems, initialCoins),
+    readLocalState(initialGems, initialCoins, dataStore),
   );
   const stateRef = useRef(homeState);
 
@@ -968,9 +932,9 @@ export function HomeResourcesProvider({
       const next = updater(stateRef.current);
       stateRef.current = next;
       setHomeState(next);
-      writeLocalState(next);
+      writeLocalState(next, dataStore);
     },
-    [],
+    [dataStore],
   );
 
   const tryRedeem = useCallback(
