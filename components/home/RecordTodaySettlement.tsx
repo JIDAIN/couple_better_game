@@ -6,13 +6,16 @@ import {
   buildHeatmapDay,
   computeCoinPreview,
   computeCoupleBonus,
+  getCurrentIsoDate,
   gemsForPerson,
-  getMaySettlementDay,
+  isInCoinWeek,
   parseNonNegativeInt,
   parseOptionalWeight,
   type PersonKey,
   type SideLogInput,
 } from "./settlement-rules";
+
+type HistoryEditMode = "single" | "both";
 
 function SoftField({
   label,
@@ -25,7 +28,7 @@ function SoftField({
   label: string;
   hint?: string;
   value: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
   inputMode?: "decimal" | "numeric" | "text";
   unit?: string;
 }) {
@@ -38,10 +41,10 @@ function SoftField({
       <div className="mt-1 flex items-center gap-1.5 rounded-2xl border border-white/80 bg-white/65 px-3 py-2 shadow-inner shadow-rose-50/40 backdrop-blur-sm">
         <input
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
           className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums text-stone-800 outline-none placeholder:text-stone-300"
-          placeholder="—"
+          placeholder="0"
         />
         {unit ? (
           <span className="shrink-0 text-[11px] font-medium text-stone-400">
@@ -66,11 +69,11 @@ function PartnerColumn({
   emoji: string;
   title: string;
   weight: string;
-  setWeight: (v: string) => void;
+  setWeight: (value: string) => void;
   deficit: string;
-  setDeficit: (v: string) => void;
+  setDeficit: (value: string) => void;
   minutes: string;
-  setMinutes: (v: string) => void;
+  setMinutes: (value: string) => void;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-rose-100/70 bg-gradient-to-b from-white/75 to-rose-50/40 p-3 shadow-sm backdrop-blur-sm">
@@ -105,6 +108,47 @@ function PartnerColumn({
         inputMode="numeric"
         unit="kcal"
       />
+    </div>
+  );
+}
+
+function HistoryPartnerCard({
+  emoji,
+  title,
+  deficit,
+  setDeficit,
+  minutes,
+  setMinutes,
+}: {
+  emoji: string;
+  title: string;
+  deficit: string;
+  setDeficit: (value: string) => void;
+  minutes: string;
+  setMinutes: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-rose-100/70 bg-white/60 p-3 shadow-sm">
+      <div className="mb-2 flex items-center gap-2">
+        <span aria-hidden>{emoji}</span>
+        <p className="text-xs font-bold text-stone-700">{title}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <SoftField
+          label="热量缺口"
+          value={deficit}
+          onChange={setDeficit}
+          inputMode="numeric"
+          unit="kcal"
+        />
+        <SoftField
+          label="运动时长"
+          value={minutes}
+          onChange={setMinutes}
+          inputMode="numeric"
+          unit="分钟"
+        />
+      </div>
     </div>
   );
 }
@@ -145,7 +189,11 @@ function parseDateInputDay(value: string) {
 function previousDateInputValue(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
   date.setDate(date.getDate() - 1);
   return toDateInputValue(date);
 }
@@ -154,11 +202,21 @@ function recordIsoDate(record: { recordDate?: string; day: number }) {
   return record.recordDate ?? `2026-05-${pad2(record.day)}`;
 }
 
+function totalRecordGems(record: {
+  fish: { gems: number };
+  cat: { gems: number };
+  bonus: number;
+}) {
+  return record.fish.gems + record.cat.gems + record.bonus;
+}
+
 export function RecordTodaySettlement() {
   const {
     applyTodayRecord,
-    applyHistoricalRecord,
+    coinRules,
     dailyRecords,
+    upsertHistoricalRecord,
+    visualRules,
     weekGemTotal,
   } = useHomeResources();
   const [open, setOpen] = useState(false);
@@ -173,10 +231,14 @@ export function RecordTodaySettlement() {
   const [catW, setCatW] = useState("");
   const [catD, setCatD] = useState("0");
   const [catM, setCatM] = useState("0");
+
   const [historyDate, setHistoryDate] = useState(getDefaultHistoryDate);
+  const [historyMode, setHistoryMode] = useState<HistoryEditMode>("single");
   const [historyPerson, setHistoryPerson] = useState<PersonKey>("fish");
-  const [historyD, setHistoryD] = useState("0");
-  const [historyM, setHistoryM] = useState("0");
+  const [historyFishD, setHistoryFishD] = useState("0");
+  const [historyFishM, setHistoryFishM] = useState("0");
+  const [historyCatD, setHistoryCatD] = useState("0");
+  const [historyCatM, setHistoryCatM] = useState("0");
 
   const fishInput: SideLogInput = useMemo(
     () => ({
@@ -184,31 +246,36 @@ export function RecordTodaySettlement() {
       deficit: parseNonNegativeInt(fishD),
       minutes: parseNonNegativeInt(fishM),
     }),
-    [fishW, fishD, fishM],
+    [fishD, fishM, fishW],
   );
-
   const catInput: SideLogInput = useMemo(
     () => ({
       weightKg: parseOptionalWeight(catW),
       deficit: parseNonNegativeInt(catD),
       minutes: parseNonNegativeInt(catM),
     }),
-    [catW, catD, catM],
+    [catD, catM, catW],
   );
 
   const maxHistoryDate = useMemo(() => toDateInputValue(new Date()), []);
-  const historyInput: SideLogInput = useMemo(
+  const historyFishInput: SideLogInput = useMemo(
     () => ({
       weightKg: null,
-      deficit: parseNonNegativeInt(historyD),
-      minutes: parseNonNegativeInt(historyM),
+      deficit: parseNonNegativeInt(historyFishD),
+      minutes: parseNonNegativeInt(historyFishM),
     }),
-    [historyD, historyM],
+    [historyFishD, historyFishM],
   );
-  const historyDay = useMemo(
-    () => parseDateInputDay(historyDate),
-    [historyDate],
+  const historyCatInput: SideLogInput = useMemo(
+    () => ({
+      weightKg: null,
+      deficit: parseNonNegativeInt(historyCatD),
+      minutes: parseNonNegativeInt(historyCatM),
+    }),
+    [historyCatD, historyCatM],
   );
+
+  const historyDay = useMemo(() => parseDateInputDay(historyDate), [historyDate]);
   const existingHistoryRecord = useMemo(
     () =>
       dailyRecords.find((record) => recordIsoDate(record) === historyDate) ??
@@ -224,10 +291,28 @@ export function RecordTodaySettlement() {
     );
   }, [dailyRecords, historyDate]);
 
-  const settlementDay = useMemo(() => getMaySettlementDay(), []);
-  const yesterdayRecord = useMemo(
-    () => dailyRecords.find((record) => record.day === settlementDay - 1) ?? null,
-    [dailyRecords, settlementDay],
+  const todayDate = useMemo(() => getCurrentIsoDate(), []);
+  const settlementDay = useMemo(
+    () => parseDateInputDay(todayDate) ?? new Date().getDate(),
+    [todayDate],
+  );
+  const yesterdayRecord = useMemo(() => {
+    const previousDate = previousDateInputValue(todayDate);
+    if (!previousDate) return null;
+    return (
+      dailyRecords.find((record) => recordIsoDate(record) === previousDate) ??
+      null
+    );
+  }, [dailyRecords, todayDate]);
+
+  const hydrateHistoryInputs = useCallback(
+    (record: typeof existingHistoryRecord) => {
+      setHistoryFishD(String(record?.fish.deficit ?? 0));
+      setHistoryFishM(String(record?.fish.minutes ?? 0));
+      setHistoryCatD(String(record?.cat.deficit ?? 0));
+      setHistoryCatM(String(record?.cat.minutes ?? 0));
+    },
+    [],
   );
 
   const preview = useMemo(() => {
@@ -239,26 +324,28 @@ export function RecordTodaySettlement() {
       fish: fishInput,
       cat: catInput,
       todayDay: settlementDay,
+      todayDate,
       todayGemTotal,
       currentWeekGemTotal: weekGemTotal,
       dailyRecords,
+      coinRules,
+      visualRules,
     });
     return { fg, cg, couple, coin };
   }, [
     catInput,
+    coinRules,
     dailyRecords,
     fishInput,
     settlementDay,
+    todayDate,
+    visualRules,
     weekGemTotal,
     yesterdayRecord,
   ]);
 
   const historyPreview = useMemo(() => {
-    const zeroInput: SideLogInput = {
-      weightKg: null,
-      deficit: 0,
-      minutes: 0,
-    };
+    const zeroInput: SideLogInput = { weightKg: null, deficit: 0, minutes: 0 };
     const existingFish = existingHistoryRecord
       ? {
           weightKg: existingHistoryRecord.fish.weightKg,
@@ -274,58 +361,91 @@ export function RecordTodaySettlement() {
         }
       : zeroInput;
     const fish =
-      historyPerson === "fish" ? historyInput : existingFish;
-    const cat = historyPerson === "cat" ? historyInput : existingCat;
+      historyMode === "both"
+        ? historyFishInput
+        : historyPerson === "fish"
+          ? historyFishInput
+          : existingFish;
+    const cat =
+      historyMode === "both"
+        ? historyCatInput
+        : historyPerson === "cat"
+          ? historyCatInput
+          : existingCat;
     const fg = gemsForPerson("fish", fish, historyYesterdayRecord);
     const cg = gemsForPerson("cat", cat, historyYesterdayRecord);
     const couple = computeCoupleBonus(fish, cat);
-    const oldGemTotal = existingHistoryRecord
-      ? existingHistoryRecord.fish.gems +
-        existingHistoryRecord.cat.gems +
-        existingHistoryRecord.bonus
-      : 0;
     const recordsWithoutExisting = existingHistoryRecord
       ? dailyRecords.filter((record) => record.id !== existingHistoryRecord.id)
       : dailyRecords;
+    const weekGemTotalForHistory = recordsWithoutExisting.reduce(
+      (total, record) =>
+        isInCoinWeek(recordIsoDate(record), historyDate, coinRules.weekStartDay)
+          ? total + totalRecordGems(record)
+          : total,
+      0,
+    );
     const todayGemTotal = fg + cg + couple.gems;
     const coin = computeCoinPreview({
       fish,
       cat,
       todayDay: historyDay ?? 1,
+      todayDate: historyDate,
       todayGemTotal,
-      currentWeekGemTotal: Math.max(0, weekGemTotal - oldGemTotal),
+      currentWeekGemTotal: weekGemTotalForHistory,
       dailyRecords: recordsWithoutExisting,
+      coinRules,
+      visualRules,
     });
     return { fg, cg, couple, coin };
   }, [
+    coinRules,
     dailyRecords,
     existingHistoryRecord,
+    historyCatInput,
+    historyDate,
     historyDay,
-    historyInput,
+    historyFishInput,
+    historyMode,
     historyPerson,
     historyYesterdayRecord,
-    weekGemTotal,
+    visualRules,
   ]);
 
-  const hasAnyEffort = useMemo(() => {
-    return (
+  const hasAnyEffort = useMemo(
+    () =>
       fishInput.deficit > 0 ||
       fishInput.minutes > 0 ||
       fishInput.weightKg != null ||
       catInput.deficit > 0 ||
       catInput.minutes > 0 ||
-      catInput.weightKg != null
-    );
-  }, [fishInput, catInput]);
-  const hasAnyHistoryEffort = useMemo(
-    () => historyInput.deficit > 0 || historyInput.minutes > 0,
-    [historyInput],
+      catInput.weightKg != null,
+    [catInput, fishInput],
   );
+
+  const hasAnyHistoryEffort = useMemo(() => {
+    if (historyMode === "both") {
+      return (
+        historyFishInput.deficit > 0 ||
+        historyFishInput.minutes > 0 ||
+        historyCatInput.deficit > 0 ||
+        historyCatInput.minutes > 0
+      );
+    }
+    return historyPerson === "fish"
+      ? historyFishInput.deficit > 0 || historyFishInput.minutes > 0
+      : historyCatInput.deficit > 0 || historyCatInput.minutes > 0;
+  }, [
+    historyCatInput,
+    historyFishInput,
+    historyMode,
+    historyPerson,
+  ]);
 
   useEffect(() => {
     if (!open) {
-      setEntered(false);
-      return;
+      const id = requestAnimationFrame(() => setEntered(false));
+      return () => cancelAnimationFrame(id);
     }
     const id = requestAnimationFrame(() =>
       requestAnimationFrame(() => setEntered(true)),
@@ -344,8 +464,8 @@ export function RecordTodaySettlement() {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -353,8 +473,8 @@ export function RecordTodaySettlement() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 2200);
-    return () => window.clearTimeout(t);
+    const timeout = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timeout);
   }, [toast]);
 
   const onConfirm = useCallback(() => {
@@ -363,8 +483,8 @@ export function RecordTodaySettlement() {
       day: settlementDay,
       fish: fishInput,
       cat: catInput,
-      fishHeat: buildHeatmapDay(fishInput),
-      catHeat: buildHeatmapDay(catInput),
+      fishHeat: buildHeatmapDay("fish", fishInput, visualRules),
+      catHeat: buildHeatmapDay("cat", catInput, visualRules),
       fishGems: preview.fg,
       catGems: preview.cg,
       bonusGems: preview.couple.gems,
@@ -374,10 +494,10 @@ export function RecordTodaySettlement() {
     setFishW("");
     setCatW("");
     setFishD("0");
-    setCatD("0");
     setFishM("0");
+    setCatD("0");
     setCatM("0");
-    setToast("今日已温柔存档～ 明天继续并肩 ✨");
+    setToast("今天已经存好啦，明天继续并肩");
   }, [
     applyTodayRecord,
     catInput,
@@ -385,14 +505,29 @@ export function RecordTodaySettlement() {
     hasAnyEffort,
     preview,
     settlementDay,
+    visualRules,
   ]);
 
   const onSaveHistory = useCallback(() => {
     if (!hasAnyHistoryEffort || historyDay == null) return;
-    const result = applyHistoricalRecord({
+    const result = upsertHistoricalRecord({
       recordDate: historyDate,
-      person: historyPerson,
-      input: historyInput,
+      fish:
+        historyMode === "both" || historyPerson === "fish"
+          ? {
+              weightKg: null,
+              deficit: historyFishInput.deficit,
+              minutes: historyFishInput.minutes,
+            }
+          : null,
+      cat:
+        historyMode === "both" || historyPerson === "cat"
+          ? {
+              weightKg: null,
+              deficit: historyCatInput.deficit,
+              minutes: historyCatInput.minutes,
+            }
+          : null,
     });
     if (!result.ok) {
       setToast(
@@ -403,16 +538,20 @@ export function RecordTodaySettlement() {
       return;
     }
     setOpen(false);
-    setHistoryD("0");
-    setHistoryM("0");
-    setToast(result.updatedExisting ? "这一天已更新完成 ✨" : "历史记录已保存 ✨");
+    setHistoryFishD("0");
+    setHistoryFishM("0");
+    setHistoryCatD("0");
+    setHistoryCatM("0");
+    setToast(result.updatedExisting ? "这一天已经更新完成" : "历史记录已保存");
   }, [
-    applyHistoricalRecord,
     hasAnyHistoryEffort,
+    historyCatInput,
     historyDate,
     historyDay,
-    historyInput,
+    historyFishInput,
+    historyMode,
     historyPerson,
+    upsertHistoricalRecord,
   ]);
 
   return (
@@ -428,11 +567,11 @@ export function RecordTodaySettlement() {
         >
           <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
             <span className="text-lg" aria-hidden>
-              ✨
+              ✦
             </span>
             记录今天
             <span className="text-lg" aria-hidden>
-              ✨
+              ✦
             </span>
           </span>
         </button>
@@ -440,7 +579,12 @@ export function RecordTodaySettlement() {
           type="button"
           onClick={() => {
             setMode("history");
-            setHistoryDate(getDefaultHistoryDate());
+            const nextDate = getDefaultHistoryDate();
+            const nextRecord =
+              dailyRecords.find((record) => recordIsoDate(record) === nextDate) ??
+              null;
+            setHistoryDate(nextDate);
+            hydrateHistoryInputs(nextRecord);
             setOpen(true);
           }}
           className="ui-button-secondary group flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-stone-600 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:translate-y-0"
@@ -482,116 +626,111 @@ export function RecordTodaySettlement() {
                 {mode === "today" ? "今日收工啦" : "补记一颗星"}
               </p>
               <h2 id={titleId} className="mt-1 text-lg font-bold text-stone-800">
-                {mode === "today" ? "双人结算面板" : "历史记录新增"}
+                {mode === "today" ? "双人结算面板" : "历史记录补记"}
               </h2>
               <p className="mt-1 text-xs text-stone-500">
                 {mode === "today"
-                  ? "一边是 🐟，一边是 🐱，一起把今天收进小背包"
-                  : "选择过去日期和一位用户，保存后会同步日志与热力图"}
+                  ? "一起把今天轻轻收进小背包"
+                  : "支持单人补记，也支持双人同时更新"}
               </p>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
               {mode === "today" ? (
                 <>
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                <PartnerColumn
-                  emoji="🐟"
-                  title="小鱼这边"
-                  weight={fishW}
-                  setWeight={setFishW}
-                  deficit={fishD}
-                  setDeficit={setFishD}
-                  minutes={fishM}
-                  setMinutes={setFishM}
-                />
-                <PartnerColumn
-                  emoji="🐱"
-                  title="小猫这边"
-                  weight={catW}
-                  setWeight={setCatW}
-                  deficit={catD}
-                  setDeficit={setCatD}
-                  minutes={catM}
-                  setMinutes={setCatM}
-                />
-              </div>
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                    <PartnerColumn
+                      emoji="🐟"
+                      title="鱼鱼这边"
+                      weight={fishW}
+                      setWeight={setFishW}
+                      deficit={fishD}
+                      setDeficit={setFishD}
+                      minutes={fishM}
+                      setMinutes={setFishM}
+                    />
+                    <PartnerColumn
+                      emoji="🐱"
+                      title="猫猫这边"
+                      weight={catW}
+                      setWeight={setCatW}
+                      deficit={catD}
+                      setDeficit={setCatD}
+                      minutes={catM}
+                      setMinutes={setCatM}
+                    />
+                  </div>
 
-              <div className="mt-4 rounded-2xl border border-amber-100/80 bg-white/55 p-3.5 shadow-inner shadow-amber-50/50 backdrop-blur-sm">
-                <p className="text-center text-[11px] font-bold text-amber-700/90">
-                  结算预览
-                </p>
-                <ul className="mt-3 space-y-2 text-xs font-semibold text-stone-700">
-                  <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
-                    <span>🐟 今日宝石</span>
-                    <span className="tabular-nums text-rose-600">
-                      +{preview.fg}
-                    </span>
-                  </li>
-                  <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
-                    <span>🐱 今日宝石</span>
-                    <span className="tabular-nums text-rose-600">
-                      +{preview.cg}
-                    </span>
-                  </li>
-                  <li className="flex flex-col gap-1 rounded-xl bg-gradient-to-r from-pink-50/80 to-amber-50/70 px-2.5 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span>🤝 情侣 bonus</span>
-                      <span className="tabular-nums text-pink-600">
-                        {preview.couple.gems > 0
-                          ? `+${preview.couple.gems}`
-                          : "—"}
-                      </span>
-                    </div>
-                    {preview.couple.reasons.length > 0 ? (
-                      <p className="text-[10px] font-medium leading-relaxed text-stone-500">
-                        {preview.couple.reasons.join(" · ")}
-                      </p>
-                    ) : (
-                      <p className="text-[10px] font-medium text-stone-400">
-                        一起运动（双方各 ≥30 分钟）可触发：双方各 +1，共 +2
-                      </p>
-                    )}
-                  </li>
-                  <li className="flex flex-col gap-0.5 rounded-xl bg-amber-50/55 px-2.5 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span>🪙 金币变化</span>
-                      <span
-                        className={
-                          preview.coin.delta > 0
-                            ? "tabular-nums text-amber-700"
-                            : "text-[11px] font-medium text-stone-400"
-                        }
-                      >
-                        {preview.coin.delta > 0
-                          ? `+${preview.coin.delta}`
-                          : "未触发"}
-                      </span>
-                    </div>
-                    <p className="text-[10px] font-medium leading-relaxed text-stone-500">
-                      {preview.coin.hint}
+                  <div className="mt-4 rounded-2xl border border-amber-100/80 bg-white/55 p-3.5 shadow-inner shadow-amber-50/50 backdrop-blur-sm">
+                    <p className="text-center text-[11px] font-bold text-amber-700/90">
+                      结算预览
                     </p>
-                  </li>
-                </ul>
-              </div>
+                    <ul className="mt-3 space-y-2 text-xs font-semibold text-stone-700">
+                      <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
+                        <span>🐟 今日宝石</span>
+                        <span className="tabular-nums text-rose-600">
+                          +{preview.fg}
+                        </span>
+                      </li>
+                      <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
+                        <span>🐱 今日宝石</span>
+                        <span className="tabular-nums text-rose-600">
+                          +{preview.cg}
+                        </span>
+                      </li>
+                      <li className="flex flex-col gap-1 rounded-xl bg-gradient-to-r from-pink-50/80 to-amber-50/70 px-2.5 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>情侣 bonus</span>
+                          <span className="tabular-nums text-pink-600">
+                            {preview.couple.gems > 0
+                              ? `+${preview.couple.gems}`
+                              : "—"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-medium text-stone-400">
+                          {preview.couple.reasons[0] ??
+                            "双方都运动 30 分钟以上时触发"}
+                        </p>
+                      </li>
+                      <li className="flex flex-col gap-0.5 rounded-xl bg-amber-50/55 px-2.5 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>金币变化</span>
+                          <span
+                            className={
+                              preview.coin.delta > 0
+                                ? "tabular-nums text-amber-700"
+                                : "text-[11px] font-medium text-stone-400"
+                            }
+                          >
+                            {preview.coin.delta > 0
+                              ? `+${preview.coin.delta}`
+                              : "未触发"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-medium leading-relaxed text-stone-500">
+                          {preview.coin.hint}
+                        </p>
+                      </li>
+                    </ul>
+                  </div>
 
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="flex-1 rounded-2xl border border-white/80 bg-white/50 py-3 text-sm font-bold text-stone-500 transition hover:bg-white/80"
-                >
-                  下次再记
-                </button>
-                <button
-                  type="button"
-                  disabled={!hasAnyEffort}
-                  onClick={onConfirm}
-                  className="flex-[1.35] rounded-2xl border border-rose-200/80 bg-gradient-to-r from-rose-400 to-pink-400 py-3 text-sm font-bold text-white shadow-md shadow-rose-200/50 transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  确认记录今天
-                </button>
-              </div>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpen(false)}
+                      className="flex-1 rounded-2xl border border-white/80 bg-white/50 py-3 text-sm font-bold text-stone-500 transition hover:bg-white/80"
+                    >
+                      下次再记
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!hasAnyEffort}
+                      onClick={onConfirm}
+                      className="flex-[1.35] rounded-2xl border border-rose-200/80 bg-gradient-to-r from-rose-400 to-pink-400 py-3 text-sm font-bold text-white shadow-md shadow-rose-200/50 transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      确认记录今天
+                    </button>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-3">
@@ -603,57 +742,130 @@ export function RecordTodaySettlement() {
                       type="date"
                       value={historyDate}
                       max={maxHistoryDate}
-                      onChange={(e) => setHistoryDate(e.target.value)}
+                      onChange={(event) => {
+                        const nextDate = event.target.value;
+                        const nextRecord =
+                          dailyRecords.find(
+                            (record) => recordIsoDate(record) === nextDate,
+                          ) ?? null;
+                        setHistoryDate(nextDate);
+                        hydrateHistoryInputs(nextRecord);
+                      }}
                       className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none"
                     />
                   </label>
 
                   <div>
                     <p className="text-[11px] font-semibold text-stone-600">
-                      用户
+                      编辑方式
                     </p>
                     <div className="mt-1 grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setHistoryPerson("fish")}
+                        onClick={() => setHistoryMode("single")}
                         className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
-                          historyPerson === "fish"
+                          historyMode === "single"
                             ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
                             : "border-white/80 bg-white/60 text-stone-500"
                         }`}
                       >
-                        🐟 鱼鱼
+                        单人
                       </button>
                       <button
                         type="button"
-                        onClick={() => setHistoryPerson("cat")}
+                        onClick={() => setHistoryMode("both")}
                         className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
-                          historyPerson === "cat"
+                          historyMode === "both"
                             ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
                             : "border-white/80 bg-white/60 text-stone-500"
                         }`}
                       >
-                        🐱 猫猫
+                        双人
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <SoftField
-                      label="热量缺口"
-                      value={historyD}
-                      onChange={setHistoryD}
-                      inputMode="numeric"
-                      unit="kcal"
-                    />
-                    <SoftField
-                      label="运动时长"
-                      value={historyM}
-                      onChange={setHistoryM}
-                      inputMode="numeric"
-                      unit="分钟"
-                    />
-                  </div>
+                  {historyMode === "single" ? (
+                    <>
+                      <div>
+                        <p className="text-[11px] font-semibold text-stone-600">
+                          用户
+                        </p>
+                        <div className="mt-1 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setHistoryPerson("fish")}
+                            className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                              historyPerson === "fish"
+                                ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
+                                : "border-white/80 bg-white/60 text-stone-500"
+                            }`}
+                          >
+                            🐟 鱼鱼
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHistoryPerson("cat")}
+                            className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                              historyPerson === "cat"
+                                ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
+                                : "border-white/80 bg-white/60 text-stone-500"
+                            }`}
+                          >
+                            🐱 猫猫
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <SoftField
+                          label="热量缺口"
+                          value={
+                            historyPerson === "fish" ? historyFishD : historyCatD
+                          }
+                          onChange={
+                            historyPerson === "fish"
+                              ? setHistoryFishD
+                              : setHistoryCatD
+                          }
+                          inputMode="numeric"
+                          unit="kcal"
+                        />
+                        <SoftField
+                          label="运动时长"
+                          value={
+                            historyPerson === "fish" ? historyFishM : historyCatM
+                          }
+                          onChange={
+                            historyPerson === "fish"
+                              ? setHistoryFishM
+                              : setHistoryCatM
+                          }
+                          inputMode="numeric"
+                          unit="分钟"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2.5">
+                      <HistoryPartnerCard
+                        emoji="🐟"
+                        title="鱼鱼"
+                        deficit={historyFishD}
+                        setDeficit={setHistoryFishD}
+                        minutes={historyFishM}
+                        setMinutes={setHistoryFishM}
+                      />
+                      <HistoryPartnerCard
+                        emoji="🐱"
+                        title="猫猫"
+                        deficit={historyCatD}
+                        setDeficit={setHistoryCatD}
+                        minutes={historyCatM}
+                        setMinutes={setHistoryCatM}
+                      />
+                    </div>
+                  )}
 
                   <div className="rounded-2xl border border-amber-100/80 bg-white/55 p-3.5 shadow-inner shadow-amber-50/50 backdrop-blur-sm">
                     <p className="text-center text-[11px] font-bold text-amber-700/90">
@@ -683,7 +895,7 @@ export function RecordTodaySettlement() {
                         </div>
                         <p className="text-[10px] font-medium text-stone-400">
                           {historyPreview.couple.reasons[0] ??
-                            "当天双方都达到 30 分钟才触发"}
+                            "当天双方都达到 30 分钟运动时触发"}
                         </p>
                       </li>
                       <li className="flex flex-col gap-0.5 rounded-xl bg-amber-50/55 px-2.5 py-2">
@@ -708,7 +920,7 @@ export function RecordTodaySettlement() {
                     </ul>
                     {existingHistoryRecord ? (
                       <p className="mt-2 text-center text-[10px] font-medium text-stone-500">
-                        这一天已有记录，保存会更新所选用户并保留另一侧。
+                        这一天已有记录，保存会覆盖你当前编辑到的那一侧或整天数据。
                       </p>
                     ) : null}
                   </div>

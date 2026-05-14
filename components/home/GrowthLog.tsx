@@ -1,14 +1,29 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   useHomeResources,
   type DailyRecord,
 } from "./HomeResourcesProvider";
+import {
+  computeCoinPreview,
+  computeCoupleBonus,
+  gemsForPerson,
+  isInCoinWeek,
+  parseNonNegativeInt,
+} from "./settlement-rules";
 
 type GrowthLogEntry = DailyRecord;
 
 function totalGems(entry: GrowthLogEntry) {
+  return entry.fish.gems + entry.cat.gems + entry.bonus;
+}
+
+function recordIsoDate(entry: GrowthLogEntry) {
+  return entry.recordDate;
+}
+
+function totalRecordGems(entry: GrowthLogEntry) {
   return entry.fish.gems + entry.cat.gems + entry.bonus;
 }
 
@@ -36,6 +51,74 @@ function PartnerLine({
       <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium text-stone-500">
         <span>获得宝石</span>
         <span className="tabular-nums text-rose-500">+{gems}</span>
+      </div>
+    </div>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  onChange,
+  unit,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  unit: string;
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="text-[11px] font-semibold text-stone-600">{label}</span>
+      <div className="mt-1 flex items-center gap-1.5 rounded-2xl border border-white/80 bg-white/65 px-3 py-2 shadow-inner shadow-rose-50/40">
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          inputMode="numeric"
+          className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums text-stone-800 outline-none"
+        />
+        <span className="shrink-0 text-[11px] font-medium text-stone-400">
+          {unit}
+        </span>
+      </div>
+    </label>
+  );
+}
+
+function EditPartnerCard({
+  emoji,
+  title,
+  deficit,
+  setDeficit,
+  minutes,
+  setMinutes,
+}: {
+  emoji: string;
+  title: string;
+  deficit: string;
+  setDeficit: (value: string) => void;
+  minutes: string;
+  setMinutes: (value: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-rose-100/70 bg-white/60 p-3 shadow-sm">
+      <div className="mb-2 flex items-center gap-2">
+        <span aria-hidden>{emoji}</span>
+        <p className="text-xs font-bold text-stone-700">{title}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <EditField
+          label="热量缺口"
+          value={deficit}
+          onChange={setDeficit}
+          unit="kcal"
+        />
+        <EditField
+          label="运动时长"
+          value={minutes}
+          onChange={setMinutes}
+          unit="分钟"
+        />
       </div>
     </div>
   );
@@ -85,15 +168,98 @@ function LogCard({
 
 function DetailSheet({
   entry,
+  previousRecord,
+  dailyRecords,
   onClose,
 }: {
   entry: GrowthLogEntry;
+  previousRecord: GrowthLogEntry | null;
+  dailyRecords: GrowthLogEntry[];
   onClose: () => void;
 }) {
+  const { coinRules, upsertHistoricalRecord, visualRules } = useHomeResources();
   const detailTitleId = useId();
+  const [editing, setEditing] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [fishDeficit, setFishDeficit] = useState(String(entry.fish.deficit));
+  const [fishMinutes, setFishMinutes] = useState(String(entry.fish.minutes));
+  const [catDeficit, setCatDeficit] = useState(String(entry.cat.deficit));
+  const [catMinutes, setCatMinutes] = useState(String(entry.cat.minutes));
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = window.setTimeout(() => setToast(null), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
+  const preview = useMemo(() => {
+    const fish = {
+      weightKg: entry.fish.weightKg,
+      deficit: parseNonNegativeInt(fishDeficit),
+      minutes: parseNonNegativeInt(fishMinutes),
+    };
+    const cat = {
+      weightKg: entry.cat.weightKg,
+      deficit: parseNonNegativeInt(catDeficit),
+      minutes: parseNonNegativeInt(catMinutes),
+    };
+    const fg = gemsForPerson("fish", fish, previousRecord);
+    const cg = gemsForPerson("cat", cat, previousRecord);
+    const couple = computeCoupleBonus(fish, cat);
+    const recordsWithoutCurrent = dailyRecords.filter(
+      (record) => record.id !== entry.id,
+    );
+    const weekGemTotal = recordsWithoutCurrent.reduce(
+      (total, record) =>
+        isInCoinWeek(
+          recordIsoDate(record),
+          entry.recordDate,
+          coinRules.weekStartDay,
+        )
+          ? total + totalRecordGems(record)
+          : total,
+      0,
+    );
+    const coin = computeCoinPreview({
+      fish,
+      cat,
+      todayDay: entry.day,
+      todayDate: entry.recordDate,
+      todayGemTotal: fg + cg + couple.gems,
+      currentWeekGemTotal: weekGemTotal,
+      dailyRecords: recordsWithoutCurrent,
+      coinRules,
+      visualRules,
+    });
+    return { fish, cat, fg, cg, couple, coin };
+  }, [
+    catDeficit,
+    catMinutes,
+    coinRules,
+    dailyRecords,
+    entry,
+    fishDeficit,
+    fishMinutes,
+    previousRecord,
+    visualRules,
+  ]);
+
+  const onSave = useCallback(() => {
+    const result = upsertHistoricalRecord({
+      recordDate: entry.recordDate,
+      fish: preview.fish,
+      cat: preview.cat,
+    });
+    if (!result.ok) {
+      setToast("保存失败");
+      return;
+    }
+    setEditing(false);
+    setToast("这一天已经更新");
+  }, [entry.recordDate, preview.cat, preview.fish, upsertHistoricalRecord]);
 
   return (
-    <div className="absolute inset-0 z-10 flex items-end justify-center bg-stone-900/12 px-1 pb-1 backdrop-blur-[1px] sm:items-center sm:p-3">
+    <div className="absolute inset-0 z-20 flex items-end justify-center bg-stone-900/12 px-1 pb-1 backdrop-blur-[1px] sm:items-center sm:p-3">
       <div
         role="dialog"
         aria-modal="true"
@@ -121,40 +287,114 @@ function DetailSheet({
           </button>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-2">
-          <PartnerLine emoji="🐟" {...entry.fish} />
-          <PartnerLine emoji="🐱" {...entry.cat} />
-        </div>
+        {editing ? (
+          <>
+            <div className="mt-3 space-y-2.5">
+              <EditPartnerCard
+                emoji="🐟"
+                title="鱼鱼"
+                deficit={fishDeficit}
+                setDeficit={setFishDeficit}
+                minutes={fishMinutes}
+                setMinutes={setFishMinutes}
+              />
+              <EditPartnerCard
+                emoji="🐱"
+                title="猫猫"
+                deficit={catDeficit}
+                setDeficit={setCatDeficit}
+                minutes={catMinutes}
+                setMinutes={setCatMinutes}
+              />
+            </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-2xl border border-rose-100/75 bg-rose-50/55 px-3 py-2">
-            <p className="text-[10px] font-semibold text-stone-500">情侣 bonus</p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
-              +{entry.bonus}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-amber-200/70 bg-amber-50/60 px-3 py-2">
-            <p className="text-[10px] font-semibold text-stone-500">金币变化</p>
-            <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
-              {entry.coins > 0 ? `+${entry.coins}` : "0"}
-            </p>
-          </div>
-        </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-2xl border border-rose-100/75 bg-rose-50/55 px-3 py-2">
+                <p className="text-[10px] font-semibold text-stone-500">
+                  双方宝石
+                </p>
+                <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
+                  🐟 +{preview.fg} / 🐱 +{preview.cg}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/60 px-3 py-2">
+                <p className="text-[10px] font-semibold text-stone-500">
+                  奖励变化
+                </p>
+                <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
+                  bonus +{preview.couple.gems} / 金币{" "}
+                  {preview.coin.delta > 0 ? `+${preview.coin.delta}` : "0"}
+                </p>
+              </div>
+            </div>
 
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            className="flex-1 rounded-2xl border border-stone-200/70 bg-white/55 py-2.5 text-xs font-semibold text-stone-500 transition hover:bg-white/80"
-          >
-            编辑这一天
-          </button>
-          <button
-            type="button"
-            className="flex-1 rounded-2xl border border-rose-100/75 bg-rose-50/45 py-2.5 text-xs font-semibold text-stone-500 transition hover:bg-rose-50/80"
-          >
-            删除记录
-          </button>
-        </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="flex-1 rounded-2xl border border-stone-200/70 bg-white/55 py-2.5 text-xs font-semibold text-stone-500 transition hover:bg-white/80"
+              >
+                取消编辑
+              </button>
+              <button
+                type="button"
+                onClick={onSave}
+                className="flex-1 rounded-2xl border border-rose-200/80 bg-gradient-to-r from-rose-400 to-pink-400 py-2.5 text-xs font-semibold text-white shadow-md shadow-rose-200/50"
+              >
+                保存这一天
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              <PartnerLine emoji="🐟" {...entry.fish} />
+              <PartnerLine emoji="🐱" {...entry.cat} />
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-2xl border border-rose-100/75 bg-rose-50/55 px-3 py-2">
+                <p className="text-[10px] font-semibold text-stone-500">
+                  情侣 bonus
+                </p>
+                <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
+                  +{entry.bonus}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-amber-200/70 bg-amber-50/60 px-3 py-2">
+                <p className="text-[10px] font-semibold text-stone-500">
+                  金币变化
+                </p>
+                <p className="mt-1 text-sm font-semibold tabular-nums text-stone-700">
+                  {entry.coins > 0 ? `+${entry.coins}` : "0"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="flex-1 rounded-2xl border border-stone-200/70 bg-white/55 py-2.5 text-xs font-semibold text-stone-500 transition hover:bg-white/80"
+              >
+                编辑这一天
+              </button>
+              <button
+                type="button"
+                disabled
+                className="flex-1 rounded-2xl border border-rose-100/75 bg-rose-50/45 py-2.5 text-xs font-semibold text-stone-400"
+              >
+                删除记录
+              </button>
+            </div>
+          </>
+        )}
+
+        {toast ? (
+          <p className="mt-3 text-center text-[11px] font-semibold text-rose-500">
+            {toast}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -175,6 +415,18 @@ export function GrowthLog() {
     null,
   );
   const titleId = useId();
+
+  const previousRecord = useMemo(() => {
+    if (!selectedEntry) return null;
+    const date = new Date(selectedEntry.recordDate);
+    date.setDate(date.getDate() - 1);
+    const previousIso = `${date.getFullYear()}-${String(
+      date.getMonth() + 1,
+    ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return (
+      dailyRecords.find((record) => record.recordDate === previousIso) ?? null
+    );
+  }, [dailyRecords, selectedEntry]);
 
   const closeSheet = () => {
     setSelectedEntry(null);
@@ -207,8 +459,8 @@ export function GrowthLog() {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
         if (selectedEntry) {
           setSelectedEntry(null);
           return;
@@ -303,10 +555,10 @@ export function GrowthLog() {
               ) : (
                 <div className="ui-card-soft flex min-h-52 flex-col items-center justify-center px-5 py-8 text-center">
                   <span className="text-3xl" aria-hidden>
-                    ✨
+                    ✦
                   </span>
                   <p className="mt-3 text-sm font-semibold text-stone-600">
-                    还没有成长日志，今天开始攒第一颗星吧 ✨
+                    还没有成长日志，今天开始攒第一颗星
                   </p>
                 </div>
               )}
@@ -314,7 +566,10 @@ export function GrowthLog() {
 
             {selectedEntry ? (
               <DetailSheet
+                key={selectedEntry.id}
                 entry={selectedEntry}
+                previousRecord={previousRecord}
+                dailyRecords={dailyRecords}
                 onClose={() => setSelectedEntry(null)}
               />
             ) : null}

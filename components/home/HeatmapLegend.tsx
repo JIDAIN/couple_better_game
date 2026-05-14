@@ -1,4 +1,9 @@
+"use client";
+
+import { useHomeResources } from "./HomeResourcesProvider";
+
 export function HeatmapLegend() {
+  const { visualRules } = useHomeResources();
   const items = [
     { cls: "bg-stone-200/90 border-stone-300/50", label: "未完成" },
     { cls: "bg-emerald-200/95 border-emerald-300/55", label: "一般" },
@@ -26,18 +31,23 @@ export function HeatmapLegend() {
           </span>
         ))}
       </div>
+      <div className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 text-stone-400">
+        <span>🐟 超棒 ≥ {visualRules.heatmap.fish.perfectMin} kcal</span>
+        <span>🐱 超棒 ≥ {visualRules.heatmap.cat.perfectMin} kcal</span>
+      </div>
       <div className="flex w-full flex-col items-center gap-y-1 sm:w-auto sm:flex-row sm:gap-x-5 sm:gap-y-0">
         <span className="inline-flex w-full items-center justify-center gap-1 sm:w-auto">
           <span className="text-[9px]" aria-hidden>
             🏃
           </span>
-          有运动
+          {visualRules.exerciseTag.runMin}-{visualRules.exerciseTag.intenseMin - 1}
+          min
         </span>
         <span className="inline-flex w-full items-center justify-center gap-1 sm:w-auto">
           <span className="text-[9px]" aria-hidden>
             🔥
           </span>
-          高强度
+          ≥ {visualRules.exerciseTag.intenseMin} min
         </span>
       </div>
     </div>

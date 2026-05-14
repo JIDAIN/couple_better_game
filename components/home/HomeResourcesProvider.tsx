@@ -13,10 +13,15 @@ import {
   buildHeatmapDay,
   computeCoinPreview,
   computeCoupleBonus,
+  DEFAULT_COIN_RULES,
+  DEFAULT_VISUAL_RULES,
   GEM_CAP,
+  getCurrentIsoDate,
   gemsForPerson,
-  getMaySettlementDay,
+  isInCoinWeek,
+  type CoinRulesConfig,
   type PersonKey,
+  type SettlementVisualRules,
   type SideLogInput,
 } from "./settlement-rules";
 import type { HeatmapDay } from "./types";
@@ -44,6 +49,8 @@ export type ExchangeRecord = {
   id: string;
   date: string;
   createdAt: string;
+  occurredAt: string;
+  time: string;
   category: string;
   remark: string;
   resourceKind: ResourceKind;
@@ -97,6 +104,12 @@ export type HistoricalRecordPayload = {
   input: TodayRecordSidePayload;
 };
 
+export type HistoricalRecordDraft = {
+  recordDate: string;
+  fish?: TodayRecordSidePayload | null;
+  cat?: TodayRecordSidePayload | null;
+};
+
 export type HistoricalRecordResult = {
   ok: boolean;
   updatedExisting: boolean;
@@ -109,16 +122,23 @@ type ExchangeRedeemPayload = {
   resourceKind: ResourceKind;
   price: number;
   icon: string;
+  occurredAt?: string;
 };
 
 export type HomeResourcesState = {
   wallet: Wallet;
   streakDays: number;
+  weeklySuccessDays: number;
+  cumulativeSuccessDays: number;
+  yesterdayGemTotal: number;
   todayFishGems: number;
   todayCatGems: number;
   todayBonusGems: number;
   weekGemTotal: number;
   weekCoinTotal: number;
+  heatmapStartDate: string;
+  coinRules: CoinRulesConfig;
+  visualRules: SettlementVisualRules;
   fishHeatmapOverrides: HeatmapDayOverrides;
   catHeatmapOverrides: HeatmapDayOverrides;
   dailyRecords: DailyRecord[];
@@ -132,11 +152,17 @@ type HomeResourcesContextValue = {
   tryRedeem: (cost: { gems?: number; coins?: number }) => boolean;
   redeemExchange: (payload: ExchangeRedeemPayload) => boolean;
   streakDays: number;
+  weeklySuccessDays: number;
+  cumulativeSuccessDays: number;
+  yesterdayGemTotal: number;
   todayFishGems: number;
   todayCatGems: number;
   todayBonusGems: number;
   weekGemTotal: number;
   weekCoinTotal: number;
+  heatmapStartDate: string;
+  coinRules: CoinRulesConfig;
+  visualRules: SettlementVisualRules;
   fishHeatmapOverrides: HeatmapDayOverrides;
   catHeatmapOverrides: HeatmapDayOverrides;
   dailyRecords: DailyRecord[];
@@ -146,6 +172,15 @@ type HomeResourcesContextValue = {
   applyHistoricalRecord: (
     payload: HistoricalRecordPayload,
   ) => HistoricalRecordResult;
+  upsertHistoricalRecord: (
+    payload: HistoricalRecordDraft,
+  ) => HistoricalRecordResult;
+  updateExchangeRecord: (
+    recordId: string,
+    patch: { occurredAt?: string; remark?: string },
+  ) => boolean;
+  deleteExchangeRecord: (recordId: string) => boolean;
+  updateHeatmapStartDate: (date: string) => void;
   upsertExchangeCategory: (category: ExchangeCategory) => void;
   deleteExchangeCategory: (categoryId: string) => void;
 };
@@ -154,31 +189,31 @@ const DEFAULT_EXCHANGE_CATEGORIES: ExchangeCategory[] = [
   {
     id: "snack",
     title: "零食",
-    icon: "🍦",
-    description: "小口甜甜，轻轻奖励一下",
+    icon: "🍪",
+    description: "轻轻松松来一点，小小满足一下",
     resourceKind: "gem",
     price: 5,
   },
   {
     id: "drink",
-    title: "饮料",
-    icon: "🧋",
-    description: "想喝点喜欢的，就记这一笔",
+    title: "双份零食",
+    icon: "🍿",
+    description: "给认真努力的自己，再多一点奖励",
     resourceKind: "gem",
     price: 8,
   },
   {
     id: "double-drink",
     title: "双份饮料",
-    icon: "🧋",
-    description: "双人份快乐，备注里写清楚就好",
+    icon: "🥤",
+    description: "双人份的小快乐，备注里写清楚就好",
     resourceKind: "gem",
     price: 15,
   },
   {
     id: "dinner",
     title: "大餐",
-    icon: "🍲",
+    icon: "🍝",
     description: "热乎乎的一顿，适合记账",
     resourceKind: "coin",
     price: 4,
@@ -186,7 +221,7 @@ const DEFAULT_EXCHANGE_CATEGORIES: ExchangeCategory[] = [
   {
     id: "deluxe-dinner",
     title: "豪华大餐",
-    icon: "🍖",
+    icon: "🍰",
     description: "更丰盛一点，像周末的小奖励",
     resourceKind: "coin",
     price: 8,
@@ -194,12 +229,25 @@ const DEFAULT_EXCHANGE_CATEGORIES: ExchangeCategory[] = [
   {
     id: "family",
     title: "家庭放纵餐",
-    icon: "🏡",
+    icon: "🏠",
     description: "给特殊时刻留一笔温柔的奖励",
     resourceKind: "gem",
     price: 15,
   },
 ];
+
+function normalizeExchangeCategories(
+  categories: ExchangeCategory[],
+): ExchangeCategory[] {
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const mergedDefaults = DEFAULT_EXCHANGE_CATEGORIES.map((category) => {
+    const existing = byId.get(category.id);
+    return existing ? { ...category, ...existing } : category;
+  });
+  const defaultIds = new Set(DEFAULT_EXCHANGE_CATEGORIES.map((item) => item.id));
+  const extras = categories.filter((category) => !defaultIds.has(category.id));
+  return [...mergedDefaults, ...extras];
+}
 
 const MAY_HISTORY_ROWS = [
   {
@@ -269,11 +317,17 @@ function createDefaultState(
       coins: initialCoins,
     },
     streakDays: 0,
+    weeklySuccessDays: 0,
+    cumulativeSuccessDays: 0,
+    yesterdayGemTotal: 0,
     todayFishGems: 0,
     todayCatGems: 0,
     todayBonusGems: 0,
     weekGemTotal: 0,
     weekCoinTotal: 0,
+    heatmapStartDate: defaultHeatmapStartDate(),
+    coinRules: DEFAULT_COIN_RULES,
+    visualRules: DEFAULT_VISUAL_RULES,
     fishHeatmapOverrides: {},
     catHeatmapOverrides: {},
     dailyRecords: [],
@@ -288,6 +342,43 @@ function safeNumber(value: unknown, fallback = 0) {
     : fallback;
 }
 
+function normalizeVisualRules(
+  value: unknown,
+  fallback: SettlementVisualRules,
+): SettlementVisualRules {
+  const source = value as Partial<SettlementVisualRules> | null | undefined;
+  return {
+    heatmap: {
+      fish: {
+        ...fallback.heatmap.fish,
+        ...(source?.heatmap?.fish ?? {}),
+      },
+      cat: {
+        ...fallback.heatmap.cat,
+        ...(source?.heatmap?.cat ?? {}),
+      },
+    },
+    exerciseTag: {
+      ...fallback.exerciseTag,
+      ...(source?.exerciseTag ?? {}),
+    },
+  };
+}
+
+function normalizeCoinRules(
+  value: unknown,
+  fallback: CoinRulesConfig,
+): CoinRulesConfig {
+  const source = value as Partial<CoinRulesConfig> | null | undefined;
+  return {
+    weekStartDay: safeNumber(source?.weekStartDay, fallback.weekStartDay),
+    deficitStreakDays: safeNumber(
+      source?.deficitStreakDays,
+      fallback.deficitStreakDays,
+    ),
+  };
+}
+
 function readLocalState(
   initialGems: number,
   initialCoins: number,
@@ -298,9 +389,11 @@ function readLocalState(
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      const imported = importMayHistoryRecords(fallback);
-      writeLocalState(imported);
-      return imported;
+      const next = recalculateCoinsWithCurrentRules(
+        importMayHistoryRecords(fallback),
+      );
+      writeLocalState(next);
+      return next;
     }
     const parsed = JSON.parse(raw) as Partial<HomeResourcesState>;
 
@@ -310,11 +403,28 @@ function readLocalState(
         coins: safeNumber(parsed.wallet?.coins, fallback.wallet.coins),
       },
       streakDays: safeNumber(parsed.streakDays),
+      weeklySuccessDays: safeNumber(
+        (parsed as Partial<HomeResourcesState>).weeklySuccessDays,
+        safeNumber(parsed.streakDays),
+      ),
+      cumulativeSuccessDays: safeNumber(
+        (parsed as Partial<HomeResourcesState>).cumulativeSuccessDays,
+        safeNumber(parsed.streakDays),
+      ),
+      yesterdayGemTotal: safeNumber(
+        (parsed as Partial<HomeResourcesState>).yesterdayGemTotal,
+      ),
       todayFishGems: safeNumber(parsed.todayFishGems),
       todayCatGems: safeNumber(parsed.todayCatGems),
       todayBonusGems: safeNumber(parsed.todayBonusGems),
       weekGemTotal: safeNumber(parsed.weekGemTotal),
       weekCoinTotal: safeNumber(parsed.weekCoinTotal),
+      heatmapStartDate:
+        typeof parsed.heatmapStartDate === "string"
+          ? parsed.heatmapStartDate
+          : fallback.heatmapStartDate,
+      coinRules: normalizeCoinRules(parsed.coinRules, fallback.coinRules),
+      visualRules: normalizeVisualRules(parsed.visualRules, fallback.visualRules),
       fishHeatmapOverrides:
         parsed.fishHeatmapOverrides ?? fallback.fishHeatmapOverrides,
       catHeatmapOverrides:
@@ -323,19 +433,25 @@ function readLocalState(
         ? parsed.dailyRecords.map(normalizeDailyRecord)
         : fallback.dailyRecords,
       exchangeRecords: Array.isArray(parsed.exchangeRecords)
-        ? parsed.exchangeRecords
+        ? parsed.exchangeRecords.map((record) =>
+            normalizeExchangeRecord(record as ExchangeRecord),
+          )
         : fallback.exchangeRecords,
       exchangeCategories: Array.isArray(parsed.exchangeCategories)
-        ? parsed.exchangeCategories
+        ? normalizeExchangeCategories(parsed.exchangeCategories)
         : fallback.exchangeCategories,
     };
-    const imported = importMayHistoryRecords(restored);
-    writeLocalState(imported);
-    return imported;
+    const next = recalculateCoinsWithCurrentRules(
+      importMayHistoryRecords(restored),
+    );
+    writeLocalState(next);
+    return next;
   } catch {
-    const imported = importMayHistoryRecords(fallback);
-    writeLocalState(imported);
-    return imported;
+    const next = recalculateCoinsWithCurrentRules(
+      importMayHistoryRecords(fallback),
+    );
+    writeLocalState(next);
+    return next;
   }
 }
 
@@ -349,9 +465,16 @@ function pad2(value: number) {
 }
 
 function todayIsoDate() {
+  return getCurrentIsoDate();
+}
+
+function defaultHeatmapStartDate() {
   const now = new Date();
-  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(
-    now.getDate(),
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  const diffFromSaturday = first.getDay() === 6 ? 0 : first.getDay() + 1;
+  first.setDate(first.getDate() - diffFromSaturday);
+  return `${first.getFullYear()}-${pad2(first.getMonth() + 1)}-${pad2(
+    first.getDate(),
   )}`;
 }
 
@@ -376,21 +499,54 @@ function parseIsoDate(value: string) {
   return { year, month, day };
 }
 
-function formatRecordDate(day: number) {
-  return `5月${day}日`;
-}
-
 function formatRecordDateFromIso(recordDate: string) {
   const parsed = parseIsoDate(recordDate);
   if (!parsed) return recordDate;
   return `${parsed.year}年${parsed.month}月${parsed.day}日`;
 }
 
-function formatTodayDate() {
-  const now = new Date();
-  return `${now.getMonth() + 1}月${now.getDate()}日`;
+function formatExchangeDateLabel(date: Date) {
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
+function formatExchangeTimeLabel(date: Date) {
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function parseDateTimeInput(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function normalizeExchangeDateTime(
+  value?: string | null,
+  fallback = new Date(),
+) {
+  const parsed = value ? parseDateTimeInput(value) : null;
+  const date = parsed ?? fallback;
+  return {
+    date,
+    occurredAt: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
+      date.getDate(),
+    )}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`,
+  };
+}
+
+function normalizeExchangeRecord(record: ExchangeRecord): ExchangeRecord {
+  const normalized = normalizeExchangeDateTime(
+    record.occurredAt ?? record.createdAt,
+  );
+  return {
+    ...record,
+    occurredAt: normalized.occurredAt,
+    time: record.time || formatExchangeTimeLabel(normalized.date),
+    date:
+      record.date ||
+      `${formatExchangeDateLabel(normalized.date)} ${formatExchangeTimeLabel(
+        normalized.date,
+      )}`,
+  };
+}
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -421,12 +577,59 @@ function sideInputFromRecordSide(side: DailyRecordSide): SideLogInput {
   };
 }
 
+function normalizeHistoricalSideInput(
+  input?: TodayRecordSidePayload | null,
+): TodayRecordSidePayload | null {
+  if (!input) return null;
+  return {
+    weightKg: input.weightKg,
+    deficit: Math.max(0, Math.floor(input.deficit)),
+    minutes: Math.max(0, Math.floor(input.minutes)),
+  };
+}
+
 function recordGems(record: DailyRecord) {
   return record.fish.gems + record.cat.gems + record.bonus;
 }
 
 function recordIsoDate(record: DailyRecord) {
   return record.recordDate ?? isoDateFromMayDay(record.day);
+}
+
+function isSuccessfulCheckIn(
+  record: DailyRecord,
+  visualRules: SettlementVisualRules = DEFAULT_VISUAL_RULES,
+) {
+  return (
+    record.fish.deficit >= visualRules.heatmap.fish.okMin &&
+    record.cat.deficit >= visualRules.heatmap.cat.okMin
+  );
+}
+
+function countSuccessfulCheckInsInWeek(
+  records: DailyRecord[],
+  targetIsoDate: string,
+  coinRules: CoinRulesConfig,
+  visualRules: SettlementVisualRules = DEFAULT_VISUAL_RULES,
+) {
+  return records.reduce((total, record) => {
+    const date = recordIsoDate(record);
+    return isInCoinWeek(date, targetIsoDate, coinRules.weekStartDay) &&
+      isSuccessfulCheckIn(record, visualRules)
+      ? total + 1
+      : total;
+  }, 0);
+}
+
+function countSuccessfulCheckInsTotal(
+  records: DailyRecord[],
+  visualRules: SettlementVisualRules = DEFAULT_VISUAL_RULES,
+) {
+  return records.reduce(
+    (total, record) =>
+      isSuccessfulCheckIn(record, visualRules) ? total + 1 : total,
+    0,
+  );
 }
 
 function findRecordByIso(records: DailyRecord[], recordDate: string) {
@@ -461,22 +664,177 @@ function buildHeatmapOverrides(
   }, {});
 }
 
-function deficitStreakEndingAt(records: DailyRecord[], day: number) {
-  let streak = 0;
-  for (let currentDay = day; currentDay >= 1; currentDay -= 1) {
-    const record = records.find((item) => item.day === currentDay);
-    if (!record || record.fish.deficit <= 0 || record.cat.deficit <= 0) break;
-    streak += 1;
-  }
-  return streak;
-}
-
-function sumRecordGems(records: DailyRecord[]) {
-  return records.reduce((total, record) => total + recordGems(record), 0);
-}
-
 function sumRecordCoins(records: DailyRecord[]) {
   return records.reduce((total, record) => total + record.coins, 0);
+}
+
+function sumRecordGemsInCoinWeek(
+  records: DailyRecord[],
+  targetIsoDate: string,
+  coinRules: CoinRulesConfig = DEFAULT_COIN_RULES,
+) {
+  return records.reduce((total, record) => {
+    const date = recordIsoDate(record);
+    return isInCoinWeek(date, targetIsoDate, coinRules.weekStartDay)
+      ? total + recordGems(record)
+      : total;
+  }, 0);
+}
+
+function sumRecordCoinsInCoinWeek(
+  records: DailyRecord[],
+  targetIsoDate: string,
+  coinRules: CoinRulesConfig = DEFAULT_COIN_RULES,
+) {
+  return records.reduce((total, record) => {
+    const date = recordIsoDate(record);
+    return isInCoinWeek(date, targetIsoDate, coinRules.weekStartDay)
+      ? total + record.coins
+      : total;
+  }, 0);
+}
+
+function sumCoinExchangeSpend(records: ExchangeRecord[]) {
+  return records.reduce(
+    (total, record) =>
+      record.resourceKind === "coin" ? total + record.price : total,
+    0,
+  );
+}
+
+function computeGemWallet(
+  records: DailyRecord[],
+  exchangeRecords: ExchangeRecord[],
+) {
+  const events = [
+    ...records.map((record) => ({
+      at: `${record.createdAt || record.recordDate}#gain`,
+      delta: recordGems(record),
+    })),
+    ...exchangeRecords
+      .filter((record) => record.resourceKind === "gem")
+      .map((record) => ({
+        at: `${record.occurredAt || record.createdAt || record.date}#spend`,
+        delta: -record.price,
+      })),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+
+  return events.reduce((balance, event) => {
+    if (event.delta >= 0) {
+      return Math.min(GEM_CAP, balance + event.delta);
+    }
+    return Math.max(0, balance + event.delta);
+  }, 0);
+}
+
+function exchangeRecordSortKey(record: ExchangeRecord) {
+  return record.occurredAt || record.createdAt || record.date;
+}
+
+function orderExchangeRecords(records: ExchangeRecord[]) {
+  return [...records].sort((a, b) =>
+    exchangeRecordSortKey(b).localeCompare(exchangeRecordSortKey(a)),
+  );
+}
+
+function todayRecordFrom(records: DailyRecord[]) {
+  return findRecordByIso(records, todayIsoDate());
+}
+
+function yesterdayRecordFrom(records: DailyRecord[]) {
+  const iso = previousIsoDate(todayIsoDate());
+  if (!iso) return null;
+  return findRecordByIso(records, iso);
+}
+
+export function recalculateCoinsWithCurrentRules(
+  state: HomeResourcesState,
+): HomeResourcesState {
+  const ascendingRecords = [...state.dailyRecords].sort((a, b) =>
+    recordIsoDate(a).localeCompare(recordIsoDate(b)),
+  );
+  let previousRecords: DailyRecord[] = [];
+  const recalculatedRecords: DailyRecord[] = [];
+
+  for (const record of ascendingRecords) {
+    const recordDate = recordIsoDate(record);
+    const coin = computeCoinPreview({
+      fish: sideInputFromRecordSide(record.fish),
+      cat: sideInputFromRecordSide(record.cat),
+      todayDay: record.day,
+      todayDate: recordDate,
+      todayGemTotal: recordGems(record),
+      currentWeekGemTotal: sumRecordGemsInCoinWeek(
+        previousRecords,
+        recordDate,
+        state.coinRules,
+      ),
+      dailyRecords: previousRecords,
+      coinRules: state.coinRules,
+      visualRules: state.visualRules,
+    });
+    const nextRecord = {
+      ...record,
+      coins: coin.delta,
+      fishHeat: buildHeatmapDay(
+        "fish",
+        sideInputFromRecordSide(record.fish),
+        state.visualRules,
+      ),
+      catHeat: buildHeatmapDay(
+        "cat",
+        sideInputFromRecordSide(record.cat),
+        state.visualRules,
+      ),
+    };
+    recalculatedRecords.push(nextRecord);
+    previousRecords = orderDailyRecords([...previousRecords, nextRecord]);
+  }
+
+  const nextRecords = orderDailyRecords(recalculatedRecords);
+  const todayRecord = todayRecordFrom(nextRecords);
+  const yesterdayRecord = yesterdayRecordFrom(nextRecords);
+  const earnedCoins = sumRecordCoins(nextRecords);
+  const spentCoins = sumCoinExchangeSpend(state.exchangeRecords);
+
+  return {
+    ...state,
+    wallet: {
+      gems: computeGemWallet(nextRecords, state.exchangeRecords),
+      coins: Math.max(0, earnedCoins - spentCoins),
+    },
+    todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
+    todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
+    todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
+    weekGemTotal: sumRecordGemsInCoinWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+    ),
+    weekCoinTotal: sumRecordCoinsInCoinWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+    ),
+    streakDays: countSuccessfulCheckInsInWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+      state.visualRules,
+    ),
+    weeklySuccessDays: countSuccessfulCheckInsInWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+      state.visualRules,
+    ),
+    cumulativeSuccessDays: countSuccessfulCheckInsTotal(
+      nextRecords,
+      state.visualRules,
+    ),
+    yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
+    dailyRecords: nextRecords,
+  };
 }
 
 export function importMayHistoryRecords(
@@ -519,9 +877,16 @@ export function importMayHistoryRecords(
       fish: fishInput,
       cat: catInput,
       todayDay: row.day,
+      todayDate: recordDate,
       todayGemTotal,
-      currentWeekGemTotal: sumRecordGems(workingRecords),
+      currentWeekGemTotal: sumRecordGemsInCoinWeek(
+        workingRecords,
+        recordDate,
+        state.coinRules,
+      ),
       dailyRecords: workingRecords,
+      coinRules: state.coinRules,
+      visualRules: state.visualRules,
     });
 
     const record: DailyRecord = {
@@ -540,8 +905,8 @@ export function importMayHistoryRecords(
       },
       bonus: couple.gems,
       coins: coin.delta,
-      fishHeat: buildHeatmapDay(fishInput),
-      catHeat: buildHeatmapDay(catInput),
+      fishHeat: buildHeatmapDay("fish", fishInput, state.visualRules),
+      catHeat: buildHeatmapDay("cat", catInput, state.visualRules),
     };
 
     importedRecords.push(record);
@@ -549,30 +914,46 @@ export function importMayHistoryRecords(
   }
 
   const nextRecords = orderDailyRecords([...importedRecords, ...baseRecords]);
-  const oldGemTotal = sumRecordGems(oldImportRecords);
-  const newGemTotal = sumRecordGems(importedRecords);
   const oldCoinTotal = sumRecordCoins(oldImportRecords);
   const newCoinTotal = sumRecordCoins(importedRecords);
-  const todayRecord = findRecordByIso(
-    nextRecords,
-    isoDateFromMayDay(getMaySettlementDay()),
-  );
+  const todayRecord = todayRecordFrom(nextRecords);
 
   return {
     ...state,
     wallet: {
-      gems: Math.min(
-        GEM_CAP,
-        Math.max(0, state.wallet.gems - oldGemTotal + newGemTotal),
-      ),
+      gems: computeGemWallet(nextRecords, state.exchangeRecords),
       coins: Math.max(0, state.wallet.coins - oldCoinTotal + newCoinTotal),
     },
     todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
     todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
     todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
-    weekGemTotal: sumRecordGems(nextRecords),
-    weekCoinTotal: sumRecordCoins(nextRecords),
-    streakDays: deficitStreakEndingAt(nextRecords, getMaySettlementDay()),
+    weekGemTotal: sumRecordGemsInCoinWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+    ),
+    weekCoinTotal: sumRecordCoinsInCoinWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+    ),
+    streakDays: countSuccessfulCheckInsInWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+      state.visualRules,
+    ),
+    weeklySuccessDays: countSuccessfulCheckInsInWeek(
+      nextRecords,
+      todayIsoDate(),
+      state.coinRules,
+      state.visualRules,
+    ),
+    cumulativeSuccessDays: countSuccessfulCheckInsTotal(
+      nextRecords,
+      state.visualRules,
+    ),
+    yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
     fishHeatmapOverrides: buildHeatmapOverrides(nextRecords, "fish"),
     catHeatmapOverrides: buildHeatmapOverrides(nextRecords, "cat"),
     dailyRecords: nextRecords,
@@ -627,35 +1008,110 @@ export function HomeResourcesProvider({
         return false;
       }
 
+      const occurred = normalizeExchangeDateTime(
+        payload.occurredAt,
+        new Date(),
+      );
       const createdAt = new Date().toISOString();
       const record: ExchangeRecord = {
         id: makeId("exchange"),
-        date: formatTodayDate(),
+        date: `${formatExchangeDateLabel(occurred.date)} ${formatExchangeTimeLabel(
+          occurred.date,
+        )}`,
         createdAt,
+        occurredAt: occurred.occurredAt,
+        time: formatExchangeTimeLabel(occurred.date),
         ...payload,
       };
 
       commitHomeState((state) => ({
         ...state,
         wallet: {
-          gems: state.wallet.gems - gems,
+          gems: computeGemWallet(state.dailyRecords, [record, ...state.exchangeRecords]),
           coins: state.wallet.coins - coins,
         },
-        exchangeRecords: [record, ...state.exchangeRecords],
+        exchangeRecords: orderExchangeRecords([record, ...state.exchangeRecords]),
       }));
       return true;
     },
     [commitHomeState],
   );
 
+  const updateExchangeRecord = useCallback(
+    (recordId: string, patch: { occurredAt?: string; remark?: string }) => {
+      let updated = false;
+      commitHomeState((state) => {
+        const existing = state.exchangeRecords.find(
+          (record) => record.id === recordId,
+        );
+        if (!existing) return state;
+
+        const occurred = normalizeExchangeDateTime(
+          patch.occurredAt ?? existing.occurredAt,
+          new Date(existing.createdAt),
+        );
+        const nextRecord: ExchangeRecord = normalizeExchangeRecord({
+          ...existing,
+          occurredAt: occurred.occurredAt,
+          time: formatExchangeTimeLabel(occurred.date),
+          date: `${formatExchangeDateLabel(occurred.date)} ${formatExchangeTimeLabel(
+            occurred.date,
+          )}`,
+          remark: patch.remark ?? existing.remark,
+        });
+
+        updated = true;
+        return {
+          ...state,
+          exchangeRecords: orderExchangeRecords(
+            state.exchangeRecords.map((record) =>
+              record.id === recordId ? nextRecord : record,
+            ),
+          ),
+        };
+      });
+      return updated;
+    },
+    [commitHomeState],
+  );
+
+  const deleteExchangeRecord = useCallback(
+    (recordId: string) => {
+      let deleted = false;
+      commitHomeState((state) => {
+        const existing = state.exchangeRecords.find(
+          (record) => record.id === recordId,
+        );
+        if (!existing) return state;
+        deleted = true;
+        const refundCoins =
+          existing.resourceKind === "coin" ? existing.price : 0;
+        return {
+          ...state,
+          wallet: {
+            gems: computeGemWallet(
+              state.dailyRecords,
+              state.exchangeRecords.filter((item) => item.id !== recordId),
+            ),
+            coins: state.wallet.coins + refundCoins,
+          },
+          exchangeRecords: state.exchangeRecords.filter(
+            (record) => record.id !== recordId,
+          ),
+        };
+      });
+      return deleted;
+    },
+    [commitHomeState],
+  );
+
   const applyTodayRecord = useCallback(
     (payload: TodayRecordPayload) => {
-      const addGems =
-        payload.fishGems + payload.catGems + payload.bonusGems;
+      const recordDate = todayIsoDate();
       const record: DailyRecord = {
         id: makeId("daily"),
-        date: formatRecordDate(payload.day),
-        recordDate: isoDateFromMayDay(payload.day),
+        date: formatRecordDateFromIso(recordDate),
+        recordDate,
         createdAt: new Date().toISOString(),
         day: payload.day,
         fish: {
@@ -672,37 +1128,63 @@ export function HomeResourcesProvider({
         catHeat: payload.catHeat,
       };
 
-      commitHomeState((state) => ({
-        ...state,
-        wallet: {
-          gems: Math.min(GEM_CAP, state.wallet.gems + addGems),
-          coins: state.wallet.coins + payload.coinDelta,
-        },
-        todayFishGems: payload.fishGems,
-        todayCatGems: payload.catGems,
-        todayBonusGems: payload.bonusGems,
-        weekGemTotal: state.weekGemTotal + addGems,
-        weekCoinTotal: state.weekCoinTotal + payload.coinDelta,
-        streakDays:
-          payload.fish.deficit > 0 && payload.cat.deficit > 0
-            ? state.streakDays + 1
-            : 0,
-        fishHeatmapOverrides: {
-          ...state.fishHeatmapOverrides,
-          [payload.day]: payload.fishHeat,
-        },
-        catHeatmapOverrides: {
-          ...state.catHeatmapOverrides,
-          [payload.day]: payload.catHeat,
-        },
-        dailyRecords: [record, ...state.dailyRecords],
-      }));
+      commitHomeState((state) => {
+        const nextRecords = orderDailyRecords([record, ...state.dailyRecords]);
+        const todayRecord = todayRecordFrom(nextRecords);
+        const yesterdayRecord = yesterdayRecordFrom(nextRecords);
+        return {
+          ...state,
+          wallet: {
+            gems: computeGemWallet(nextRecords, state.exchangeRecords),
+            coins: state.wallet.coins + payload.coinDelta,
+          },
+          todayFishGems: payload.fishGems,
+          todayCatGems: payload.catGems,
+          todayBonusGems: payload.bonusGems,
+          weekGemTotal: sumRecordGemsInCoinWeek(
+            nextRecords,
+            recordDate,
+            state.coinRules,
+          ),
+          weekCoinTotal: sumRecordCoinsInCoinWeek(
+            nextRecords,
+            recordDate,
+            state.coinRules,
+          ),
+          streakDays: countSuccessfulCheckInsInWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+            state.visualRules,
+          ),
+          weeklySuccessDays: countSuccessfulCheckInsInWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+            state.visualRules,
+          ),
+          cumulativeSuccessDays: countSuccessfulCheckInsTotal(
+            nextRecords,
+            state.visualRules,
+          ),
+          yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
+          fishHeatmapOverrides: {
+            ...state.fishHeatmapOverrides,
+            [payload.day]: payload.fishHeat,
+          },
+          catHeatmapOverrides: {
+            ...state.catHeatmapOverrides,
+            [payload.day]: payload.catHeat,
+          },
+          dailyRecords: nextRecords,
+        };
+      });
     },
     [commitHomeState],
   );
 
-  const applyHistoricalRecord = useCallback(
-    (payload: HistoricalRecordPayload): HistoricalRecordResult => {
+  const upsertHistoricalRecord = useCallback(
+    (payload: HistoricalRecordDraft): HistoricalRecordResult => {
       const parsed = parseIsoDate(payload.recordDate);
       if (!parsed) {
         return { ok: false, updatedExisting: false, reason: "invalid-date" };
@@ -726,31 +1208,37 @@ export function HomeResourcesProvider({
           ? findRecordByIso(recordsWithoutExisting, previousDate)
           : null;
 
-        const baseFish = existing
-          ? sideInputFromRecordSide(existing.fish)
-          : sideInputFromRecordSide(zeroSide());
-        const baseCat = existing
-          ? sideInputFromRecordSide(existing.cat)
-          : sideInputFromRecordSide(zeroSide());
+        const baseFish =
+          existing?.fish != null
+            ? sideInputFromRecordSide(existing.fish)
+            : sideInputFromRecordSide(zeroSide());
+        const baseCat =
+          existing?.cat != null
+            ? sideInputFromRecordSide(existing.cat)
+            : sideInputFromRecordSide(zeroSide());
         const fishInput =
-          payload.person === "fish" ? payload.input : baseFish;
-        const catInput = payload.person === "cat" ? payload.input : baseCat;
+          normalizeHistoricalSideInput(payload.fish) ?? baseFish;
+        const catInput =
+          normalizeHistoricalSideInput(payload.cat) ?? baseCat;
         const fishGems = gemsForPerson("fish", fishInput, yesterdayRecord);
         const catGems = gemsForPerson("cat", catInput, yesterdayRecord);
         const couple = computeCoupleBonus(fishInput, catInput);
         const newGemTotal = fishGems + catGems + couple.gems;
-        const oldGemTotal = existing ? recordGems(existing) : 0;
-        const weekGemTotalWithoutExisting = Math.max(
-          0,
-          state.weekGemTotal - oldGemTotal,
+        const weekGemTotalWithoutExisting = sumRecordGemsInCoinWeek(
+          recordsWithoutExisting,
+          payload.recordDate,
+          state.coinRules,
         );
         const coin = computeCoinPreview({
           fish: fishInput,
           cat: catInput,
           todayDay: parsed.day,
+          todayDate: payload.recordDate,
           todayGemTotal: newGemTotal,
           currentWeekGemTotal: weekGemTotalWithoutExisting,
           dailyRecords: recordsWithoutExisting,
+          coinRules: state.coinRules,
+          visualRules: state.visualRules,
         });
 
         const nextRecord: DailyRecord = {
@@ -769,19 +1257,16 @@ export function HomeResourcesProvider({
           },
           bonus: couple.gems,
           coins: coin.delta,
-          fishHeat: buildHeatmapDay(fishInput),
-          catHeat: buildHeatmapDay(catInput),
+          fishHeat: buildHeatmapDay("fish", fishInput, state.visualRules),
+          catHeat: buildHeatmapDay("cat", catInput, state.visualRules),
         };
 
         const nextRecords = orderDailyRecords([
           nextRecord,
           ...recordsWithoutExisting,
         ]);
-        const todayRecord = findRecordByIso(
-          nextRecords,
-          isoDateFromMayDay(getMaySettlementDay()),
-        );
-        const gemDelta = newGemTotal - oldGemTotal;
+        const todayRecord = todayRecordFrom(nextRecords);
+        const yesterdayRecord = yesterdayRecordFrom(nextRecords);
         const coinDelta = coin.delta - (existing?.coins ?? 0);
         result = {
           ok: true,
@@ -791,18 +1276,39 @@ export function HomeResourcesProvider({
         return {
           ...state,
           wallet: {
-            gems: Math.min(
-              GEM_CAP,
-              Math.max(0, state.wallet.gems + gemDelta),
-            ),
+            gems: computeGemWallet(nextRecords, state.exchangeRecords),
             coins: Math.max(0, state.wallet.coins + coinDelta),
           },
           todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
           todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
           todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
-          weekGemTotal: sumRecordGems(nextRecords),
-          weekCoinTotal: sumRecordCoins(nextRecords),
-          streakDays: deficitStreakEndingAt(nextRecords, getMaySettlementDay()),
+          weekGemTotal: sumRecordGemsInCoinWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+          ),
+          weekCoinTotal: sumRecordCoinsInCoinWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+          ),
+          streakDays: countSuccessfulCheckInsInWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+            state.visualRules,
+          ),
+          weeklySuccessDays: countSuccessfulCheckInsInWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+            state.visualRules,
+          ),
+          cumulativeSuccessDays: countSuccessfulCheckInsTotal(
+            nextRecords,
+            state.visualRules,
+          ),
+          yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
           fishHeatmapOverrides: buildHeatmapOverrides(nextRecords, "fish"),
           catHeatmapOverrides: buildHeatmapOverrides(nextRecords, "cat"),
           dailyRecords: nextRecords,
@@ -810,6 +1316,28 @@ export function HomeResourcesProvider({
       });
 
       return result;
+    },
+    [commitHomeState],
+  );
+
+  const applyHistoricalRecord = useCallback(
+    (payload: HistoricalRecordPayload): HistoricalRecordResult => {
+      return upsertHistoricalRecord({
+        recordDate: payload.recordDate,
+        fish: payload.person === "fish" ? payload.input : null,
+        cat: payload.person === "cat" ? payload.input : null,
+      });
+    },
+    [upsertHistoricalRecord],
+  );
+
+  const updateHeatmapStartDate = useCallback(
+    (date: string) => {
+      if (!parseIsoDate(date)) return;
+      commitHomeState((state) => ({
+        ...state,
+        heatmapStartDate: date,
+      }));
     },
     [commitHomeState],
   );
@@ -852,11 +1380,16 @@ export function HomeResourcesProvider({
       tryRedeem,
       redeemExchange,
       streakDays: homeState.streakDays,
+      weeklySuccessDays: homeState.weeklySuccessDays,
+      cumulativeSuccessDays: homeState.cumulativeSuccessDays,
       todayFishGems: homeState.todayFishGems,
       todayCatGems: homeState.todayCatGems,
       todayBonusGems: homeState.todayBonusGems,
       weekGemTotal: homeState.weekGemTotal,
       weekCoinTotal: homeState.weekCoinTotal,
+      heatmapStartDate: homeState.heatmapStartDate,
+      coinRules: homeState.coinRules,
+      visualRules: homeState.visualRules,
       fishHeatmapOverrides: homeState.fishHeatmapOverrides,
       catHeatmapOverrides: homeState.catHeatmapOverrides,
       dailyRecords: homeState.dailyRecords,
@@ -864,6 +1397,10 @@ export function HomeResourcesProvider({
       exchangeCategories: homeState.exchangeCategories,
       applyTodayRecord,
       applyHistoricalRecord,
+      upsertHistoricalRecord,
+      updateExchangeRecord,
+      deleteExchangeRecord,
+      updateHeatmapStartDate,
       upsertExchangeCategory,
       deleteExchangeCategory,
     }),
@@ -873,6 +1410,10 @@ export function HomeResourcesProvider({
       redeemExchange,
       applyTodayRecord,
       applyHistoricalRecord,
+      upsertHistoricalRecord,
+      updateExchangeRecord,
+      deleteExchangeRecord,
+      updateHeatmapStartDate,
       upsertExchangeCategory,
       deleteExchangeCategory,
     ],

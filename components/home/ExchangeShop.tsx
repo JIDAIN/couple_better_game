@@ -22,6 +22,11 @@ type OverlayState =
   | { kind: "category"; categoryId: string | null }
   | null;
 
+type RecordFormState = {
+  remark: string;
+  occurredAt: string;
+};
+
 const SHOP_SUBTITLE_OPTIONS = [
   "把努力变成一起期待的小快乐",
   "一点点攒下属于我们的奖励",
@@ -41,6 +46,30 @@ const EMPTY_CATEGORY_FORM: CategoryFormState = {
   resourceKind: "gem",
   price: "",
 };
+
+const EMPTY_RECORD_FORM: RecordFormState = {
+  remark: "",
+  occurredAt: "",
+};
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function currentDateTimeLocalValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(
+    now.getDate(),
+  )}T${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+}
+
+function toDateTimeLocalValue(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return currentDateTimeLocalValue();
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
+    date.getDate(),
+  )}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
 
 function resourceLabel(kind: ResourceKind) {
   return kind === "gem" ? "宝石" : "金币";
@@ -78,6 +107,8 @@ export function ExchangeShop() {
     gemStock,
     coinStock,
     redeemExchange,
+    updateExchangeRecord,
+    deleteExchangeRecord,
     exchangeRecords,
     exchangeCategories: categories,
     upsertExchangeCategory,
@@ -92,7 +123,10 @@ export function ExchangeShop() {
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(
     EMPTY_CATEGORY_FORM,
   );
-  const [remark, setRemark] = useState("");
+  const [recordForm, setRecordForm] = useState<RecordFormState>(
+    EMPTY_RECORD_FORM,
+  );
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const titleId = useId();
   const overlayTitleId = useId();
   const prevOverflow = useRef<string | null>(null);
@@ -101,26 +135,34 @@ export function ExchangeShop() {
     overlay?.kind === "record"
       ? categories.find((item) => item.id === overlay.categoryId) ?? null
       : null;
+  const selectedRecord =
+    editingRecordId != null
+      ? exchangeRecords.find((item) => item.id === editingRecordId) ?? null
+      : null;
 
   const closeOverlay = useCallback(() => {
     setOverlayEnter(false);
     setOverlay(null);
-    setRemark("");
+    setRecordForm(EMPTY_RECORD_FORM);
+    setEditingRecordId(null);
     setCategoryForm(EMPTY_CATEGORY_FORM);
   }, []);
 
   const openOverlay = useCallback((next: OverlayState) => {
     setOverlay(next);
     setOverlayEnter(false);
-    setRemark("");
     if (next?.kind === "category") {
       const source =
         next.categoryId == null
           ? null
           : categories.find((item) => item.id === next.categoryId) ?? null;
       setCategoryForm(formFromCategory(source));
-    } else {
+      setRecordForm(EMPTY_RECORD_FORM);
+      setEditingRecordId(null);
+    } else if (next?.kind === "history") {
       setCategoryForm(EMPTY_CATEGORY_FORM);
+      setRecordForm(EMPTY_RECORD_FORM);
+      setEditingRecordId(null);
     }
   }, [categories]);
 
@@ -139,8 +181,31 @@ export function ExchangeShop() {
   }, [closeOverlay]);
 
   const openRecord = useCallback((categoryId: string) => {
+    setEditingRecordId(null);
+    setRecordForm({
+      remark: "",
+      occurredAt: currentDateTimeLocalValue(),
+    });
     openOverlay({ kind: "record", categoryId });
   }, [openOverlay]);
+
+  const openEditRecord = useCallback(
+    (recordId: string) => {
+      const source = exchangeRecords.find((item) => item.id === recordId);
+      if (!source) return;
+      setEditingRecordId(recordId);
+      setRecordForm({
+        remark: source.remark,
+        occurredAt: toDateTimeLocalValue(source.occurredAt),
+      });
+      openOverlay({
+        kind: "record",
+        categoryId:
+          categories.find((item) => item.title === source.category)?.id ?? "",
+      });
+    },
+    [categories, exchangeRecords, openOverlay],
+  );
 
   const openHistory = useCallback(() => {
     openOverlay({ kind: "history" });
@@ -230,15 +295,29 @@ export function ExchangeShop() {
     deleteExchangeCategory(categoryId);
   }, [deleteExchangeCategory]);
 
-  const confirmRedeem = useCallback(() => {
+  const saveExchangeRecord = useCallback(() => {
+    const note = recordForm.remark.trim();
+    const occurredAt = recordForm.occurredAt || currentDateTimeLocalValue();
+
+    if (editingRecordId) {
+      const ok = updateExchangeRecord(editingRecordId, {
+        occurredAt,
+        remark: note,
+      });
+      if (!ok) return;
+      setToast("已更新兑换记录");
+      closeOverlay();
+      return;
+    }
+
     if (!selectedCategory) return;
-    const note = remark.trim();
     const ok = redeemExchange({
       category: selectedCategory.title,
       remark: note,
       resourceKind: selectedCategory.resourceKind,
       price: selectedCategory.price,
       icon: selectedCategory.icon,
+      occurredAt,
     });
     if (!ok) return;
 
@@ -248,8 +327,15 @@ export function ExchangeShop() {
         : `已兑换：${selectedCategory.title} ✨`,
     );
     closeOverlay();
-  }, [closeOverlay, redeemExchange, remark, selectedCategory]);
-
+  }, [
+    closeOverlay,
+    editingRecordId,
+    redeemExchange,
+    recordForm.occurredAt,
+    recordForm.remark,
+    selectedCategory,
+    updateExchangeRecord,
+  ]);
   const canAfford = useCallback(
     (category: ExchangeCategory) => {
       if (category.resourceKind === "gem") return gemStock >= category.price;
@@ -258,157 +344,205 @@ export function ExchangeShop() {
     [coinStock, gemStock],
   );
 
-  const renderBrowseList = () => (
-    <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+  const renderBrowseList = () => {
+    const gemCategories = categories.filter(
+      (category) => category.resourceKind === "gem",
+    );
+    const coinCategories = categories.filter(
+      (category) => category.resourceKind === "coin",
+    );
+
+    const renderCategoryCard = (category: ExchangeCategory) => {
+      const affordable = canAfford(category);
+      return (
+        <article
+          key={category.id}
+          className="rounded-[1.05rem] border border-white/80 bg-white/58 px-3 py-2.5 shadow-sm shadow-stone-100/25"
+        >
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${categoryTone(
+                category.resourceKind,
+              )}`}
+              aria-hidden
+            >
+              {category.icon}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-semibold text-stone-700">
+                {category.title}
+              </p>
+              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-stone-400">
+                {category.description}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getCategoryChipClass(
+                    category.resourceKind,
+                  )}`}
+                >
+                  {resourceLabel(category.resourceKind)}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
+                  消耗 {categoryPriceLabel(category)}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={!affordable}
+              onClick={() => openRecord(category.id)}
+              className="shrink-0 rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-[11px] font-semibold text-stone-600 shadow-sm shadow-rose-100/20 transition hover:bg-white/85 disabled:cursor-not-allowed disabled:border-stone-200/80 disabled:bg-stone-100/70 disabled:text-stone-400 disabled:shadow-none"
+            >
+              {affordable ? "兑换" : "差一点"}
+            </button>
+          </div>
+        </article>
+      );
+    };
+
+    const renderSection = (title: string, items: ExchangeCategory[]) => (
       <section className="space-y-1.5">
-        <p className="px-1 text-[11px] font-semibold tracking-wide text-stone-500">
-          固定兑换分类
-        </p>
+        <div className="flex items-center justify-between gap-3 px-1">
+          <p className="text-[11px] font-semibold tracking-wide text-stone-500">
+            {title}
+          </p>
+          <span className="text-[10px] font-semibold text-stone-400">
+            {items.length} 项
+          </span>
+        </div>
         <div className="space-y-1.5">
-          {categories.map((category) => {
-            const affordable = canAfford(category);
-            return (
-              <article
-                key={category.id}
-                className="rounded-[1.05rem] border border-white/80 bg-white/58 px-3 py-2.5 shadow-sm shadow-stone-100/25"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${categoryTone(
-                      category.resourceKind,
-                    )}`}
-                    aria-hidden
-                  >
-                    {category.icon}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-stone-700">
-                      {category.title}
-                    </p>
-                    <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-stone-400">
-                      {category.description}
-                    </p>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getCategoryChipClass(
-                          category.resourceKind,
-                        )}`}
-                      >
-                        {resourceLabel(category.resourceKind)}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
-                        消耗 {categoryPriceLabel(category)}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!affordable}
-                    onClick={() => openRecord(category.id)}
-                    className="shrink-0 rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-[11px] font-semibold text-stone-600 shadow-sm shadow-rose-100/20 transition hover:bg-white/85 disabled:cursor-not-allowed disabled:border-stone-200/80 disabled:bg-stone-100/70 disabled:text-stone-400 disabled:shadow-none"
-                  >
-                    {affordable ? "兑换" : "差一点"}
-                  </button>
-                </div>
-              </article>
-            );
-          })}
+          {items.map(renderCategoryCard)}
         </div>
       </section>
+    );
 
-      <section className="mt-2.5 space-y-1.5">
+    return (
+      <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+        {renderSection("宝石兑换", gemCategories)}
+        {renderSection("金币兑换", coinCategories)}
+
+        <section className="mt-2.5 space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="px-1 text-[11px] font-semibold tracking-wide text-stone-500">
+              已兑换记录
+            </p>
+            <button
+              type="button"
+              onClick={openHistory}
+              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold text-stone-600"
+            >
+              查看记录
+            </button>
+          </div>
+          <div className="rounded-[1.05rem] border border-white/75 bg-white/52 px-3 py-2.5 text-[11px] font-medium text-stone-500">
+            记录会以轻量时间线展开，方便回头翻看每一笔小奖励。
+          </div>
+        </section>
+      </div>
+    );
+  };
+
+  const renderManageList = () => {
+    const gemCategories = categories.filter(
+      (category) => category.resourceKind === "gem",
+    );
+    const coinCategories = categories.filter(
+      (category) => category.resourceKind === "coin",
+    );
+
+    const renderCategoryCard = (category: ExchangeCategory) => (
+      <article
+        key={category.id}
+        className="rounded-[1.05rem] border border-white/80 bg-white/58 px-3 py-2.5 shadow-sm shadow-stone-100/25"
+      >
+        <div className="flex items-center gap-2.5">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${categoryTone(
+              category.resourceKind,
+            )}`}
+            aria-hidden
+          >
+            {category.icon}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold text-stone-700">
+              {category.title}
+            </p>
+            <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-stone-400">
+              {category.description}
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getCategoryChipClass(
+                  category.resourceKind,
+                )}`}
+              >
+                {resourceLabel(category.resourceKind)}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
+                消耗 {categoryPriceLabel(category)}
+              </span>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => openCategoryForm(category.id)}
+              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold text-stone-600"
+            >
+              编辑
+            </button>
+            <button
+              type="button"
+              onClick={() => deleteCategory(category.id)}
+              className="rounded-full border border-stone-200/75 bg-white/55 px-3 py-1.5 text-[11px] font-semibold text-stone-500 transition hover:bg-white/80"
+            >
+              删除
+            </button>
+          </div>
+        </div>
+      </article>
+    );
+
+    const renderSection = (title: string, items: ExchangeCategory[]) => (
+      <section className="space-y-1.5">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <p className="text-[11px] font-semibold tracking-wide text-stone-500">
+            {title}
+          </p>
+          <span className="text-[10px] font-semibold text-stone-400">
+            {items.length} 项
+          </span>
+        </div>
+        <div className="space-y-1.5">
+          {items.map(renderCategoryCard)}
+        </div>
+      </section>
+    );
+
+    return (
+      <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
         <div className="flex items-center justify-between gap-3">
           <p className="px-1 text-[11px] font-semibold tracking-wide text-stone-500">
-            已兑换记录
+            奖励模板
           </p>
           <button
             type="button"
-            onClick={openHistory}
-            className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold text-stone-600"
+            onClick={() => openCategoryForm(null)}
+            className="ui-button-secondary px-3 py-1.5 text-xs font-semibold text-stone-600"
           >
-            查看记录
+            新增类别
           </button>
         </div>
-        <div className="rounded-[1.05rem] border border-white/75 bg-white/52 px-3 py-2.5 text-[11px] font-medium text-stone-500">
-          记录会以轻量时间线展开，方便回头翻看每一笔小奖励。
+
+        <div className="mt-2 space-y-3">
+          {renderSection("宝石类", gemCategories)}
+          {renderSection("金币类", coinCategories)}
         </div>
-      </section>
-    </div>
-  );
-
-  const renderManageList = () => (
-    <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
-      <div className="flex items-center justify-between gap-3">
-        <p className="px-1 text-[11px] font-semibold tracking-wide text-stone-500">
-          奖励模板
-        </p>
-        <button
-          type="button"
-          onClick={() => openCategoryForm(null)}
-          className="ui-button-secondary px-3 py-1.5 text-xs font-semibold text-stone-600"
-        >
-          新增类别
-        </button>
       </div>
-
-      <div className="mt-2 space-y-1.5">
-        {categories.map((category) => (
-          <article
-            key={category.id}
-            className="rounded-[1.05rem] border border-white/80 bg-white/58 px-3 py-2.5 shadow-sm shadow-stone-100/25"
-          >
-            <div className="flex items-center gap-2.5">
-              <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${categoryTone(
-                  category.resourceKind,
-                )}`}
-                aria-hidden
-              >
-                {category.icon}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold text-stone-700">
-                  {category.title}
-                </p>
-                <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-stone-400">
-                  {category.description}
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getCategoryChipClass(
-                      category.resourceKind,
-                    )}`}
-                  >
-                    {resourceLabel(category.resourceKind)}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
-                    消耗 {categoryPriceLabel(category)}
-                  </span>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => openCategoryForm(category.id)}
-                  className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold text-stone-600"
-                >
-                  编辑
-                </button>
-                <button
-                  type="button"
-                  onClick={() => deleteCategory(category.id)}
-                  className="rounded-full border border-stone-200/75 bg-white/55 px-3 py-1.5 text-[11px] font-semibold text-stone-500 transition hover:bg-white/80"
-                >
-                  删除
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-
+    );
+  };
   const renderOverlay = () => {
     if (!overlay) return null;
 
@@ -461,16 +595,39 @@ export function ExchangeShop() {
                     key={record.id}
                     className="rounded-[1.1rem] border border-white/75 bg-white/58 px-3 py-3 shadow-sm shadow-stone-100/30"
                   >
-                    <p className="text-[11px] font-semibold tracking-wide text-stone-400">
-                      {record.date}
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-stone-700">
-                      {record.icon} {record.category}
-                      {record.remark ? ` · ${record.remark}` : ""}
-                    </p>
-                    <p className="mt-1 text-[11px] font-semibold text-stone-500">
-                      消耗 {record.price} {resourceLabel(record.resourceKind)}
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold tracking-wide text-stone-400">
+                          {record.date}
+                        </p>
+                        <p className="mt-1 text-sm font-medium text-stone-700">
+                          {record.icon} {record.category}
+                          {record.remark ? ` · ${record.remark}` : ""}
+                        </p>
+                        <p className="mt-1 text-[11px] font-semibold text-stone-500">
+                          消耗 {record.price} {resourceLabel(record.resourceKind)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditRecord(record.id)}
+                          className="ui-button-secondary px-3 py-1 text-[11px] font-semibold text-stone-600"
+                        >
+                          编辑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const ok = deleteExchangeRecord(record.id);
+                            if (ok) setToast("已删除兑换记录");
+                          }}
+                          className="rounded-full border border-stone-200/75 bg-white/55 px-3 py-1 text-[11px] font-semibold text-stone-500 transition hover:bg-white/80"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
                   </article>
                 ))
               ) : (
@@ -485,15 +642,24 @@ export function ExchangeShop() {
     }
 
     if (overlay.kind === "record") {
-      const category =
-        categories.find((item) => item.id === overlay.categoryId) ?? null;
-      if (!category) return null;
+      const isEditing = editingRecordId != null;
+      const record = selectedRecord;
+      const category = selectedCategory;
+      const displayIcon = isEditing ? record?.icon : category?.icon;
+      const displayTitle = isEditing ? record?.category : category?.title;
+      const displayResource = isEditing ? record?.resourceKind : category?.resourceKind;
+      const displayPrice = isEditing ? record?.price : category?.price;
+      const canSubmit = isEditing ? true : category != null;
+
+      if (!displayIcon || !displayTitle || !displayResource || displayPrice == null) {
+        return null;
+      }
 
       return (
         <div className="absolute inset-0 z-10 flex items-end justify-center p-2.5 sm:items-center sm:p-4">
           <button
             type="button"
-            aria-label="关闭记录兑换"
+            aria-label={isEditing ? "关闭记录编辑" : "关闭记录兑换"}
             className={`absolute inset-0 bg-stone-900/20 backdrop-blur-[1px] transition-opacity duration-300 ${
               overlayEnter ? "opacity-100" : "opacity-0"
             }`}
@@ -512,13 +678,13 @@ export function ExchangeShop() {
             <div className="flex items-start justify-between gap-3 border-b border-stone-100/80 pb-3">
               <div>
                 <p className="text-[11px] font-semibold tracking-wide text-stone-400">
-                  记录兑换
+                  {isEditing ? "编辑兑换记录" : "记录兑换"}
                 </p>
                 <h3
                   id={overlayTitleId}
                   className="mt-0.5 text-base font-semibold tracking-tight text-stone-800"
                 >
-                  {category.icon} {category.title}
+                  {displayIcon} {displayTitle}
                 </h3>
               </div>
               <button
@@ -533,25 +699,47 @@ export function ExchangeShop() {
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span
                 className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getCategoryChipClass(
-                  category.resourceKind,
+                  displayResource,
                 )}`}
               >
-                {resourceLabel(category.resourceKind)}
+                {resourceLabel(displayResource)}
               </span>
               <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2.5 py-1 text-[11px] font-semibold text-stone-600">
-                消耗 {categoryPriceLabel(category)}
+                消耗 {displayPrice} {resourceLabel(displayResource)}
               </span>
             </div>
+
+            <label className="mt-3 block">
+              <span className="text-[11px] font-semibold text-stone-600">
+                时间
+              </span>
+              <input
+                type="datetime-local"
+                value={recordForm.occurredAt}
+                onChange={(e) =>
+                  setRecordForm((current) => ({
+                    ...current,
+                    occurredAt: e.target.value,
+                  }))
+                }
+                className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none"
+              />
+            </label>
 
             <label className="mt-3 block">
               <span className="text-[11px] font-semibold text-stone-600">
                 备注
               </span>
               <input
-                value={remark}
-                onChange={(e) => setRemark(e.target.value)}
+                value={recordForm.remark}
+                onChange={(e) =>
+                  setRecordForm((current) => ({
+                    ...current,
+                    remark: e.target.value,
+                  }))
+                }
                 className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none placeholder:text-stone-300"
-                placeholder="比如：雪糕 / DQ暴风雪 / 海底捞"
+                placeholder="例如：下午茶 / 小奖励 / 周末加餐"
               />
             </label>
 
@@ -565,19 +753,17 @@ export function ExchangeShop() {
               </button>
               <button
                 type="button"
-                onClick={confirmRedeem}
-                disabled={!canAfford(category)}
+                onClick={saveExchangeRecord}
+                disabled={!canSubmit}
                 className="ui-button-primary flex-[1.3] py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
-                确认兑换
+                {isEditing ? "保存修改" : "确认兑换"}
               </button>
             </div>
           </div>
         </div>
       );
-    }
-
-    if (overlay.kind === "category") {
+    }    if (overlay.kind === "category") {
       const isEdit = overlay.categoryId != null;
 
       return (

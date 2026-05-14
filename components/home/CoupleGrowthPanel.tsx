@@ -24,7 +24,9 @@ function StatBubble({
     <div
       className={`ui-card-soft relative overflow-hidden bg-gradient-to-br ${toneRing} p-3`}
     >
-      <p className="text-[11px] font-semibold tracking-wide text-stone-600/85">{label}</p>
+      <p className="text-[11px] font-semibold tracking-wide text-stone-600/85">
+        {label}
+      </p>
       <p className="mt-0.5 text-[1.1rem] font-bold tabular-nums text-stone-800">
         {value}
         <span className="ml-0.5 text-xs font-semibold text-stone-600">
@@ -63,7 +65,9 @@ function GemTreasureBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="mt-1.5 text-[10px] font-medium text-stone-500">攒满会有小惊喜哦</p>
+      <p className="mt-1.5 text-[10px] font-medium text-stone-500">
+        攒满会有小惊喜哦
+      </p>
     </div>
   );
 }
@@ -72,7 +76,7 @@ export function CoupleGrowthPanel() {
   const {
     gemStock,
     coinStock,
-    streakDays,
+    cumulativeSuccessDays,
     todayFishGems,
     todayCatGems,
     todayBonusGems,
@@ -87,12 +91,16 @@ export function CoupleGrowthPanel() {
       aria-label="情侣成长资源"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[13px] font-bold tracking-wide text-stone-700">成长补给站</h2>
+        <h2 className="text-[13px] font-bold tracking-wide text-stone-700">
+          成长补给站
+        </h2>
         <span className="text-lg" aria-hidden>
-          🎒
+          📦
         </span>
       </div>
-      <p className="mt-0.5 text-[10px] font-medium text-stone-500">两个人的小小收获面板</p>
+      <p className="mt-0.5 text-[10px] font-medium text-stone-500">
+        两个人的小小收获面板
+      </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <StatBubble label="今日宝石" value={todayGemSum} unit="颗" tone="gem" />
@@ -115,12 +123,12 @@ export function CoupleGrowthPanel() {
               双人热量缺口连击
             </p>
             <p className="mt-0.5 text-2xl font-bold tabular-nums text-stone-800">
-              {streakDays}
+              {cumulativeSuccessDays}
               <span className="ml-1 text-sm font-semibold text-stone-600">天</span>
             </p>
           </div>
           <span className="text-2xl" aria-hidden>
-            💞
+            💘
           </span>
         </div>
       </div>

@@ -12,6 +12,7 @@ export type SideLogInput = {
 
 export type PreviousDailyRecord = {
   day: number;
+  recordDate?: string;
   fish: Pick<SideLogInput, "deficit" | "minutes">;
   cat: Pick<SideLogInput, "deficit" | "minutes">;
 };
@@ -20,9 +21,24 @@ export type CoinRuleContext = {
   fish: SideLogInput;
   cat: SideLogInput;
   todayDay: number;
+  todayDate?: string;
   todayGemTotal: number;
   currentWeekGemTotal: number;
   dailyRecords: PreviousDailyRecord[];
+  coinRules?: CoinRulesConfig;
+  visualRules?: SettlementVisualRules;
+};
+
+export const COIN_WEEK_START_DAY = 6;
+
+export type CoinRulesConfig = {
+  weekStartDay: number;
+  deficitStreakDays: number;
+};
+
+export const DEFAULT_COIN_RULES: CoinRulesConfig = {
+  weekStartDay: COIN_WEEK_START_DAY,
+  deficitStreakDays: 5,
 };
 
 export function parseOptionalWeight(raw: string): number | null {
@@ -92,30 +108,161 @@ export function gemsForPerson(
   );
 }
 
-export function heatLevelFromDeficit(deficit: number): HeatLevel {
-  if (deficit <= 0) return "none";
-  if (deficit < 280) return "ok";
-  if (deficit < 520) return "good";
-  return "perfect";
+export type HeatmapThresholds = {
+  noneMax: number;
+  okMin: number;
+  goodMin: number;
+  perfectMin: number;
+};
+
+export type ExerciseTagThresholds = {
+  runMin: number;
+  intenseMin: number;
+};
+
+export type SettlementVisualRules = {
+  heatmap: Record<PersonKey, HeatmapThresholds>;
+  exerciseTag: ExerciseTagThresholds;
+};
+
+export const DEFAULT_VISUAL_RULES: SettlementVisualRules = {
+  heatmap: {
+    fish: {
+      noneMax: 199,
+      okMin: 200,
+      goodMin: 300,
+      perfectMin: 500,
+    },
+    cat: {
+      noneMax: 99,
+      okMin: 100,
+      goodMin: 200,
+      perfectMin: 300,
+    },
+  },
+  exerciseTag: {
+    runMin: 1,
+    intenseMin: 60,
+  },
+};
+
+export function heatLevelFromDeficit(
+  person: PersonKey,
+  deficit: number,
+  rules: SettlementVisualRules = DEFAULT_VISUAL_RULES,
+): HeatLevel {
+  const thresholds = rules.heatmap[person];
+  if (deficit <= thresholds.noneMax) return "none";
+  if (deficit >= thresholds.perfectMin) return "perfect";
+  if (deficit >= thresholds.goodMin) return "good";
+  if (deficit >= thresholds.okMin) return "ok";
+  return "none";
 }
 
-export function exerciseTagFromMinutes(minutes: number): ExerciseTag {
-  if (minutes <= 0) return "none";
-  if (minutes < 40) return "run";
-  return "intense";
+export function exerciseTagFromMinutes(
+  minutes: number,
+  rules: SettlementVisualRules = DEFAULT_VISUAL_RULES,
+): ExerciseTag {
+  const thresholds = rules.exerciseTag;
+  if (minutes < thresholds.runMin) return "none";
+  if (minutes >= thresholds.intenseMin) return "intense";
+  return "run";
 }
 
-export function buildHeatmapDay(input: SideLogInput): HeatmapDay {
+export function buildHeatmapDay(
+  person: PersonKey,
+  input: SideLogInput,
+  rules: SettlementVisualRules = DEFAULT_VISUAL_RULES,
+): HeatmapDay {
   return {
-    level: heatLevelFromDeficit(input.deficit),
-    exercise: exerciseTagFromMinutes(input.minutes),
+    level: heatLevelFromDeficit(person, input.deficit, rules),
+    exercise: exerciseTagFromMinutes(input.minutes, rules),
   };
 }
 
 export function getMaySettlementDay(): number {
   const d = new Date();
-  if (d.getFullYear() === 2026 && d.getMonth() === 4) return d.getDate();
-  return 11;
+  return d.getDate();
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+export function formatIsoDate(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
+    date.getDate(),
+  )}`;
+}
+
+export function getCurrentIsoDate(): string {
+  return formatIsoDate(new Date());
+}
+
+export function isoDateFromDay(day: number): string {
+  return `2026-05-${pad2(day)}`;
+}
+
+export function parseIsoDateParts(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+function dateFromIso(value: string) {
+  const parsed = parseIsoDateParts(value);
+  if (!parsed) return null;
+  return new Date(parsed.year, parsed.month - 1, parsed.day);
+}
+
+function addDaysIso(value: string, days: number) {
+  const date = dateFromIso(value);
+  if (!date) return value;
+  date.setDate(date.getDate() + days);
+  return formatIsoDate(date);
+}
+
+function recordDate(record: PreviousDailyRecord) {
+  return record.recordDate ?? isoDateFromDay(record.day);
+}
+
+export function getCoinWeekRange(
+  targetIsoDate: string,
+  weekStartDay = DEFAULT_COIN_RULES.weekStartDay,
+): {
+  start: string;
+  end: string;
+} {
+  const date = dateFromIso(targetIsoDate) ?? new Date();
+  const diffFromSaturday = (date.getDay() - weekStartDay + 7) % 7;
+  const startDate = new Date(date);
+  startDate.setDate(date.getDate() - diffFromSaturday);
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+  return {
+    start: formatIsoDate(startDate),
+    end: formatIsoDate(endDate),
+  };
+}
+
+export function isInCoinWeek(
+  recordIsoDate: string,
+  targetIsoDate: string,
+  weekStartDay = DEFAULT_COIN_RULES.weekStartDay,
+) {
+  const range = getCoinWeekRange(targetIsoDate, weekStartDay);
+  return recordIsoDate >= range.start && recordIsoDate <= range.end;
 }
 
 export type CoupleBonusResult = {
@@ -142,8 +289,22 @@ export type CoinPreview = {
   hint: string;
 };
 
-function bothHaveDeficit(record: PreviousDailyRecord) {
-  return record.fish.deficit > 0 && record.cat.deficit > 0;
+function reachesOkLevel(
+  person: PersonKey,
+  deficit: number,
+  visualRules: SettlementVisualRules,
+) {
+  return deficit >= visualRules.heatmap[person].okMin;
+}
+
+function bothReachedOkLevel(
+  record: PreviousDailyRecord,
+  visualRules: SettlementVisualRules,
+) {
+  return (
+    reachesOkLevel("fish", record.fish.deficit, visualRules) &&
+    reachesOkLevel("cat", record.cat.deficit, visualRules)
+  );
 }
 
 function bothExercised(record: PreviousDailyRecord) {
@@ -152,22 +313,28 @@ function bothExercised(record: PreviousDailyRecord) {
 
 function recordsInCurrentWeek(
   records: PreviousDailyRecord[],
-  todayDay: number,
+  todayDate: string,
+  coinRules: CoinRulesConfig,
 ) {
-  const weekStartDay = todayDay - ((todayDay - 1) % 7);
-  return records.filter(
-    (record) => record.day >= weekStartDay && record.day < todayDay,
-  );
+  const range = getCoinWeekRange(todayDate, coinRules.weekStartDay);
+  return records.filter((record) => {
+    const date = recordDate(record);
+    return date >= range.start && date < todayDate;
+  });
 }
 
 function countDeficitStreakBeforeToday(
   records: PreviousDailyRecord[],
-  todayDay: number,
+  todayDate: string,
+  coinRules: CoinRulesConfig,
+  visualRules: SettlementVisualRules,
 ) {
   let streak = 0;
-  for (let day = todayDay - 1; day >= 1; day -= 1) {
-    const record = records.find((item) => item.day === day);
-    if (!record || !bothHaveDeficit(record)) break;
+  const range = getCoinWeekRange(todayDate, coinRules.weekStartDay);
+  for (let date = addDaysIso(todayDate, -1); ; date = addDaysIso(date, -1)) {
+    if (date < range.start) break;
+    const record = records.find((item) => recordDate(item) === date);
+    if (!record || !bothReachedOkLevel(record, visualRules)) break;
     streak += 1;
   }
   return streak;
@@ -177,13 +344,17 @@ export function computeCoinPreview({
   fish,
   cat,
   todayDay,
+  todayDate,
   todayGemTotal,
   currentWeekGemTotal,
   dailyRecords,
+  coinRules = DEFAULT_COIN_RULES,
+  visualRules = DEFAULT_VISUAL_RULES,
 }: CoinRuleContext): CoinPreview {
   let delta = 0;
   const bits: string[] = [];
   const nextWeekGemTotal = currentWeekGemTotal + todayGemTotal;
+  const currentDate = todayDate ?? isoDateFromDay(todayDay);
 
   if (currentWeekGemTotal < 30 && nextWeekGemTotal >= 30) {
     delta += 1;
@@ -195,16 +366,27 @@ export function computeCoinPreview({
     bits.push("本周新增宝石达到 50：再 +1");
   }
 
-  const todayBothHaveDeficit = fish.deficit > 0 && cat.deficit > 0;
-  const deficitStreak = todayBothHaveDeficit
-    ? countDeficitStreakBeforeToday(dailyRecords, todayDay) + 1
+  const todayBothReachedOk =
+    reachesOkLevel("fish", fish.deficit, visualRules) &&
+    reachesOkLevel("cat", cat.deficit, visualRules);
+  const deficitStreak = todayBothReachedOk
+    ? countDeficitStreakBeforeToday(
+        dailyRecords,
+        currentDate,
+        coinRules,
+        visualRules,
+      ) + 1
     : 0;
-  if (deficitStreak === 5) {
+  if (deficitStreak === coinRules.deficitStreakDays) {
     delta += 1;
-    bits.push("双人连续 5 天热量缺口打卡：+1");
+    bits.push(`双人连续 ${coinRules.deficitStreakDays} 天达到一般打卡：+1`);
   }
 
-  const weekRecords = recordsInCurrentWeek(dailyRecords, todayDay);
+  const weekRecords = recordsInCurrentWeek(
+    dailyRecords,
+    currentDate,
+    coinRules,
+  );
   const previousTogetherExerciseCount = weekRecords.filter(bothExercised).length;
   const todayTogetherExercise = fish.minutes >= 30 && cat.minutes >= 30;
   const nextTogetherExerciseCount =

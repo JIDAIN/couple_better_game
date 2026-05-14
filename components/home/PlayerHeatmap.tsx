@@ -1,9 +1,8 @@
 import type { MonthGrid } from "./mockHeatmapData";
-import { may2026DayLabel } from "./mockHeatmapData";
+import { dayLabel } from "./mockHeatmapData";
 import { HeatmapCell } from "./HeatmapCell";
 import type { HeatLevel } from "./types";
 
-/** 周六 → 周五 */
 const weekdayLabels = ["六", "日", "一", "二", "三", "四", "五"] as const;
 
 const levelHint: Record<HeatLevel, string> = {
@@ -13,19 +12,23 @@ const levelHint: Record<HeatLevel, string> = {
   perfect: "超棒的一天",
 };
 
-function buildCellTitle(
-  playerShort: string,
-  weekIndex: number,
-  rowIndex: number,
-  level: HeatLevel,
-  hasRun: boolean,
-) {
-  const dateLabel = may2026DayLabel(weekIndex, rowIndex);
-  const wk = weekdayLabels[rowIndex];
+function buildCellTitle({
+  playerShort,
+  dateLabel,
+  weekday,
+  level,
+  hasRun,
+}: {
+  playerShort: string;
+  dateLabel: string | null;
+  weekday: string;
+  level: HeatLevel;
+  hasRun: boolean;
+}) {
   const run = hasRun ? "有运动" : "未记录运动";
   const head = dateLabel
-    ? `${playerShort} · ${dateLabel} · 周${wk}`
-    : `${playerShort} · 周${wk}`;
+    ? `${playerShort} · ${dateLabel} · 周${weekday}`
+    : `${playerShort} · 周${weekday}`;
   return `${head} · 热量缺口${levelHint[level]} · ${run}`;
 }
 
@@ -44,7 +47,9 @@ export function PlayerHeatmap({
     <div className="ui-card-soft p-3 sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-[13px] font-bold tracking-wide text-stone-800">{title}</h3>
+          <h3 className="text-[13px] font-bold tracking-wide text-stone-800">
+            {title}
+          </h3>
           <p className="text-[11px] font-medium text-stone-500">{subtitle}</p>
         </div>
         <span className="text-base opacity-90" aria-hidden>
@@ -78,23 +83,21 @@ export function PlayerHeatmap({
               第{weekIndex + 1}周
             </div>
             {week.map((cell, dayIndex) => {
-              const level = cell?.level ?? "none";
-              const exercise = cell?.exercise ?? "none";
-              const title = cell
-                ? buildCellTitle(
-                    playerShort,
-                    weekIndex,
-                    dayIndex,
-                    cell.level,
-                    cell.exercise !== "none",
-                  )
-                : `${playerShort} · 补齐日期 · 周${weekdayLabels[dayIndex]} · 热量缺口未完成 · 未记录运动`;
+              const heat = cell?.heat;
+              const level = heat?.level ?? "none";
+              const exercise = heat?.exercise ?? "none";
               return (
                 <HeatmapCell
                   key={`${weekIndex}-${dayIndex}`}
                   level={level}
                   exercise={exercise}
-                  title={title}
+                  title={buildCellTitle({
+                    playerShort,
+                    dateLabel: dayLabel(cell),
+                    weekday: weekdayLabels[dayIndex],
+                    level,
+                    hasRun: exercise !== "none",
+                  })}
                 />
               );
             })}

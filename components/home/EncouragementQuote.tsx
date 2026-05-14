@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const quotes = [
   "今天也是一起发光的一天 ✨",
@@ -12,11 +12,9 @@ const quotes = [
 ];
 
 export function EncouragementQuote() {
-  const [text, setText] = useState(quotes[0]);
-
-  useEffect(() => {
-    setText(quotes[Math.floor(Math.random() * quotes.length)]);
-  }, []);
+  const [text] = useState(
+    () => quotes[Math.floor(Math.random() * quotes.length)],
+  );
 
   return (
     <section
