@@ -29,7 +29,7 @@ export function HeatmapCell({
       title={title}
       className={[
         "heat-cell relative mx-auto",
-        "hover:z-10 hover:scale-125",
+        "hover:z-10 hover:scale-110",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1",
         levelClass[level],
       ].join(" ")}
@@ -38,7 +38,7 @@ export function HeatmapCell({
     >
       {icon ? (
         <span
-          className="pointer-events-none absolute -right-px -top-px origin-top-right scale-[0.45] leading-none sm:scale-[0.5]"
+          className="pointer-events-none absolute -right-0.5 -top-0.5 origin-top-right scale-[0.36] leading-none sm:scale-[0.42]"
           aria-hidden
         >
           {icon}

@@ -625,7 +625,7 @@ export function RecordTodaySettlement({
                 {mode === "today" ? "今日收工啦" : "补记一颗星"}
               </p>
               <h2 id={titleId} className="mt-1 text-lg font-bold ui-text-main">
-                {mode === "today" ? "双人结算面板" : "历史记录补记"}
+                {mode === "today" ? "今天的小记录" : "历史记录补记"}
               </h2>
               <p className="mt-1 text-xs ui-text-muted">
                 {mode === "today"
@@ -662,7 +662,7 @@ export function RecordTodaySettlement({
 
                   <div className="ui-soft-panel ui-card-item mt-4">
                     <p className="text-center text-[11px] font-bold ui-text-reward">
-                      结算预览
+                      今日小奖励
                     </p>
                     <ul className="mt-3 space-y-2 text-xs font-semibold ui-text-main">
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
@@ -727,7 +727,7 @@ export function RecordTodaySettlement({
                       onClick={onConfirm}
                       className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      确认记录今天
+                      存好今天
                     </button>
                   </div>
                 </>
@@ -868,7 +868,7 @@ export function RecordTodaySettlement({
 
                   <div className="ui-soft-panel ui-card-item">
                     <p className="text-center text-[11px] font-bold ui-text-reward">
-                      历史结算预览
+                      补记后的小奖励
                     </p>
                     <ul className="mt-3 space-y-2 text-xs font-semibold ui-text-main">
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">

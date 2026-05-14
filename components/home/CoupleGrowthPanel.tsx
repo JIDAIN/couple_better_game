@@ -46,7 +46,7 @@ function GemTreasureBar({
 }) {
   const pct = Math.min(100, Math.round((current / max) * 100));
   return (
-    <div className="ui-card-soft ui-card-item">
+    <div className="ui-card-soft ui-card-item ui-sparkle-card relative overflow-hidden">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13px] font-bold ui-text-main">宝石小宝箱</span>
         <span className="text-[11px] font-semibold tabular-nums ui-text-muted">
@@ -89,14 +89,14 @@ export function CoupleGrowthPanel() {
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-[13px] font-bold tracking-wide ui-text-main">
-          成长补给站
+          今日小收获
         </h2>
         <span className="text-lg" aria-hidden>
           📝
         </span>
       </div>
       <p className="mt-0.5 text-[10px] font-medium ui-text-muted">
-        两个人的小小收获面板
+        我们攒下的闪光
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
@@ -117,7 +117,7 @@ export function CoupleGrowthPanel() {
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="text-[10px] font-semibold tracking-wide ui-text-primary">
-              双人热量缺口连击
+              一起坚持的小火苗
             </p>
             <p className="mt-0.5 text-2xl font-bold tabular-nums ui-text-main">
               {cumulativeSuccessDays}

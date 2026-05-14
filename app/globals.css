@@ -16,8 +16,11 @@
   --card-bg-strong: rgb(255 255 255 / 0.88);
   --card-bg-warm: rgb(255 248 241 / 0.82);
   --card-border: rgb(255 255 255 / 0.72);
-  --cell-empty: #e9e4de;
-  --shadow-card: 0 12px 32px rgb(120 80 60 / 0.08);
+  --cell-empty: #eee7dc;
+  --cell-normal: #d7ead1;
+  --cell-good: #a8d9b4;
+  --cell-great: #f7d977;
+  --shadow-card: 0 12px 32px rgb(120 80 60 / 0.075);
   --shadow-soft: 0 8px 22px rgb(120 80 60 / 0.06);
   --shadow-float: 0 24px 58px rgb(76 54 42 / 0.16);
   --radius-card: 28px;
@@ -45,6 +48,16 @@ body {
     linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 58%, #fff7e8 100%);
   color: var(--foreground);
   font-feature-settings: "ss01" on;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 4rem, rgb(255 255 255 / 0.34), transparent 18rem),
+    radial-gradient(circle at 52% 11rem, rgb(255 201 74 / 0.08), transparent 10rem);
 }
 
 * {
@@ -181,8 +194,10 @@ body {
   justify-content: center;
   border-radius: 999px;
   border: 1px solid rgb(255 255 255 / 0.7);
-  background: linear-gradient(135deg, var(--primary) 0%, #ffb86b 100%);
-  box-shadow: 0 10px 24px rgb(255 107 147 / 0.22);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.22), transparent 45%),
+    linear-gradient(135deg, var(--primary) 0%, #ffb86b 100%);
+  box-shadow: 0 9px 22px rgb(255 107 147 / 0.18);
   transition:
     transform 220ms ease,
     filter 220ms ease,
@@ -191,7 +206,8 @@ body {
 
 .ui-button-primary:hover {
   filter: brightness(1.02);
-  box-shadow: 0 12px 28px rgb(255 107 147 / 0.25);
+  box-shadow: 0 11px 26px rgb(255 107 147 / 0.2);
+  transform: translateY(-1px);
 }
 
 .ui-button-primary:active,
@@ -234,9 +250,16 @@ body {
   min-height: 3rem;
   justify-content: center;
   gap: 0.375rem;
-  padding: 0.75rem 0.75rem;
+  padding: 0.75rem 0.55rem;
   font-weight: 650;
   color: var(--text-main);
+  line-height: 1.15;
+  text-align: center;
+}
+
+.ui-nav-button span[aria-hidden] {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 .ui-tab {
@@ -370,24 +393,55 @@ body {
   color: var(--growth-strong);
 }
 
+.ui-title-glow {
+  position: relative;
+}
+
+.ui-title-glow::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0.15rem;
+  z-index: -1;
+  width: min(16rem, 86vw);
+  height: 3rem;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(255 228 236 / 0.42), transparent 68%);
+}
+
+.ui-sparkle-card::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  top: 0.8rem;
+  width: 0.34rem;
+  height: 0.34rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.9);
+  box-shadow:
+    -1.1rem 0.85rem 0 -0.08rem rgb(255 240 189 / 0.85),
+    0.75rem 1.55rem 0 -0.12rem rgb(255 228 236 / 0.8);
+}
+
 .heat-cell-empty {
-  border-color: rgb(178 167 160 / 0.36);
+  border-color: rgb(178 167 160 / 0.32);
   background: var(--cell-empty);
 }
 
 .heat-cell-normal {
-  border-color: rgb(141 214 165 / 0.42);
-  background: rgb(141 214 165 / 0.5);
+  border-color: rgb(141 214 165 / 0.34);
+  background: var(--cell-normal);
 }
 
 .heat-cell-good {
-  border-color: rgb(76 175 131 / 0.34);
-  background: rgb(76 175 131 / 0.72);
+  border-color: rgb(76 175 131 / 0.28);
+  background: var(--cell-good);
 }
 
 .heat-cell-great {
-  border-color: rgb(255 201 74 / 0.5);
-  background: linear-gradient(135deg, rgb(255 240 189 / 0.96), rgb(255 201 74 / 0.82));
+  border-color: rgb(255 201 74 / 0.42);
+  background: linear-gradient(135deg, rgb(255 240 189 / 0.95), var(--cell-great));
 }
 
 .heat-cell-streak {
@@ -397,10 +451,10 @@ body {
 
 .heat-cell {
   width: 100%;
-  max-width: 18px;
-  height: 0.75rem;
+  max-width: 20px;
+  height: 0.9rem;
   border: 1px solid;
-  border-radius: 5px;
+  border-radius: 7px;
   transition: transform 200ms ease, box-shadow 200ms ease;
 }
 
@@ -410,10 +464,18 @@ body {
 
 @media (min-width: 640px) {
   .heat-cell {
-    max-width: 22px;
-    height: 1rem;
-    border-radius: 6px;
+    max-width: 24px;
+    height: 1.05rem;
+    border-radius: 8px;
   }
+}
+
+.heat-legend-dot {
+  width: 1rem;
+  min-width: 1rem;
+  height: 0.65rem;
+  border: 1px solid;
+  border-radius: 999px;
 }
 
 .ui-tinted-primary {
