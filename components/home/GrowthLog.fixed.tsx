@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider.fixed";
+import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider.safe";
 
 function totalGems(entry: DailyRecord) {
   return entry.fish.gems + entry.cat.gems + entry.bonus;
