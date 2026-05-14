@@ -1,52 +1,59 @@
 # 重构后的数据管理说明
 
-本文档说明当前首页数据如何划分、保存和恢复。
+本文档说明当前首页数据如何划分、保存、恢复和重算。
 
-## 数据类型分组
+## 数据分层
 
-核心类型在 `lib/home/types.ts`。
+当前首页数据分成两类：
 
-### UserRuntimeData
+1. 用户运行数据 `UserRuntimeData`
+2. 配置数据 `AppConfigData`
 
-`UserRuntimeData` 表示用户在使用过程中产生或变化的数据。它偏向“运行时状态”和“业务结果”。
+再加上一层持久化快照 `AppDataSnapshot`，用于本地存储和未来远程同步。
 
-当前包含：
+## `UserRuntimeData`
 
-| 字段 | 说明 |
-|---|---|
-| `wallet` | 当前宝石和金币余额 |
-| `streakDays` | 当前兼容字段，表示本周成功打卡天数 |
-| `weeklySuccessDays` | 本周成功打卡天数 |
-| `cumulativeSuccessDays` | 累计成功打卡天数 |
-| `yesterdayGemTotal` | 昨日总宝石，用于首页展示 |
-| `todayFishGems` | 今日鱼鱼宝石 |
-| `todayCatGems` | 今日猫猫宝石 |
-| `todayBonusGems` | 今日情侣 bonus 宝石 |
-| `weekGemTotal` | 本周新增宝石 |
-| `weekCoinTotal` | 本周新增金币 |
-| `fishHeatmapOverrides` | 鱼鱼热力图覆盖数据 |
-| `catHeatmapOverrides` | 猫猫热力图覆盖数据 |
-| `dailyRecords` | 每日记录，是成长日志、热力图、统计计算的重要来源 |
-| `exchangeRecords` | 兑换记录，是钱包扣减和兑换历史的重要来源 |
+`UserRuntimeData` 表示“用户运行时产生或变化的数据”。这些字段会随着打卡、兑换、补录等行为变化。
 
-### AppConfigData
+当前包括：
 
-`AppConfigData` 表示偏配置的数据。它不是每天产生的记录，而是决定页面如何计算或展示。
+- `wallet`
+- `streakDays`
+- `weeklySuccessDays`
+- `cumulativeSuccessDays`
+- `yesterdayGemTotal`
+- `todayFishGems`
+- `todayCatGems`
+- `todayBonusGems`
+- `weekGemTotal`
+- `weekCoinTotal`
+- `fishHeatmapOverrides`
+- `catHeatmapOverrides`
+- `dailyRecords`
+- `exchangeRecords`
 
-当前包含：
+其中：
 
-| 字段 | 说明 |
-|---|---|
-| `heatmapStartDate` | 作战开始日，也是热力图起始日期设置 |
-| `coinRules` | 金币规则配置，例如周起始日、连续打卡天数阈值 |
-| `visualRules` | 热力图等级和运动角标阈值配置 |
-| `exchangeCategories` | 兑换商品类别配置，包括名称、图标、价格、资源类型 |
+- `dailyRecords` 是每日记录主表
+- `exchangeRecords` 是兑换记录主表
+- `wallet`、`weekGemTotal`、`weekCoinTotal`、`streakDays` 等属于可重算字段
 
-### AppDataSnapshot
+## `AppConfigData`
 
-`AppDataSnapshot` 是持久化层保存和读取的统一数据包。
+`AppConfigData` 表示“配置类数据”，也就是影响计算和展示方式的静态参数。
 
-结构为：
+当前包括：
+
+- `heatmapStartDate`
+- `coinRules`
+- `visualRules`
+- `exchangeCategories`
+
+这些数据不是每天产生的记录，而是决定规则或展示方式的配置。
+
+## `AppDataSnapshot`
+
+当前 snapshot 的结构是：
 
 ```ts
 type AppDataSnapshot = {
@@ -56,72 +63,105 @@ type AppDataSnapshot = {
 };
 ```
 
-它的作用是把“用户运行数据”和“应用配置数据”分开保存，同时保留 `version`，方便未来做数据迁移。
+这样拆分的原因有三个：
 
-目前 `runtime` 和 `config` 使用 `Partial`，是为了兼容旧数据和渐进迁移。Provider 读取后会用默认值补齐缺失字段。
+1. 把“用户数据”和“配置数据”分开，后续更容易迁移
+2. 给未来后端/API/数据库同步留出明确边界
+3. 允许历史数据逐步兼容，不要求一次性全量升级
 
-## Source of Truth
+`runtime` 和 `config` 目前使用 `Partial`，是为了兼容旧数据和渐进式补字段。
 
-当前真正的业务源数据主要是：
+## 当前存储方案
 
-| 数据 | 原因 |
-|---|---|
-| `dailyRecords` | 每日热量、运动、宝石、金币、热力图的核心来源 |
-| `exchangeRecords` | 兑换消费和兑换历史的核心来源 |
-| `exchangeCategories` | 兑换商品列表的核心来源 |
-| `heatmapStartDate` | 热力图起始日和作战天数展示的配置来源 |
-| `coinRules` | 金币计算规则来源 |
-| `visualRules` | 热力图等级和运动角标规则来源 |
+当前本地存储仍然使用浏览器 `localStorage`。
 
-## Derived Data
-
-以下数据目前会保存，但本质上可以由源数据重新计算：
-
-| 数据 | 由什么推导 |
-|---|---|
-| `wallet` | `dailyRecords` 的获得记录，加上 `exchangeRecords` 的消费记录 |
-| `weekGemTotal` | 当前周范围内的 `dailyRecords` |
-| `weekCoinTotal` | 当前周范围内的 `dailyRecords` |
-| `weeklySuccessDays` | 当前周内双方达到“一般”等级的 `dailyRecords` |
-| `cumulativeSuccessDays` | 全部 `dailyRecords` 中双方达到“一般”等级的天数 |
-| `yesterdayGemTotal` | 昨天的 `dailyRecords` |
-| `todayFishGems` / `todayCatGems` / `todayBonusGems` | 今天的 `dailyRecords` |
-| `fishHeatmapOverrides` / `catHeatmapOverrides` | `dailyRecords` 中保存的 `fishHeat` / `catHeat` |
-
-当前仍保存这些派生数据，是为了保持现有 UI 和本地数据结构稳定。Provider 在读取时会通过 `recalculateCoinsWithCurrentRules()` 尽量重新校正。
-
-## 当前 localStorage key
-
-当前本地存储 key 定义在 `lib/home/app-data-store.ts`：
+存储 key 定义在：
 
 ```ts
-export const APP_DATA_STORAGE_KEY = "couple-better-game:home-resources:v1";
+couple-better-game:home-resources:v1
 ```
 
-浏览器中保存的是 `AppDataSnapshot`。如果读取到旧版扁平 `HomeResourcesState`，`local-storage-app-data-store.ts` 会先转换成 snapshot。
+当前分工是：
 
-## localStorage 当前如何保存
+- `local-storage-app-data-store.ts` 只负责读、写、清理
+- `home-state-service.ts` 负责恢复、规范化、fallback、legacy 兼容
+- `app-data-store.ts` 负责 snapshot 和 state 之间的转换
 
-当前 `local-storage-app-data-store.ts` 做三件事：
+也就是说，`localStorage` 本身只是一个字节载体，真正的业务恢复逻辑不放在 UI 里。
 
-1. `load()`：从 `window.localStorage` 读取字符串并 `JSON.parse()`。
-2. 如果读到的是新格式 `AppDataSnapshot`，直接返回。
-3. 如果读到的是旧格式 `HomeResourcesState`，调用 `snapshotFromLegacyHomeState()` 转成新格式。
-4. `save()`：将 `AppDataSnapshot` 序列化为 JSON 后写回同一个 key。
-5. `clear()`：删除该 key。
+## Source of Truth 与 Derived Data
 
-这个 store 是同步接口，适配当前本地 MVP。未来如果接 API，可以新建异步版本或在 service 层处理加载状态。
+### 当前的核心 source of truth
 
-## memory store 的用途
+当前最重要的源数据是：
 
-`memory-app-data-store.ts` 提供 `createMemoryAppDataStore()`。
+- `dailyRecords`
+- `exchangeRecords`
+- `exchangeCategories`
+- `heatmapStartDate`
+- `coinRules`
+- `visualRules`
 
-它不写浏览器，只把 snapshot 保存在内存变量里。适合：
+这些字段决定了首页的真实内容和后续可重算结果。
 
-- 后续给 Provider 或业务 service 写测试。
-- 在 Storybook 或临时沙盒里模拟数据。
-- 验证未来 API store 的替换边界。
-- 不污染真实 `localStorage` 的本地调试。
+### 当前的 derived data
 
-它不是生产持久化方案，刷新页面后数据会消失。
+以下字段可以从源数据重算出来：
 
+- `wallet`
+- `weekGemTotal`
+- `weekCoinTotal`
+- `streakDays`
+- `weeklySuccessDays`
+- `cumulativeSuccessDays`
+- `yesterdayGemTotal`
+- `todayFishGems`
+- `todayCatGems`
+- `todayBonusGems`
+- `fishHeatmapOverrides`
+- `catHeatmapOverrides`
+
+目前这些派生字段仍然会一起存进 snapshot，原因是：
+
+1. 方便当前 UI 快速展示
+2. 保持现有 localStorage 结构稳定
+3. 便于渐进式重构，不影响现有行为
+
+后续如果接数据库，可以重新评估哪些派生字段要持久化、哪些只在读取时重算。
+
+## 当前恢复流程
+
+当前恢复大致是：
+
+1. `HomeResourcesProvider` 创建 `AppDataStore`
+2. `home-state-service.ts` 通过 `dataStore.load()` 读 snapshot
+3. 如果没有 snapshot，就创建默认 state，再导入 seed 历史记录并重算
+4. 如果读到 snapshot，就恢复到 `HomeResourcesState`
+5. 对 `dailyRecords`、`exchangeRecords`、`exchangeCategories`、规则字段做规范化
+6. 再调用统计重算，保证 wallet 和汇总字段与当前规则一致
+
+## 未来接后端时优先替换哪一层
+
+如果未来接 API 或数据库，优先替换的是：
+
+1. `AppDataStore` 的实现
+2. 然后再决定 `home-state-service.ts` 是否改成异步加载
+
+建议的远程实现可以叫：
+
+- `remote-api-app-data-store.ts`
+- 或 `api-app-data-store.ts`
+
+这样 UI 和 Provider 理论上不需要大改，只要继续面向 `AppDataStore` 接口工作即可。
+
+## 当前的兼容策略
+
+当前项目对旧数据采取的是“先兼容，再规范化，再重算”策略。
+
+这意味着：
+
+- 旧 snapshot 还能读
+- 缺字段会用默认值补齐
+- 每次恢复后都会尽量回到当前规则计算结果
+
+这个策略对现在的本地 MVP 很重要，因为它能保证重构过程中不会把历史数据弄丢。  

@@ -1,150 +1,110 @@
 # 重构后的开发指南
 
-本文档说明在当前架构下应该如何继续开发，尤其是如何避免重新把 UI、业务规则和数据管理混在一起。
+本文档说明以后在当前代码结构下应该如何继续开发，尽量避免把 UI、业务规则和数据管理重新揉回一起。
 
-## 新增或修改业务规则
+## 1. 新增 UI 的规则
 
-优先修改：
+新增页面或组件时，优先放在 `components/` 下。
+
+开发 UI 时请遵守：
+
+- 不要直接读写 `localStorage`
+- 不要在 UI 里计算钱包、金币、热力图等级、热力图角标
+- 不要把结算规则写死在组件里
+- 通过 `useHomeResources()` 获取状态和 action
+
+如果 UI 只是展示结果，就应该让业务逻辑先在 `lib/home` 里算好。
+
+## 2. 新增业务规则的规则
+
+如果要新增或修改结算规则、金币规则、热力图规则，优先放在：
 
 - `lib/home/settlement-rules.ts`
-- 必要时补充 `lib/home/types.ts`
 
-不要把新的宝石、金币、热力图等级、运动角标规则直接写进 UI 组件。
-
-如果 UI 只是展示规则结果，应调用规则函数，例如：
-
-- `gemsFromDeficit()`
-- `gemsFromExercise()`
-- `computeRecoveryBonus()`
-- `computeCoupleBonus()`
-- `computeCoinPreview()`
-- `buildHeatmapDay()`
-
-## 新增数据字段
-
-先判断字段属于哪一类。
-
-如果是用户操作产生的数据，优先放入 `UserRuntimeData`。例如新的记录、消费、累计状态。
-
-如果是可配置规则或展示配置，优先放入 `AppConfigData`。例如阈值、商品类别、起始日期。
-
-如果字段只是可以从 `dailyRecords` 或 `exchangeRecords` 推导出来，优先考虑不要把它作为新的 source of truth。当前项目里保留了一些派生字段，是为了兼容已有 UI 和本地存储，后续可以逐步减少。
-
-## 新增持久化方式
-
-后续如果接 API 或数据库，优先替换 `AppDataStore` 实现，而不是先改 UI。
-
-推荐步骤：
-
-1. 保留 `AppDataStore` 接口。
-2. 新增一个实现，例如 `api-app-data-store.ts`。
-3. 让新 store 负责把远端数据转换为 `AppDataSnapshot`。
-4. Provider 继续消费 `AppDataSnapshot`。
-5. 等 API 稳定后，再考虑把同步 store 接口升级为异步加载流程。
-
-当前需要优先替换的层是：
-
-```text
-lib/home/local-storage-app-data-store.ts
-```
-
-而不是：
-
-```text
-components/home/ExchangeShop.tsx
-components/home/GrowthLog.tsx
-components/home/DualMonthlyHeatmaps.tsx
-```
-
-UI 组件应该尽量不知道数据来自 `localStorage`、API 还是数据库。
-
-## 后续继续拆分 Provider 的建议顺序
-
-`HomeResourcesProvider.tsx` 当前仍然较大。建议按下面顺序继续拆，不要一次性重写。
-
-### 第一步：抽默认数据和规范化函数
-
-可拆到：
-
-- `lib/home/default-home-data.ts`
-- `lib/home/normalize-home-data.ts`
-
-适合迁出的内容：
-
-- `DEFAULT_EXCHANGE_CATEGORIES`
-- `normalizeExchangeCategories()`
-- `normalizeVisualRules()`
-- `normalizeCoinRules()`
-- `normalizeDailyRecord()`
-- `normalizeExchangeRecord()`
-
-### 第二步：抽统计和钱包计算
-
-可拆到：
-
-- `lib/home/home-statistics.ts`
-- `lib/home/wallet-calculation.ts`
-
-适合迁出的内容：
-
-- `recordGems()`
-- `countSuccessfulCheckInsInWeek()`
-- `countSuccessfulCheckInsTotal()`
-- `sumRecordGemsInCoinWeek()`
-- `sumRecordCoinsInCoinWeek()`
-- `computeGemWallet()`
-- `recalculateCoinsWithCurrentRules()`
-
-### 第三步：抽记录写入 service
-
-可拆到：
+如果是和“记录创建/补录/删除”相关的纯业务动作，可以放在：
 
 - `lib/home/daily-record-service.ts`
 - `lib/home/exchange-service.ts`
+- 或新的 `lib/home/*-service.ts`
 
-适合迁出的内容：
+改规则时一定要补测试。没有测试就改规则，很容易把历史数据或钱包重算搞偏。
 
-- 今日记录生成。
-- 历史记录 upsert。
-- 历史记录删除。
-- 兑换记录生成。
-- 兑换记录编辑和删除。
+## 3. 新增用户数据字段
 
-Provider 最终只保留 React Context、state dispatch、store load/save。
+如果要新增会随着用户操作变化的数据字段，处理顺序建议是：
 
-### 第四步：再考虑 reducer
+1. 先更新 `lib/home/types.ts`
+2. 再更新 `AppDataSnapshot` 转换
+3. 再更新 `home-state-service.ts` 的恢复逻辑
+4. 再补对应测试
+5. 最后再让 UI 使用新字段
 
-当 service 拆出后，可以考虑把状态更新改成 reducer。
+这里最重要的是：**不要只改 UI，不改 snapshot 和恢复逻辑。**
 
-目标不是追求抽象，而是让每个操作可测试：
+## 4. 新增配置项
 
-- `applyTodayRecord`
-- `upsertHistoricalRecord`
-- `deleteHistoricalRecord`
-- `redeemExchange`
-- `updateExchangeRecord`
-- `deleteExchangeRecord`
+如果要新增配置项，处理顺序建议是：
 
-## 测试建议
+1. 更新 `AppConfigData`
+2. 更新默认配置
+3. 更新 snapshot 恢复逻辑
+4. 更新相关文档
+5. 再让 UI 使用配置
 
-当前 `package.json` 还没有 test script。后续补测试时，优先测试纯函数：
+配置项应该和运行时数据分开，不要混在一起。
 
-- `lib/home/settlement-rules.ts`
-- 后续拆出的统计函数
-- 后续拆出的 wallet 计算函数
-- `memory-app-data-store.ts`
+## 5. 新增本地存储字段
 
-测试时可以用 `createMemoryAppDataStore()`，避免污染浏览器 `localStorage`。
+如果要新增要落到本地的数据字段：
 
-## 开发边界
+- 先想清楚它属于 `UserRuntimeData` 还是 `AppConfigData`
+- 再更新 snapshot
+- 再更新 `home-state-service.ts`
+- 再更新 store 测试
 
-当前阶段不要新增：
+不要直接在 UI 组件里读写 `localStorage`。  
+当前的本地存储层只应该通过 `AppDataStore` 接口访问。
 
-- 登录系统
-- Prisma
-- 后端数据库
-- 后端 API
-- 云同步
+## 6. 未来接 API 的规则
 
-如果确实要接远端数据，应先让远端实现适配 `AppDataStore` 的数据形状，再逐步修改 Provider 加载流程。
+如果未来要接远程 API 或数据库，优先替换的是 `AppDataStore` 的实现。
 
+推荐顺序：
+
+1. 新增远程实现，例如 `remote-api-app-data-store.ts`
+2. 保持 `AppDataStore` 接口不变
+3. 让 `home-state-service.ts` 继续通过 store 读写
+4. UI 和 Provider 尽量不动
+
+也就是说，UI 不应该关心数据来自本地还是远程。
+
+## 7. 后续继续拆分 Provider 的建议顺序
+
+如果后续还要继续拆 `HomeResourcesProvider.tsx`，建议优先沿着现在的 service 边界继续拆：
+
+1. 把 action 的更多编排继续下沉到 service
+2. 把重复的派生字段计算继续整理成更小的纯函数
+3. 再考虑 reducer 化
+
+不要为了“看起来更整洁”把逻辑重新塞回 Provider。
+
+## 8. 不要做的事
+
+以后开发时尽量避免：
+
+- 把业务逻辑重新写回 Provider
+- 在 UI 组件里计算钱包、金币、热力图
+- 把 runtime 数据和 config 混在一起
+- 没有测试就改结算规则
+- 不通过 `AppDataStore` 直接接触存储
+
+## 9. 当前推荐的开发姿势
+
+一个比较稳的顺序是：
+
+1. 先改 `lib/home`
+2. 再补测试
+3. 再让 `components/home` 消费新结果
+4. 最后跑 `npm run test`、`npm run lint`、`npm run build`
+
+这样做会慢一点，但回头修 bug 会轻松很多。  

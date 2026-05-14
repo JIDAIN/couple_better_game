@@ -1,74 +1,204 @@
-# 重构后的首页架构说明
+# 重构后的架构说明
 
-本文档说明当前 `codex-publish-current-version` 分支中首页相关代码的真实分层。当前项目仍然是纯前端本地 MVP，没有登录、数据库、后端 API 或云同步。
+本文档描述当前 `codex-publish-current-version` 分支中首页相关代码的真实分层。项目目前仍然是纯前端 Web MVP，没有登录、数据库、后端 API 或云同步。
 
-## 当前分层
+## 总体分层
 
-首页相关代码目前分为三层：
+当前首页相关代码可以按职责分成四层：
 
-| 层级 | 主要目录 | 当前职责 |
+| 层级 | 目录 | 主要职责 |
 |---|---|---|
-| UI 组件层 | `components/home` | 渲染首页、弹窗、热力图、成长日志、兑换商店，并调用 `useHomeResources()` |
-| 规则与数据类型层 | `lib/home` | 放置结算规则、共享类型、数据快照结构、数据存储接口 |
-| 持久化实现层 | `lib/home/*app-data-store.ts` | 当前使用 `localStorage` 保存，另有 memory store 供后续测试或替换 |
+| 页面层 | `app/` | Next.js 页面入口和路由挂载 |
+| 组件层 | `components/home/` | UI 展示、交互、弹窗、Context 消费 |
+| 领域与数据层 | `lib/home/` | 类型、规则、服务、存储抽象、日期工具、默认配置、seed 数据 |
+| 测试层 | `tests/home/` | 保护结算规则、存储抽象、状态恢复、业务服务的单元测试 |
 
-为了降低一次性重构风险，旧路径 `components/home/settlement-rules.ts` 和 `components/home/types.ts` 现在只是 re-export 到 `lib/home`。因此老组件可以继续使用旧 import，后续再逐步改为直接从 `@/lib/home/...` 引用。
+## 当前组件层
 
-## 关键文件职责
+`components/home/` 主要负责界面展示与动作触发。最关键的组件是 `HomeResourcesProvider.tsx`，它现在已经从原来的大文件缩短成一个薄状态编排器。
 
-| 文件 | 职责 |
-|---|---|
-| `lib/home/types.ts` | 定义首页运行时数据、配置数据、日记录、兑换记录、钱包、热力图等共享类型 |
-| `lib/home/settlement-rules.ts` | 定义宝石、金币、热力图等级、运动角标等业务规则函数 |
-| `lib/home/app-data-store.ts` | 定义 `AppDataStore` 抽象，以及 state 与 snapshot 的转换函数 |
-| `lib/home/local-storage-app-data-store.ts` | 当前本地持久化实现，读写浏览器 `localStorage` |
-| `lib/home/memory-app-data-store.ts` | 内存版 store，适合后续测试或临时替换持久化实现 |
-| `components/home/HomeResourcesProvider.tsx` | 连接 UI、规则和 store，维护 React Context 状态与首页操作函数 |
+### `HomeResourcesProvider.tsx` 现在负责什么
 
-## 当前数据流
+它现在主要负责：
 
-页面启动时：
+- 创建 `HomeResourcesContext`
+- 暴露 `useHomeResources()`
+- 初始化 `AppDataStore`
+- 读取和写回 `HomeResourcesState`
+- 把服务层计算结果提交进 React state
+- 对外暴露 action，例如 `applyTodayRecord`、`redeemExchange`、`upsertHistoricalRecord` 等
+- 把当前 state 拼装成 Context value 提供给 UI
 
-1. `HomeResourcesProvider` 创建 `localStorage` store。
-2. 调用 `readLocalState()` 从 store 读取 `AppDataSnapshot`。
-3. 如果没有数据，则使用默认 state，并导入当前内置的 2026 年 5 月历史记录。
-4. 如果存在旧版扁平数据，则通过 `snapshotFromLegacyHomeState()` 兼容转换为新 snapshot。
-5. Provider 将 snapshot 合并回 `HomeResourcesState`，并用当前规则重新计算金币、热力图和统计值。
+### `HomeResourcesProvider.tsx` 现在不再负责什么
 
-用户操作时：
+经过多步拆分之后，Provider 已经不再直接承担这些纯业务/存储细节：
 
-1. UI 组件调用 `useHomeResources()` 暴露的方法，例如 `applyTodayRecord()`、`upsertHistoricalRecord()`、`redeemExchange()`。
-2. Provider 内部根据规则函数生成或更新记录。
-3. Provider 调用 `commitHomeState()` 更新 React state。
-4. `commitHomeState()` 通过 `snapshotFromHomeResourcesState()` 转成 `AppDataSnapshot`。
-5. 当前 store 将 snapshot 写入 `localStorage`。
+- 不再直接实现结算规则
+- 不再直接实现每日记录、历史补录、兑换记录的纯计算
+- 不再直接实现钱包重算和统计汇总
+- 不再直接拼装 snapshot
+- 不再直接处理 localStorage 读写细节
+- 不再直接保存默认配置和 seed 常量
 
-## HomeResourcesProvider 当前仍承担的职责
+这些职责已经分散到 `lib/home` 下的 service / store / rules 文件里。
 
-本次只是第一步小规模拆层，所以 `HomeResourcesProvider.tsx` 仍然承担较多职责：
+## `lib/home/` 当前职责地图
 
-- 创建默认首页 state。
-- 兼容旧数据读取。
-- 规范化兑换类别、兑换记录、日记录。
-- 导入 2026 年 5 月内置历史记录。
-- 处理今日记录、补录历史、删除历史记录。
-- 处理兑换、编辑兑换记录、删除兑换记录。
-- 维护钱包余额、热力图覆盖数据、周统计、累计统计。
-- 通过 Context 向 UI 暴露数据和操作函数。
-- 调用 `AppDataStore` 保存最终 snapshot。
+### `types.ts`
 
-也就是说，Provider 已经不再直接关心 `localStorage` API，但还没有完全拆成独立的 service/reducer 层。
+统一定义领域类型，是整个首页数据层的类型入口。
 
-## 当前没有做的事情
+它包含：
 
-当前架构没有新增：
+- `UserRuntimeData`
+- `AppConfigData`
+- `AppDataSnapshot`
+- `HomeResourcesState`
+- `DailyRecord`
+- `ExchangeRecord`
+- `ExchangeCategory`
+- `Wallet`
+- `HeatmapDay`
+- `TodayRecordPayload`
+- `HistoricalRecordDraft`
+- `HistoricalRecordResult`
 
-- 登录系统
-- Prisma
-- 后端数据库
-- 后端 API
-- 云同步
-- 规则设置页
+### `settlement-rules.ts`
 
-这次重构的边界是：把规则、类型和持久化接口先移出 UI 层，让后续替换存储层更顺滑。
+纯结算规则层。这里放的是不会直接触碰 UI、store 或 React state 的业务规则：
 
+- 热量缺口对应的宝石规则
+- 运动宝石规则
+- 恢复日奖励
+- 情侣 bonus
+- 金币规则
+- 热力图等级与运动角标规则
+- `computeCoinPreview()`
+- `buildHeatmapDay()`
+
+### `app-data-store.ts`
+
+数据存储接口层和 snapshot 转换层。
+
+它定义：
+
+- `AppDataStore`
+- `isAppDataSnapshot()`
+- `snapshotFromHomeResourcesState()`
+- `snapshotFromLegacyHomeState()`
+- `homeStatePatchFromSnapshot()`
+
+### `local-storage-app-data-store.ts`
+
+当前浏览器本地存储实现。它只关心：
+
+- 从 `localStorage` 读取字符串
+- 解析 JSON
+- 识别 snapshot 或 legacy 数据
+- 写回 JSON
+- 清理 storage key
+
+### `memory-app-data-store.ts`
+
+内存版 store，主要给测试和未来替换实现使用。它不会碰浏览器，也不会触碰 `localStorage`。
+
+### `home-state-service.ts`
+
+状态初始化与恢复服务。它负责：
+
+- 创建默认 state
+- 从 `AppDataStore` 读取 snapshot
+- 兼容 legacy 数据
+- 规范化默认值、规则、记录、分类
+- 导入 seed 历史记录
+- 重算派生字段
+- 写回 snapshot
+
+### `home-stat-service.ts`
+
+统计计算服务。它负责：
+
+- 钱包重算
+- 本周宝石和金币统计
+- 成功打卡统计
+- seed 历史数据导入时的重算
+- 相关汇总函数
+
+### `daily-record-service.ts`
+
+每日记录服务。它负责：
+
+- 今日记录生成
+- 今日记录应用到 state
+- 历史记录补录
+- 历史记录删除
+- 这些 action 的纯计算部分
+
+### `exchange-service.ts`
+
+兑换服务。它负责：
+
+- 兑换分类归一化
+- 兑换分类增删改的纯计算
+- 兑换记录归一化
+- 兑换记录排序
+- 兑换记录创建
+
+### `date-utils.ts`
+
+日期工具。它负责：
+
+- 日期格式化
+- ISO 日期解析
+- 兑换时间格式化
+- 日期归一化
+
+### `daily-record-utils.ts`
+
+每日记录通用工具。它负责：
+
+- `DailyRecord` 归一化
+- 记录日期提取
+- 记录查找
+- 记录排序
+- 热力图 override 构建
+
+### `home-default-config.ts`
+
+默认配置集中地，保存默认分类等静态配置。
+
+### `home-seed-data.ts`
+
+seed 历史数据集中地，保存内置的 5 月历史记录导入数据。
+
+## Provider 当前的定位
+
+现在的 `HomeResourcesProvider.tsx` 已经更接近“状态编排器”而不是“业务规则容器”。
+
+它做的事情更像这样：
+
+1. 从 `home-state-service.ts` 读取初始 state
+2. 把 state 放进 React
+3. 提供 `commitHomeState()`
+4. 在 action 中调用各个 service
+5. 把结果写回 store
+6. 通过 Context 让 UI 消费状态和动作
+
+这意味着：
+
+- UI 不直接访问 `localStorage`
+- UI 不直接实现结算规则
+- UI 不直接做钱包或统计重算
+- UI 不直接处理 snapshot 恢复
+
+## 目前的边界
+
+当前还没有做的事情：
+
+- 没有登录系统
+- 没有 Prisma
+- 没有后端数据库
+- 没有后端 API
+- 没有云同步
+
+当前边界的目标很明确：先把业务规则、数据恢复和存储抽象成可替换层，后续再把 `AppDataStore` 替换成远程实现。  

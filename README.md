@@ -1,48 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 恋爱宝库 / 变美变瘦大作战
 
-## 中文项目文档
+这是一个基于 Next.js 的本地 Web MVP。当前数据仍然存储在浏览器 `localStorage`，项目已经为未来接 API、数据库或云同步做了 store 抽象，但目前还没有接入登录、后端或数据库。
 
-当前项目是一个本地数据闭环的首页 MVP，数据通过 `localStorage` 持久化，暂未接入登录、数据库、后端 API 或云同步。
+## 项目文档
 
-- [重构后的首页架构说明](docs/architecture-after-refactor.md)
-- [重构后的数据管理说明](docs/data-management-after-refactor.md)
-- [重构后的模块地图](docs/module-map-after-refactor.md)
-- [重构后的开发指南](docs/development-guide-after-refactor.md)
-- [规则与 UI 对应关系](docs/rules-confirmation.md)
-- [热力图日期逻辑说明](docs/heatmap-date-logic.md)
-- [UI 功能盘点](docs/ui-inventory.md)
+如果你是第一次阅读这个项目，建议按下面顺序查看：
 
-## Getting Started
+1. [docs/architecture-after-refactor.md](docs/architecture-after-refactor.md)
+2. [docs/data-management-after-refactor.md](docs/data-management-after-refactor.md)
+3. [docs/module-map-after-refactor.md](docs/module-map-after-refactor.md)
+4. [docs/development-guide-after-refactor.md](docs/development-guide-after-refactor.md)
+5. [docs/testing-guide.md](docs/testing-guide.md)
+6. [docs/rules-confirmation.md](docs/rules-confirmation.md)
+7. [docs/heatmap-date-logic.md](docs/heatmap-date-logic.md)
+8. [docs/ui-inventory.md](docs/ui-inventory.md)
 
-First, run the development server:
+如果后续再补充产品说明或需求说明文档，可以把它们放在最前面，作为更高层的阅读入口。
+
+## 当前项目状态
+
+- 这是一个纯前端 Web MVP
+- 当前状态主要通过 React Context、`AppDataStore` 和 `localStorage` 协同管理
+- 结算规则、统计逻辑、每日记录逻辑、兑换逻辑都已经拆到 `lib/home/`
+- `HomeResourcesProvider.tsx` 目前主要负责状态编排和对外暴露 action
+
+## 常用命令
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run test
+npm run lint
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+其中：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `npm run test`：运行 Vitest 单元测试
+- `npm run lint`：检查代码风格和类型相关的静态问题
+- `npm run build`：执行生产构建
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 目录提示
 
-## Learn More
+- `app/`：Next.js 页面入口
+- `components/home/`：首页 UI 组件
+- `lib/home/`：类型、规则、数据服务、store 抽象、工具函数
+- `tests/home/`：首页核心逻辑测试
 
-To learn more about Next.js, take a look at the following resources:
+## 未来扩展方向
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+当前项目已经把数据访问抽象成 `AppDataStore`，后续如果接 API 或数据库，优先替换存储实现层，不需要先改 UI。  
