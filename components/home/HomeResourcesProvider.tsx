@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { defaultHeatmapStartDate } from "./mockHeatmapData";
 import {
   buildHeatmapDay,
   computeCoinPreview,
@@ -175,6 +176,7 @@ type HomeResourcesContextValue = {
   upsertHistoricalRecord: (
     payload: HistoricalRecordDraft,
   ) => HistoricalRecordResult;
+  deleteHistoricalRecord: (recordId: string) => boolean;
   updateExchangeRecord: (
     recordId: string,
     patch: { occurredAt?: string; remark?: string },
@@ -466,16 +468,6 @@ function pad2(value: number) {
 
 function todayIsoDate() {
   return getCurrentIsoDate();
-}
-
-function defaultHeatmapStartDate() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const diffFromSaturday = first.getDay() === 6 ? 0 : first.getDay() + 1;
-  first.setDate(first.getDate() - diffFromSaturday);
-  return `${first.getFullYear()}-${pad2(first.getMonth() + 1)}-${pad2(
-    first.getDate(),
-  )}`;
 }
 
 function isoDateFromMayDay(day: number) {
@@ -917,6 +909,7 @@ export function importMayHistoryRecords(
   const oldCoinTotal = sumRecordCoins(oldImportRecords);
   const newCoinTotal = sumRecordCoins(importedRecords);
   const todayRecord = todayRecordFrom(nextRecords);
+  const yesterdayRecord = yesterdayRecordFrom(nextRecords);
 
   return {
     ...state,
@@ -1130,7 +1123,6 @@ export function HomeResourcesProvider({
 
       commitHomeState((state) => {
         const nextRecords = orderDailyRecords([record, ...state.dailyRecords]);
-        const todayRecord = todayRecordFrom(nextRecords);
         const yesterdayRecord = yesterdayRecordFrom(nextRecords);
         return {
           ...state,
@@ -1204,7 +1196,7 @@ export function HomeResourcesProvider({
           ? state.dailyRecords.filter((record) => record.id !== existing.id)
           : state.dailyRecords;
         const previousDate = previousIsoDate(payload.recordDate);
-        const yesterdayRecord = previousDate
+        const previousRecord = previousDate
           ? findRecordByIso(recordsWithoutExisting, previousDate)
           : null;
 
@@ -1220,8 +1212,8 @@ export function HomeResourcesProvider({
           normalizeHistoricalSideInput(payload.fish) ?? baseFish;
         const catInput =
           normalizeHistoricalSideInput(payload.cat) ?? baseCat;
-        const fishGems = gemsForPerson("fish", fishInput, yesterdayRecord);
-        const catGems = gemsForPerson("cat", catInput, yesterdayRecord);
+        const fishGems = gemsForPerson("fish", fishInput, previousRecord);
+        const catGems = gemsForPerson("cat", catInput, previousRecord);
         const couple = computeCoupleBonus(fishInput, catInput);
         const newGemTotal = fishGems + catGems + couple.gems;
         const weekGemTotalWithoutExisting = sumRecordGemsInCoinWeek(
@@ -1266,7 +1258,7 @@ export function HomeResourcesProvider({
           ...recordsWithoutExisting,
         ]);
         const todayRecord = todayRecordFrom(nextRecords);
-        const yesterdayRecord = yesterdayRecordFrom(nextRecords);
+        const currentYesterdayRecord = yesterdayRecordFrom(nextRecords);
         const coinDelta = coin.delta - (existing?.coins ?? 0);
         result = {
           ok: true,
@@ -1308,7 +1300,9 @@ export function HomeResourcesProvider({
             nextRecords,
             state.visualRules,
           ),
-          yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
+          yesterdayGemTotal: currentYesterdayRecord
+            ? recordGems(currentYesterdayRecord)
+            : 0,
           fishHeatmapOverrides: buildHeatmapOverrides(nextRecords, "fish"),
           catHeatmapOverrides: buildHeatmapOverrides(nextRecords, "cat"),
           dailyRecords: nextRecords,
@@ -1316,6 +1310,72 @@ export function HomeResourcesProvider({
       });
 
       return result;
+    },
+    [commitHomeState],
+  );
+
+  const deleteHistoricalRecord = useCallback(
+    (recordId: string) => {
+      let removed = false;
+
+      commitHomeState((state) => {
+        const recordToDelete = state.dailyRecords.find(
+          (record) => record.id === recordId,
+        );
+        if (!recordToDelete) return state;
+        removed = true;
+
+        const nextRecords = orderDailyRecords(
+          state.dailyRecords.filter((record) => record.id !== recordId),
+        );
+        const todayRecord = todayRecordFrom(nextRecords);
+        const yesterdayRecord = yesterdayRecordFrom(nextRecords);
+        const earnedCoins = sumRecordCoins(nextRecords);
+        const spentCoins = sumCoinExchangeSpend(state.exchangeRecords);
+
+        return {
+          ...state,
+          wallet: {
+            gems: computeGemWallet(nextRecords, state.exchangeRecords),
+            coins: Math.max(0, earnedCoins - spentCoins),
+          },
+          todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
+          todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
+          todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
+          weekGemTotal: sumRecordGemsInCoinWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+          ),
+          weekCoinTotal: sumRecordCoinsInCoinWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+          ),
+          streakDays: countSuccessfulCheckInsInWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+            state.visualRules,
+          ),
+          weeklySuccessDays: countSuccessfulCheckInsInWeek(
+            nextRecords,
+            todayIsoDate(),
+            state.coinRules,
+            state.visualRules,
+          ),
+          cumulativeSuccessDays: countSuccessfulCheckInsTotal(
+            nextRecords,
+            state.visualRules,
+          ),
+          yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
+          fishHeatmapOverrides: buildHeatmapOverrides(nextRecords, "fish"),
+          catHeatmapOverrides: buildHeatmapOverrides(nextRecords, "cat"),
+          dailyRecords: nextRecords,
+        };
+      });
+
+      return removed;
     },
     [commitHomeState],
   );
@@ -1387,6 +1447,7 @@ export function HomeResourcesProvider({
       todayBonusGems: homeState.todayBonusGems,
       weekGemTotal: homeState.weekGemTotal,
       weekCoinTotal: homeState.weekCoinTotal,
+      yesterdayGemTotal: homeState.yesterdayGemTotal,
       heatmapStartDate: homeState.heatmapStartDate,
       coinRules: homeState.coinRules,
       visualRules: homeState.visualRules,
@@ -1398,6 +1459,7 @@ export function HomeResourcesProvider({
       applyTodayRecord,
       applyHistoricalRecord,
       upsertHistoricalRecord,
+      deleteHistoricalRecord,
       updateExchangeRecord,
       deleteExchangeRecord,
       updateHeatmapStartDate,
@@ -1411,6 +1473,7 @@ export function HomeResourcesProvider({
       applyTodayRecord,
       applyHistoricalRecord,
       upsertHistoricalRecord,
+      deleteHistoricalRecord,
       updateExchangeRecord,
       deleteExchangeRecord,
       updateHeatmapStartDate,

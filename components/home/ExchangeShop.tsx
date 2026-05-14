@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
@@ -26,18 +26,6 @@ type RecordFormState = {
   remark: string;
   occurredAt: string;
 };
-
-const SHOP_SUBTITLE_OPTIONS = [
-  "把努力变成一起期待的小快乐",
-  "一点点攒下属于我们的奖励",
-  "今天的坚持，换一点点喜欢",
-  "慢慢攒下属于我们的奖励",
-  "把认真生活，换成小小惊喜",
-  "一起攒一点喜欢，也攒一点期待",
-  "把每天的努力，轻轻存成奖励",
-] as const;
-
-const DEFAULT_SHOP_SUBTITLE = SHOP_SUBTITLE_OPTIONS[0];
 
 const EMPTY_CATEGORY_FORM: CategoryFormState = {
   title: "",
@@ -354,48 +342,54 @@ export function ExchangeShop() {
 
     const renderCategoryCard = (category: ExchangeCategory) => {
       const affordable = canAfford(category);
+      const isGem = category.resourceKind === "gem";
+      const cardClass = isGem
+        ? "border-fuchsia-100/70 bg-white/60 hover:bg-fuchsia-50/40"
+        : "border-amber-100/70 bg-white/60 hover:bg-amber-50/40";
+      const iconClass = isGem
+        ? "border-rose-100 bg-rose-50 text-rose-500"
+        : "border-amber-100 bg-amber-50 text-amber-500";
+      const priceClass = isGem
+        ? "border-fuchsia-100 bg-fuchsia-50/80 text-fuchsia-600"
+        : "border-amber-100 bg-amber-50/80 text-amber-600";
+      const buttonClass = isGem
+        ? "border-fuchsia-100/80 bg-white/70 text-fuchsia-600 hover:bg-fuchsia-50/70"
+        : "border-amber-100/80 bg-white/70 text-amber-600 hover:bg-amber-50/70";
       return (
         <article
           key={category.id}
-          className="rounded-[1.05rem] border border-white/80 bg-white/58 px-3 py-2.5 shadow-sm shadow-stone-100/25"
+          className={`rounded-[1rem] border px-2.5 py-2.5 shadow-sm shadow-rose-100/20 transition ${cardClass}`}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-start gap-2">
             <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${categoryTone(
-                category.resourceKind,
-              )}`}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${iconClass}`}
               aria-hidden
             >
               {category.icon}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold text-stone-700">
+              <p className="truncate text-[12px] font-bold leading-4 text-stone-700 sm:text-[13px]">
                 {category.title}
               </p>
-              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-stone-400">
+              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 text-stone-400">
                 {category.description}
               </p>
-              <div className="mt-1.5 flex flex-wrap gap-1">
+              <div className="mt-1.5 flex items-center justify-between gap-1.5">
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getCategoryChipClass(
-                    category.resourceKind,
-                  )}`}
+                  className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${priceClass}`}
                 >
-                  {resourceLabel(category.resourceKind)}
+                  {categoryPriceLabel(category)}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
-                  消耗 {categoryPriceLabel(category)}
-                </span>
+                <button
+                  type="button"
+                  disabled={!affordable}
+                  onClick={() => openRecord(category.id)}
+                  className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:border-stone-200/80 disabled:bg-stone-100/70 disabled:text-stone-400 disabled:shadow-none ${buttonClass}`}
+                >
+                  {affordable ? "兑换" : "差一点"}
+                </button>
               </div>
             </div>
-            <button
-              type="button"
-              disabled={!affordable}
-              onClick={() => openRecord(category.id)}
-              className="shrink-0 rounded-full border border-white/80 bg-white/72 px-3 py-1.5 text-[11px] font-semibold text-stone-600 shadow-sm shadow-rose-100/20 transition hover:bg-white/85 disabled:cursor-not-allowed disabled:border-stone-200/80 disabled:bg-stone-100/70 disabled:text-stone-400 disabled:shadow-none"
-            >
-              {affordable ? "兑换" : "差一点"}
-            </button>
           </div>
         </article>
       );
@@ -404,23 +398,30 @@ export function ExchangeShop() {
     const renderSection = (title: string, items: ExchangeCategory[]) => (
       <section className="space-y-1.5">
         <div className="flex items-center justify-between gap-3 px-1">
-          <p className="text-[11px] font-semibold tracking-wide text-stone-500">
+          <p
+            className={`text-sm font-bold tracking-wide ${
+              title.includes("宝石") ? "text-fuchsia-500" : "text-amber-600"
+            }`}
+          >
             {title}
           </p>
-          <span className="text-[10px] font-semibold text-stone-400">
-            {items.length} 项
-          </span>
         </div>
-        <div className="space-y-1.5">
-          {items.map(renderCategoryCard)}
-        </div>
+        {items.length > 0 ? (
+          <div className="space-y-1.5">{items.map(renderCategoryCard)}</div>
+        ) : (
+          <div className="rounded-[1rem] border border-white/70 bg-white/45 px-3 py-5 text-center text-[11px] font-semibold text-stone-400">
+            {title.includes("宝石") ? "还没有宝石商品" : "还没有金币商品"}
+          </div>
+        )}
       </section>
     );
 
     return (
       <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
-        {renderSection("宝石兑换", gemCategories)}
-        {renderSection("金币兑换", coinCategories)}
+        <div className="grid grid-cols-2 gap-2">
+          {renderSection("💎 宝石兑换", gemCategories)}
+          {renderSection("🪙 金币兑换", coinCategories)}
+        </div>
 
         <section className="mt-2.5 space-y-1.5">
           <div className="flex items-center justify-between gap-3">
@@ -430,13 +431,13 @@ export function ExchangeShop() {
             <button
               type="button"
               onClick={openHistory}
-              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold text-stone-600"
+              className="rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-[11px] font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
             >
               查看记录
             </button>
           </div>
-          <div className="rounded-[1.05rem] border border-white/75 bg-white/52 px-3 py-2.5 text-[11px] font-medium text-stone-500">
-            记录会以轻量时间线展开，方便回头翻看每一笔小奖励。
+          <div className="rounded-[1.05rem] border border-white/75 bg-white/45 px-3 py-2.5 text-[11px] font-medium text-stone-400">
+            每一笔小奖励，都是认真生活的痕迹。
           </div>
         </section>
       </div>
@@ -956,17 +957,10 @@ export function ExchangeShop() {
         <button
           type="button"
           onClick={openShop}
-          className="ui-button-secondary group flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-stone-600 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:translate-y-0"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-white/80 bg-white/70 px-3 py-3 text-[12px] font-bold text-stone-700 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:scale-[0.98] sm:text-sm"
         >
-          <span className="inline-flex min-w-0 items-center gap-2">
-            <span className="text-base" aria-hidden>
-              🎁
-            </span>
-            <span className="truncate">兑换商店</span>
-          </span>
-          <span className="shrink-0 text-[11px] font-semibold text-stone-400 transition group-hover:text-rose-500">
-            进入
-          </span>
+          <span aria-hidden>🎁</span>
+          <span>兑换商店</span>
         </button>
       </div>
 
@@ -992,21 +986,21 @@ export function ExchangeShop() {
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300/70" aria-hidden />
 
-            <div className="relative overflow-hidden rounded-[1.15rem] border border-white/75 bg-gradient-to-r from-rose-50/85 via-white/82 to-amber-50/70 px-3.5 py-3 shadow-sm shadow-rose-100/40">
+            <div className="relative overflow-hidden rounded-[1.15rem] border border-white/75 bg-gradient-to-r from-rose-50/85 via-white/82 to-amber-50/70 px-3.5 py-2.5 shadow-sm shadow-rose-100/40">
               <div
                 aria-hidden
                 className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/40 blur-xl"
               />
               <div className="relative flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <h2
                     id={titleId}
-                    className="mt-0.5 text-base font-bold text-stone-800"
+                    className="mt-0.5 text-base font-extrabold text-stone-700"
                   >
                     🎁 恋爱宝库
                   </h2>
-                  <p className="mt-0.5 text-[11px] font-medium text-stone-500">
-                    {DEFAULT_SHOP_SUBTITLE}
+                  <p className="mt-0.5 text-[11px] font-medium text-stone-400">
+                    把每天的认真，换成小小奖励
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -1014,7 +1008,7 @@ export function ExchangeShop() {
                     <button
                       type="button"
                       onClick={() => setMode("manage")}
-                      className="ui-button-secondary px-3 py-1 text-xs font-semibold text-stone-500"
+                      className="rounded-full border border-white/80 bg-white/65 px-3 py-1 text-xs font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
                     >
                       管理类别
                     </button>
@@ -1022,7 +1016,7 @@ export function ExchangeShop() {
                     <button
                       type="button"
                       onClick={closeCategoryMode}
-                      className="ui-button-secondary px-3 py-1 text-xs font-semibold text-stone-500"
+                      className="rounded-full border border-white/80 bg-white/65 px-3 py-1 text-xs font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
                     >
                       返回
                     </button>
@@ -1030,7 +1024,7 @@ export function ExchangeShop() {
                   <button
                     type="button"
                     onClick={closeShop}
-                    className="ui-button-secondary px-3 py-1 text-xs font-semibold text-stone-500"
+                    className="rounded-full border border-white/80 bg-white/65 px-3 py-1 text-xs font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
                   >
                     收起
                   </button>
@@ -1038,11 +1032,11 @@ export function ExchangeShop() {
               </div>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-200/80 bg-fuchsia-50/90 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-100 bg-fuchsia-50/80 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-600">
                   <span aria-hidden>💎</span>
                   {gemStock}/{GEM_CAP}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50/80 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
                   <span aria-hidden>🪙</span>
                   {coinStock}
                 </span>
@@ -1067,3 +1061,4 @@ export function ExchangeShop() {
     </>
   );
 }
+

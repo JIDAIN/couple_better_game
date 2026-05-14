@@ -48,7 +48,7 @@ function GemTreasureBar({
   return (
     <div className="ui-card-soft p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-bold text-stone-800">💎 宝石小宝箱</span>
+        <span className="text-[13px] font-bold text-stone-800">宝石小宝箱</span>
         <span className="text-[11px] font-semibold tabular-nums text-stone-500">
           {current} / {max}
         </span>
@@ -66,7 +66,7 @@ function GemTreasureBar({
         />
       </div>
       <p className="mt-1.5 text-[10px] font-medium text-stone-500">
-        攒满会有小惊喜哦
+        装满会有小惊喜哦
       </p>
     </div>
   );
@@ -77,13 +77,10 @@ export function CoupleGrowthPanel() {
     gemStock,
     coinStock,
     cumulativeSuccessDays,
-    todayFishGems,
-    todayCatGems,
-    todayBonusGems,
+    yesterdayGemTotal,
     weekGemTotal,
     weekCoinTotal,
   } = useHomeResources();
-  const todayGemSum = todayFishGems + todayCatGems + todayBonusGems;
 
   return (
     <section
@@ -95,7 +92,7 @@ export function CoupleGrowthPanel() {
           成长补给站
         </h2>
         <span className="text-lg" aria-hidden>
-          📦
+          📝
         </span>
       </div>
       <p className="mt-0.5 text-[10px] font-medium text-stone-500">
@@ -103,7 +100,7 @@ export function CoupleGrowthPanel() {
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <StatBubble label="今日宝石" value={todayGemSum} unit="颗" tone="gem" />
+        <StatBubble label="昨日宝石" value={yesterdayGemTotal} unit="颗" tone="gem" />
         <StatBubble label="本周宝石" value={weekGemTotal} unit="颗" tone="gem" />
       </div>
 
@@ -128,7 +125,7 @@ export function CoupleGrowthPanel() {
             </p>
           </div>
           <span className="text-2xl" aria-hidden>
-            💘
+            🔥
           </span>
         </div>
       </div>

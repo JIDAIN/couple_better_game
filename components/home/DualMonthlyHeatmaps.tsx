@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
-  buildMonthGrid,
+  buildMonthGridByStartDate,
   currentMonthLabel,
   defaultHeatmapStartDate,
 } from "./mockHeatmapData";
@@ -19,11 +19,21 @@ function lastDateOfMonth(date: Date) {
   )}-${String(last.getDate()).padStart(2, "0")}`;
 }
 
+function monthStart(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function addMonths(date: Date, delta: number) {
+  return new Date(date.getFullYear(), date.getMonth() + delta, 1);
+}
+
 function resolveVisibleStartDate(savedDate: string, monthDate: Date) {
   const fallback = defaultHeatmapStartDate(monthDate);
-  const monthEnd = lastDateOfMonth(monthDate);
-  if (savedDate >= fallback && savedDate <= monthEnd) return savedDate;
-  return fallback;
+  return /^\d{4}-\d{2}-\d{2}$/.test(savedDate) ? savedDate : fallback;
+}
+
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export function DualMonthlyHeatmaps() {
@@ -33,9 +43,11 @@ export function DualMonthlyHeatmaps() {
     weeklySuccessDays,
     updateHeatmapStartDate,
   } = useHomeResources();
-  const monthDate = useMemo(() => new Date(), []);
-  const monthLabel = currentMonthLabel(monthDate);
-  const monthEndDate = lastDateOfMonth(monthDate);
+  const [viewMonthDate, setViewMonthDate] = useState(() => monthStart(new Date()));
+
+  const monthLabel = currentMonthLabel(viewMonthDate);
+  const monthEndDate = lastDateOfMonth(viewMonthDate);
+  const viewMonthKey = monthKey(viewMonthDate);
 
   const fishHeatByDate = useMemo(
     () =>
@@ -53,26 +65,38 @@ export function DualMonthlyHeatmaps() {
       }, {}),
     [dailyRecords],
   );
-  const visibleStartDate = resolveVisibleStartDate(heatmapStartDate, monthDate);
+
+  const visibleStartDate = resolveVisibleStartDate(heatmapStartDate, viewMonthDate);
+  const hasMonthRecords = dailyRecords.some(
+    (record) => record.recordDate.startsWith(viewMonthKey),
+  );
 
   const fishGrid = useMemo(
     () =>
-      buildMonthGrid({
-        monthDate,
+      buildMonthGridByStartDate({
+        monthDate: viewMonthDate,
         startDate: visibleStartDate,
         heatByDate: fishHeatByDate,
       }),
-    [fishHeatByDate, monthDate, visibleStartDate],
+    [fishHeatByDate, viewMonthDate, visibleStartDate],
   );
   const catGrid = useMemo(
     () =>
-      buildMonthGrid({
-        monthDate,
+      buildMonthGridByStartDate({
+        monthDate: viewMonthDate,
         startDate: visibleStartDate,
         heatByDate: catHeatByDate,
       }),
-    [catHeatByDate, monthDate, visibleStartDate],
+    [catHeatByDate, viewMonthDate, visibleStartDate],
   );
+
+  const handlePrevMonth = () => {
+    setViewMonthDate((current) => addMonths(current, -1));
+  };
+
+  const handleNextMonth = () => {
+    setViewMonthDate((current) => addMonths(current, 1));
+  };
 
   return (
     <section
@@ -88,19 +112,39 @@ export function DualMonthlyHeatmaps() {
         className="pointer-events-none absolute bottom-4 left-0 h-20 w-20 rounded-full bg-amber-200/24 blur-2xl"
       />
 
-      <div className="relative text-center">
-        <h2 className="text-lg font-extrabold tracking-tight text-stone-800 sm:text-[1.28rem]">
-          {monthLabel}成就
-        </h2>
-        <p className="mt-1.5 text-[12px] leading-relaxed text-stone-500">
-          周六到周五为一周，已坚持 {weeklySuccessDays} 天
-        </p>
+      <div className="relative mx-auto max-w-[28rem]">
+        <div className="rounded-[1.25rem] border border-white/75 bg-gradient-to-br from-white/92 via-rose-50/88 to-amber-50/78 px-4 py-4 text-center shadow-[0_12px_30px_rgba(244,114,182,0.08)] backdrop-blur-sm sm:px-5">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/70 text-sm font-bold text-stone-500 transition hover:bg-white/95"
+              aria-label="查看上个月"
+            >
+              ‹
+            </button>
+            <h2 className="text-[1rem] font-bold tracking-tight text-stone-600 sm:text-[1.08rem]">
+              {monthLabel} · 成长地图
+            </h2>
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/80 bg-white/70 text-sm font-bold text-stone-500 transition hover:bg-white/95"
+              aria-label="查看下个月"
+            >
+              ›
+            </button>
+          </div>
+          <p className="mt-2 text-[13px] font-semibold text-rose-500/90 sm:text-[14px]">
+            本周已坚持 {weeklySuccessDays} 天 🌷
+          </p>
+        </div>
       </div>
 
       <div className="relative mt-3 rounded-2xl border border-white/70 bg-white/45 px-3 py-2.5 shadow-sm shadow-rose-100/25">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold text-stone-600">第 1 周起始日</p>
+            <p className="text-[11px] font-bold text-stone-600">作战开始日</p>
           </div>
           <input
             type="date"
@@ -118,12 +162,14 @@ export function DualMonthlyHeatmaps() {
           subtitle="小鱼也在努力闪闪发光"
           playerShort="🐟"
           grid={fishGrid}
+          showWeekLabels={hasMonthRecords}
         />
         <PlayerHeatmap
           title="🐱 的成长热力图"
-          subtitle="小猫的脚步轻轻但很坚定"
+          subtitle="小猫的脚步轻轻，但很坚定"
           playerShort="🐱"
           grid={catGrid}
+          showWeekLabels={hasMonthRecords}
         />
       </div>
 

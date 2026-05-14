@@ -210,7 +210,15 @@ function totalRecordGems(record: {
   return record.fish.gems + record.cat.gems + record.bonus;
 }
 
-export function RecordTodaySettlement() {
+type RecordTodayButtonVariant = "full" | "today" | "history";
+
+type RecordTodaySettlementProps = {
+  buttonVariant?: RecordTodayButtonVariant;
+};
+
+export function RecordTodaySettlement({
+  buttonVariant = "full",
+}: RecordTodaySettlementProps) {
   const {
     applyTodayRecord,
     coinRules,
@@ -557,48 +565,39 @@ export function RecordTodaySettlement() {
   return (
     <>
       <div className="space-y-2 pt-1">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("today");
-            setOpen(true);
-          }}
-          className="ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-bold text-white ring-2 ring-rose-200/30 will-change-transform sm:py-4"
-        >
-          <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
-            <span className="text-lg" aria-hidden>
-              ✦
+        {buttonVariant === "full" || buttonVariant === "today" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setMode("today");
+              setOpen(true);
+            }}
+            className="ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-bold text-white ring-2 ring-rose-200/30 will-change-transform sm:py-4"
+          >
+            <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
+              记录今天
             </span>
-            记录今天
-            <span className="text-lg" aria-hidden>
-              ✦
-            </span>
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode("history");
-            const nextDate = getDefaultHistoryDate();
-            const nextRecord =
-              dailyRecords.find((record) => recordIsoDate(record) === nextDate) ??
-              null;
-            setHistoryDate(nextDate);
-            hydrateHistoryInputs(nextRecord);
-            setOpen(true);
-          }}
-          className="ui-button-secondary group flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-stone-600 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:translate-y-0"
-        >
-          <span className="inline-flex min-w-0 items-center gap-2">
-            <span className="text-base" aria-hidden>
-              📅
-            </span>
-            <span className="truncate">补记历史记录</span>
-          </span>
-          <span className="shrink-0 text-[11px] font-semibold text-stone-400 transition group-hover:text-rose-500">
-            过去日期
-          </span>
-        </button>
+          </button>
+        ) : null}
+        {buttonVariant === "full" || buttonVariant === "history" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setMode("history");
+              const nextDate = getDefaultHistoryDate();
+              const nextRecord =
+                dailyRecords.find((record) => recordIsoDate(record) === nextDate) ??
+                null;
+              setHistoryDate(nextDate);
+              hydrateHistoryInputs(nextRecord);
+              setOpen(true);
+            }}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-white/80 bg-white/70 px-3 py-3 text-sm font-bold text-stone-700 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:scale-[0.98]"
+          >
+            <span aria-hidden>📝</span>
+            <span>补录记录</span>
+          </button>
+        ) : null}
       </div>
 
       {open ? (

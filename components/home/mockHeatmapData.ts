@@ -15,17 +15,25 @@ const emptyHeat: HeatmapDay = {
   exercise: "none",
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function pad2(value: number) {
   return String(value).padStart(2, "0");
 }
 
-function formatIsoDate(date: Date) {
+function startOfLocalDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+export function formatDateKey(date: Date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
     date.getDate(),
   )}`;
 }
 
-function parseIsoDate(value: string) {
+function parseDateKey(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;
   const year = Number(match[1]);
@@ -39,7 +47,7 @@ function parseIsoDate(value: string) {
   ) {
     return null;
   }
-  return date;
+  return startOfLocalDay(date);
 }
 
 function monthKey(date: Date) {
@@ -49,47 +57,83 @@ function monthKey(date: Date) {
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(date.getDate() + days);
-  return next;
+  return startOfLocalDay(next);
 }
 
 function firstDayOfMonth(target: Date) {
-  return new Date(target.getFullYear(), target.getMonth(), 1);
+  return startOfLocalDay(new Date(target.getFullYear(), target.getMonth(), 1));
 }
 
 function lastDayOfMonth(target: Date) {
-  return new Date(target.getFullYear(), target.getMonth() + 1, 0);
+  return startOfLocalDay(new Date(target.getFullYear(), target.getMonth() + 1, 0));
+}
+
+export function getWeekdayIndexForSatStart(date: Date | string) {
+  const target = typeof date === "string" ? parseDateKey(date) : startOfLocalDay(date);
+  const safeDate = target ?? startOfLocalDay(new Date());
+  return (safeDate.getDay() + 1) % 7;
+}
+
+export function getSatStartWeekStart(date: Date | string) {
+  const target = typeof date === "string" ? parseDateKey(date) : startOfLocalDay(date);
+  const safeDate = target ?? startOfLocalDay(new Date());
+  return addDays(safeDate, -getWeekdayIndexForSatStart(safeDate));
 }
 
 export function defaultHeatmapStartDate(target = new Date()) {
-  const first = firstDayOfMonth(target);
-  const diffFromSaturday = first.getDay() === 6 ? 0 : first.getDay() + 1;
-  return formatIsoDate(addDays(first, -diffFromSaturday));
+  return formatDateKey(getSatStartWeekStart(firstDayOfMonth(target)));
 }
 
 export function currentMonthLabel(target = new Date()) {
   return `${target.getFullYear()}年${target.getMonth() + 1}月`;
 }
 
-export function buildMonthGrid({
+export function getCampaignDayCount(startDate: string, today = new Date()) {
+  const start = parseDateKey(startDate);
+  if (!start) return null;
+  const todayStart = startOfLocalDay(today);
+  return Math.floor((todayStart.getTime() - start.getTime()) / DAY_MS) + 1;
+}
+
+export function getCampaignDayText(startDate: string, today = new Date()) {
+  const count = getCampaignDayCount(startDate, today);
+  if (count == null || !startDate) {
+    return "设置作战开始日后，就可以记录我们的第几天啦 ✨";
+  }
+  if (count <= 0) {
+    return "变美变瘦大作战即将开启 ✨";
+  }
+  return `变美变瘦大作战已经开启第 ${count} 天啦 ✨`;
+}
+
+export function buildMonthGridByStartDate({
   monthDate = new Date(),
-  startDate,
+  startDate: _startDate,
   heatByDate,
 }: {
   monthDate?: Date;
   startDate: string;
   heatByDate: Record<string, HeatmapDay>;
 }): MonthGrid {
-  const start = parseIsoDate(startDate) ?? parseIsoDate(defaultHeatmapStartDate(monthDate))!;
-  const targetMonth = monthKey(monthDate);
+  void _startDate;
+  const monthStart = firstDayOfMonth(monthDate);
   const monthEnd = lastDayOfMonth(monthDate);
+  const gridStart = getSatStartWeekStart(monthStart);
+  const gridEnd = getSatStartWeekStart(monthEnd);
+  const targetMonth = monthKey(monthDate);
   const grid: MonthGrid = [];
 
-  for (let weekStart = new Date(start); weekStart <= monthEnd; weekStart = addDays(weekStart, 7)) {
+  for (
+    let weekStart = new Date(gridStart);
+    weekStart <= gridEnd;
+    weekStart = addDays(weekStart, 7)
+  ) {
     const week: WeekColumn = [];
     for (let offset = 0; offset < 7; offset += 1) {
       const date = addDays(weekStart, offset);
-      const iso = formatIsoDate(date);
-      if (monthKey(date) !== targetMonth) {
+      const iso = formatDateKey(date);
+      const inTargetMonth = monthKey(date) === targetMonth;
+      if (!inTargetMonth) {
         week.push(null);
         continue;
       }
@@ -103,6 +147,14 @@ export function buildMonthGrid({
   }
 
   return grid;
+}
+
+export function buildMonthGrid(args: {
+  monthDate?: Date;
+  startDate: string;
+  heatByDate: Record<string, HeatmapDay>;
+}): MonthGrid {
+  return buildMonthGridByStartDate(args);
 }
 
 export function dayLabel(cell: HeatmapCellData): string | null {

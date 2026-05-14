@@ -1,3 +1,8 @@
+"use client";
+
+import { useHomeResources } from "./HomeResourcesProvider";
+import { getCampaignDayCount } from "./mockHeatmapData";
+
 import { CoupleGrowthPanel } from "./CoupleGrowthPanel";
 import { DualMonthlyHeatmaps } from "./DualMonthlyHeatmaps";
 import { EncouragementQuote } from "./EncouragementQuote";
@@ -6,6 +11,40 @@ import { GameTitle } from "./GameTitle";
 import { GrowthLog } from "./GrowthLog";
 import { HomeResourcesProvider } from "./HomeResourcesProvider";
 import { RecordTodayButton } from "./RecordTodayButton";
+
+function CampaignProgressBadge() {
+  const { heatmapStartDate } = useHomeResources();
+  const campaignDayCount = getCampaignDayCount(heatmapStartDate, new Date());
+  const hasStartDate = heatmapStartDate.length > 0;
+  const hasStarted = campaignDayCount != null && campaignDayCount > 0;
+
+  if (!hasStartDate) {
+    return (
+      <div className="ui-card-soft mx-auto w-full max-w-[28rem] bg-gradient-to-r from-white via-rose-50/90 to-amber-50/90 px-4 py-3 text-center text-[12px] font-semibold text-stone-500 shadow-sm">
+        设置作战开始日后，就能记录我们的第几天啦 ✨
+      </div>
+    );
+  }
+
+  if (!hasStarted) {
+    return (
+      <div className="ui-card-soft mx-auto w-full max-w-[28rem] bg-gradient-to-r from-white via-rose-50/90 to-amber-50/90 px-4 py-3 text-center text-[12px] font-semibold text-stone-600 shadow-sm">
+        变美变瘦大作战即将开启 ✨
+      </div>
+    );
+  }
+
+  return (
+    <div className="ui-card-soft mx-auto w-full max-w-[28rem] bg-gradient-to-r from-rose-100 via-white to-amber-100 px-4 py-3 text-center shadow-[0_10px_24px_rgba(244,114,182,0.08)]">
+      <span className="text-[12px] font-semibold text-rose-500/90">
+        变美变瘦大作战已开启
+      </span>
+      <span className="ml-2 text-[1.03rem] font-black tabular-nums text-stone-800">
+        第 {campaignDayCount} 天 ✨
+      </span>
+    </div>
+  );
+}
 
 export function HomeScreen() {
   return (
@@ -27,17 +66,19 @@ export function HomeScreen() {
         <div className="relative mx-auto flex w-full max-w-md flex-col gap-4.5 px-4 sm:px-5">
           <GameTitle />
 
+          <CampaignProgressBadge />
+
           <CoupleGrowthPanel />
 
           <DualMonthlyHeatmaps />
 
           <EncouragementQuote />
 
-          <RecordTodayButton />
+          <RecordTodayButton buttonVariant="today" />
 
-          <div className="flex w-full flex-col gap-2 pt-1">
+          <div className="grid w-full grid-cols-3 gap-2 pt-1">
+            <RecordTodayButton buttonVariant="history" />
             <GrowthLog />
-
             <ExchangeShop />
           </div>
         </div>
