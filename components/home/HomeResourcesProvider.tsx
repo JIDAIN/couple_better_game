@@ -14,7 +14,7 @@ import {
   snapshotFromHomeResourcesState,
   type AppDataStore,
 } from "@/lib/home/app-data-store";
-import { formatRecordDateFromIso, parseIsoDate, previousIsoDate, todayIsoDate } from "@/lib/home/date-utils";
+import { parseIsoDate } from "@/lib/home/date-utils";
 import {
   createExchangeRecordFromPayload,
   deleteExchangeCategoryFromList,
@@ -25,32 +25,22 @@ import {
   upsertExchangeCategoryInList,
 } from "@/lib/home/exchange-service";
 import {
-  buildHeatmapOverrides,
-  findRecordByIso,
   normalizeDailyRecord,
-  normalizeHistoricalSideInput,
-  orderDailyRecords,
-  recordGems,
-  sideInputFromRecordSide,
 } from "@/lib/home/daily-record-utils";
 import { DEFAULT_EXCHANGE_CATEGORIES } from "@/lib/home/home-default-config";
 import { createLocalStorageAppDataStore } from "@/lib/home/local-storage-app-data-store";
 import {
   computeGemWallet,
-  countSuccessfulCheckInsInWeek,
-  countSuccessfulCheckInsTotal,
   importMayHistoryRecords,
   recalculateCoinsWithCurrentRules,
-  sumCoinExchangeSpend,
-  sumRecordCoins,
-  sumRecordCoinsInCoinWeek,
-  sumRecordGemsInCoinWeek,
-  todayRecordFrom,
-  yesterdayRecordFrom,
 } from "@/lib/home/home-stat-service";
+import {
+  applyTodayRecordToState,
+  deleteHistoricalRecordFromState,
+  upsertHistoricalRecordInState,
+} from "@/lib/home/daily-record-service";
 import type {
   DailyRecord,
-  DailyRecordSide,
   ExchangeCategory,
   ExchangeRecord,
   HeatmapDay,
@@ -60,14 +50,9 @@ import type {
 } from "@/lib/home/types";
 import { defaultHeatmapStartDate } from "./mockHeatmapData";
 import {
-  buildHeatmapDay,
-  computeCoinPreview,
-  computeCoupleBonus,
   DEFAULT_COIN_RULES,
   DEFAULT_VISUAL_RULES,
-  gemsForPerson,
   type CoinRulesConfig,
-  type PersonKey,
   type SettlementVisualRules,
 } from "./settlement-rules";
 
@@ -93,7 +78,7 @@ export type TodayRecordPayload = {
 
 export type HistoricalRecordPayload = {
   recordDate: string;
-  person: PersonKey;
+  person: "fish" | "cat";
   input: TodayRecordSidePayload;
 };
 
@@ -340,19 +325,6 @@ function writeLocalState(state: HomeResourcesState, dataStore: AppDataStore) {
   dataStore.save(snapshotFromHomeResourcesState(state));
 }
 
-function makeId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function zeroSide(): DailyRecordSide {
-  return {
-    weightKg: null,
-    deficit: 0,
-    minutes: 0,
-    gems: 0,
-  };
-}
-
 export function HomeResourcesProvider({
   children,
   initialGems = 0,
@@ -482,215 +454,23 @@ export function HomeResourcesProvider({
 
   const applyTodayRecord = useCallback(
     (payload: TodayRecordPayload) => {
-      const recordDate = todayIsoDate();
-      const record: DailyRecord = {
-        id: makeId("daily"),
-        date: formatRecordDateFromIso(recordDate),
-        recordDate,
-        createdAt: new Date().toISOString(),
-        day: payload.day,
-        fish: {
-          ...payload.fish,
-          gems: payload.fishGems,
-        },
-        cat: {
-          ...payload.cat,
-          gems: payload.catGems,
-        },
-        bonus: payload.bonusGems,
-        coins: payload.coinDelta,
-        fishHeat: payload.fishHeat,
-        catHeat: payload.catHeat,
-      };
-
-      commitHomeState((state) => {
-        const nextRecords = orderDailyRecords([record, ...state.dailyRecords]);
-        const yesterdayRecord = yesterdayRecordFrom(nextRecords);
-        return {
-          ...state,
-          wallet: {
-            gems: computeGemWallet(nextRecords, state.exchangeRecords),
-            coins: state.wallet.coins + payload.coinDelta,
-          },
-          todayFishGems: payload.fishGems,
-          todayCatGems: payload.catGems,
-          todayBonusGems: payload.bonusGems,
-          weekGemTotal: sumRecordGemsInCoinWeek(
-            nextRecords,
-            recordDate,
-            state.coinRules,
-          ),
-          weekCoinTotal: sumRecordCoinsInCoinWeek(
-            nextRecords,
-            recordDate,
-            state.coinRules,
-          ),
-          streakDays: countSuccessfulCheckInsInWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-            state.visualRules,
-          ),
-          weeklySuccessDays: countSuccessfulCheckInsInWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-            state.visualRules,
-          ),
-          cumulativeSuccessDays: countSuccessfulCheckInsTotal(
-            nextRecords,
-            state.visualRules,
-          ),
-          yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
-          fishHeatmapOverrides: {
-            ...state.fishHeatmapOverrides,
-            [payload.day]: payload.fishHeat,
-          },
-          catHeatmapOverrides: {
-            ...state.catHeatmapOverrides,
-            [payload.day]: payload.catHeat,
-          },
-          dailyRecords: nextRecords,
-        };
-      });
+      commitHomeState((state) => applyTodayRecordToState(state, payload));
     },
     [commitHomeState],
   );
 
   const upsertHistoricalRecord = useCallback(
     (payload: HistoricalRecordDraft): HistoricalRecordResult => {
-      const parsed = parseIsoDate(payload.recordDate);
-      if (!parsed) {
-        return { ok: false, updatedExisting: false, reason: "invalid-date" };
-      }
-      if (payload.recordDate > todayIsoDate()) {
-        return { ok: false, updatedExisting: false, reason: "future-date" };
-      }
-
       let result: HistoricalRecordResult = {
-        ok: true,
+        ok: false,
         updatedExisting: false,
       };
-
       commitHomeState((state) => {
-        const existing = findRecordByIso(state.dailyRecords, payload.recordDate);
-        const recordsWithoutExisting = existing
-          ? state.dailyRecords.filter((record) => record.id !== existing.id)
-          : state.dailyRecords;
-        const previousDate = previousIsoDate(payload.recordDate);
-        const previousRecord = previousDate
-          ? findRecordByIso(recordsWithoutExisting, previousDate)
-          : null;
-
-        const baseFish =
-          existing?.fish != null
-            ? sideInputFromRecordSide(existing.fish)
-            : sideInputFromRecordSide(zeroSide());
-        const baseCat =
-          existing?.cat != null
-            ? sideInputFromRecordSide(existing.cat)
-            : sideInputFromRecordSide(zeroSide());
-        const fishInput =
-          normalizeHistoricalSideInput(payload.fish) ?? baseFish;
-        const catInput =
-          normalizeHistoricalSideInput(payload.cat) ?? baseCat;
-        const fishGems = gemsForPerson("fish", fishInput, previousRecord);
-        const catGems = gemsForPerson("cat", catInput, previousRecord);
-        const couple = computeCoupleBonus(fishInput, catInput);
-        const newGemTotal = fishGems + catGems + couple.gems;
-        const weekGemTotalWithoutExisting = sumRecordGemsInCoinWeek(
-          recordsWithoutExisting,
-          payload.recordDate,
-          state.coinRules,
-        );
-        const coin = computeCoinPreview({
-          fish: fishInput,
-          cat: catInput,
-          todayDay: parsed.day,
-          todayDate: payload.recordDate,
-          todayGemTotal: newGemTotal,
-          currentWeekGemTotal: weekGemTotalWithoutExisting,
-          dailyRecords: recordsWithoutExisting,
-          coinRules: state.coinRules,
-          visualRules: state.visualRules,
-        });
-
-        const nextRecord: DailyRecord = {
-          id: existing?.id ?? makeId("daily"),
-          date: formatRecordDateFromIso(payload.recordDate),
-          recordDate: payload.recordDate,
-          createdAt: existing?.createdAt ?? new Date().toISOString(),
-          day: parsed.day,
-          fish: {
-            ...fishInput,
-            gems: fishGems,
-          },
-          cat: {
-            ...catInput,
-            gems: catGems,
-          },
-          bonus: couple.gems,
-          coins: coin.delta,
-          fishHeat: buildHeatmapDay("fish", fishInput, state.visualRules),
-          catHeat: buildHeatmapDay("cat", catInput, state.visualRules),
-        };
-
-        const nextRecords = orderDailyRecords([
-          nextRecord,
-          ...recordsWithoutExisting,
-        ]);
-        const todayRecord = todayRecordFrom(nextRecords);
-        const currentYesterdayRecord = yesterdayRecordFrom(nextRecords);
-        const coinDelta = coin.delta - (existing?.coins ?? 0);
-        result = {
-          ok: true,
-          updatedExisting: existing != null,
-        };
-
-        return {
-          ...state,
-          wallet: {
-            gems: computeGemWallet(nextRecords, state.exchangeRecords),
-            coins: Math.max(0, state.wallet.coins + coinDelta),
-          },
-          todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
-          todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
-          todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
-          weekGemTotal: sumRecordGemsInCoinWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-          ),
-          weekCoinTotal: sumRecordCoinsInCoinWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-          ),
-          streakDays: countSuccessfulCheckInsInWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-            state.visualRules,
-          ),
-          weeklySuccessDays: countSuccessfulCheckInsInWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-            state.visualRules,
-          ),
-          cumulativeSuccessDays: countSuccessfulCheckInsTotal(
-            nextRecords,
-            state.visualRules,
-          ),
-          yesterdayGemTotal: currentYesterdayRecord
-            ? recordGems(currentYesterdayRecord)
-            : 0,
-          fishHeatmapOverrides: buildHeatmapOverrides(nextRecords, "fish"),
-          catHeatmapOverrides: buildHeatmapOverrides(nextRecords, "cat"),
-          dailyRecords: nextRecords,
-        };
+        const next = upsertHistoricalRecordInState(state, payload);
+        result = next.result;
+        if (!next.result.ok) return state;
+        return next.state;
       });
-
       return result;
     },
     [commitHomeState],
@@ -698,66 +478,14 @@ export function HomeResourcesProvider({
 
   const deleteHistoricalRecord = useCallback(
     (recordId: string) => {
-      let removed = false;
-
+      let deleted = false;
       commitHomeState((state) => {
-        const recordToDelete = state.dailyRecords.find(
-          (record) => record.id === recordId,
-        );
-        if (!recordToDelete) return state;
-        removed = true;
-
-        const nextRecords = orderDailyRecords(
-          state.dailyRecords.filter((record) => record.id !== recordId),
-        );
-        const todayRecord = todayRecordFrom(nextRecords);
-        const yesterdayRecord = yesterdayRecordFrom(nextRecords);
-        const earnedCoins = sumRecordCoins(nextRecords);
-        const spentCoins = sumCoinExchangeSpend(state.exchangeRecords);
-
-        return {
-          ...state,
-          wallet: {
-            gems: computeGemWallet(nextRecords, state.exchangeRecords),
-            coins: Math.max(0, earnedCoins - spentCoins),
-          },
-          todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
-          todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
-          todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
-          weekGemTotal: sumRecordGemsInCoinWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-          ),
-          weekCoinTotal: sumRecordCoinsInCoinWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-          ),
-          streakDays: countSuccessfulCheckInsInWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-            state.visualRules,
-          ),
-          weeklySuccessDays: countSuccessfulCheckInsInWeek(
-            nextRecords,
-            todayIsoDate(),
-            state.coinRules,
-            state.visualRules,
-          ),
-          cumulativeSuccessDays: countSuccessfulCheckInsTotal(
-            nextRecords,
-            state.visualRules,
-          ),
-          yesterdayGemTotal: yesterdayRecord ? recordGems(yesterdayRecord) : 0,
-          fishHeatmapOverrides: buildHeatmapOverrides(nextRecords, "fish"),
-          catHeatmapOverrides: buildHeatmapOverrides(nextRecords, "cat"),
-          dailyRecords: nextRecords,
-        };
+        const next = deleteHistoricalRecordFromState(state, recordId);
+        deleted = next.deleted;
+        if (!next.deleted) return state;
+        return next.state;
       });
-
-      return removed;
+      return deleted;
     },
     [commitHomeState],
   );
