@@ -4,7 +4,7 @@ import { EncouragementQuote } from "./EncouragementQuote";
 import { ExchangeShop } from "./ExchangeShop";
 import { GameTitle } from "./GameTitle";
 import { GrowthLog } from "./GrowthLog";
-import { HomeResourcesProvider } from "./HomeResourcesProvider";
+import { HomeResourcesProvider } from "./HomeResourcesProvider.fixed";
 import { RecordTodayButton } from "./RecordTodayButton";
 
 export function HomeScreen() {
