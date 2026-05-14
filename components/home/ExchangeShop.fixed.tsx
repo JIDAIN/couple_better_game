@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useHomeResources, type ExchangeCategory } from "./HomeResourcesProvider.fixed";
+import { useHomeResources, type ExchangeCategory } from "./HomeResourcesProvider.safe";
 
 function resourceLabel(kind: ExchangeCategory["resourceKind"]) {
   return kind === "gem" ? "宝石" : "金币";
