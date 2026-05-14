@@ -8,7 +8,7 @@ import {
 } from "./mockHeatmapData";
 import { HeatmapLegend } from "./HeatmapLegend";
 import { PlayerHeatmap } from "./PlayerHeatmap";
-import { useHomeResources } from "./HomeResourcesProvider";
+import { useHomeResources } from "./HomeResourcesProvider.fixed";
 import type { HeatmapDay } from "./types";
 
 function lastDateOfMonth(date: Date) {
