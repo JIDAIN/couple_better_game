@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useHomeResources } from "./HomeResourcesProvider.fixed";
+import { useHomeResources } from "./HomeResourcesProvider.safe";
 import {
   buildHeatmapDay,
   computeCoupleBonus,
