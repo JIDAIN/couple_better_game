@@ -53,10 +53,10 @@ export function PlayerHeatmap({
     <div className="ui-card-soft p-3 sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-[13px] font-bold tracking-wide text-stone-700">
+          <h3 className="text-[13px] font-bold tracking-wide ui-text-main">
             {title}
           </h3>
-          <p className="text-[11px] font-medium text-stone-500">{subtitle}</p>
+          <p className="text-[11px] font-medium ui-text-muted">{subtitle}</p>
         </div>
         <span className="text-base opacity-90" aria-hidden>
           {playerShort}
@@ -69,12 +69,12 @@ export function PlayerHeatmap({
           style={{ gridTemplateColumns: gridColumns }}
         >
           {showWeekLabels ? (
-            <div className="text-[10px] font-semibold text-stone-400"> </div>
+            <div className="text-[10px] font-semibold ui-text-soft"> </div>
           ) : null}
           {weekdayLabels.map((label) => (
             <div
               key={`weekday-${label}`}
-              className="text-center text-[10px] font-semibold text-stone-400 sm:text-[11px]"
+              className="text-center text-[10px] font-semibold ui-text-soft sm:text-[11px]"
             >
               {label}
             </div>
@@ -88,7 +88,7 @@ export function PlayerHeatmap({
             style={{ gridTemplateColumns: gridColumns }}
           >
             {showWeekLabels ? (
-              <div className="pr-1 text-[10px] font-semibold text-stone-400 sm:text-[11px]">
+              <div className="pr-1 text-[10px] font-semibold ui-text-soft sm:text-[11px]">
                 第 {weekIndex + 1} 周
               </div>
             ) : null}

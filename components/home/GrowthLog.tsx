@@ -44,25 +44,25 @@ function formatCoinDelta(value: number) {
 
 function LogCard({ entry }: { entry: GrowthLogEntry }) {
   return (
-    <article className="h-12 rounded-[1rem] border border-white/70 bg-white/75 px-3 shadow-sm shadow-rose-100/30 backdrop-blur-sm transition hover:bg-white/85 active:scale-[0.995]">
+    <article className="ui-card-soft h-12 px-3 transition active:scale-[0.995]">
       <div className="grid h-full grid-cols-[4.4rem_minmax(0,1fr)_minmax(0,1fr)_3.45rem_3rem] items-center gap-2">
-        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-bold leading-4 tabular-nums tracking-tight text-rose-500">
+        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-bold leading-4 tabular-nums tracking-tight ui-text-primary">
           {formatMonthDay(entry.recordDate)}
         </p>
 
-        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight text-stone-600 sm:text-xs">
+        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
           🐟{entry.fish.deficit}kcal/{entry.fish.minutes}min
         </p>
 
-        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight text-stone-600 sm:text-xs">
+        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
           🐱{entry.cat.deficit}kcal/{entry.cat.minutes}min
         </p>
 
-        <span className="inline-flex h-6 w-[3.45rem] items-center justify-center rounded-full border border-rose-100/70 bg-rose-50/75 text-[10px] font-semibold tabular-nums text-rose-500">
+        <span className="ui-chip-primary inline-flex h-6 w-[3.45rem] items-center justify-center text-[10px] font-semibold tabular-nums">
           💎+{totalGems(entry)}
         </span>
 
-        <span className="inline-flex h-6 w-[3rem] items-center justify-center rounded-full border border-amber-200/70 bg-amber-50/75 text-[10px] font-semibold tabular-nums text-amber-500">
+        <span className="ui-chip-reward inline-flex h-6 w-[3rem] items-center justify-center text-[10px] font-semibold tabular-nums">
           🪙{formatCoinDelta(entry.coins)}
         </span>
       </div>
@@ -120,7 +120,7 @@ export function GrowthLog() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-white/80 bg-white/70 px-3 py-3 text-sm font-bold text-stone-700 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:scale-[0.98]"
+        className="ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
       >
         <span aria-hidden>📖</span>
         <span>成长日志</span>
@@ -131,7 +131,7 @@ export function GrowthLog() {
           <button
             type="button"
             aria-label="关闭成长日志"
-            className={`absolute inset-0 bg-stone-900/30 backdrop-blur-[2px] transition-opacity duration-300 ${
+            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
               sheetEnter ? "opacity-100" : "opacity-0"
             }`}
             onClick={closeSheet}
@@ -140,53 +140,53 @@ export function GrowthLog() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`relative flex h-[78dvh] w-full max-w-lg flex-col overflow-hidden rounded-[1.45rem] border border-white/80 bg-gradient-to-b from-rose-50/98 via-white/90 to-amber-50/85 px-4 pt-3 shadow-2xl shadow-rose-200/40 transition-all duration-300 ease-out will-change-transform ${
+            className={`ui-sheet relative flex h-[78dvh] w-full max-w-lg flex-col overflow-hidden px-4 pt-3 transition-all duration-300 ease-out will-change-transform ${
               sheetEnter
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-full opacity-90 sm:translate-y-2 sm:scale-95"
             } pb-[max(1.25rem,env(safe-area-inset-bottom))]`}
           >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300/70" aria-hidden />
+            <div className="ui-sheet-handle mx-auto mb-3 h-1 w-10 rounded-full" aria-hidden />
 
-            <div className="rounded-[1.15rem] border border-white/75 bg-gradient-to-r from-rose-50/85 via-white/82 to-amber-50/70 px-3.5 py-2.5 shadow-sm shadow-rose-100/40">
+            <div className="ui-soft-panel px-3.5 py-2.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-lg font-bold leading-6 tracking-tight text-stone-800">
+                  <p className="text-lg font-bold leading-6 tracking-tight ui-text-main">
                     📖 成长日志
                   </p>
-                  <p className="text-xs font-medium leading-4 text-stone-400">
+                  <p className="text-xs font-medium leading-4 ui-text-soft">
                     一起攒下的小脚印
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={closeSheet}
-                  className="shrink-0 rounded-full border border-white/80 bg-white/65 px-3 py-1 text-xs font-semibold text-stone-500 transition hover:bg-white/95"
+                  className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
                 >
                   收起
                 </button>
               </div>
 
               <div className="mt-2 flex justify-center">
-                <div className="inline-flex items-center gap-4 rounded-full border border-white/70 bg-white/55 px-4 py-1.5 shadow-inner shadow-white/40">
+                <div className="ui-input-shell inline-flex items-center gap-4 px-4 py-1.5">
                   <button
                     type="button"
                     onClick={onPrevMonth}
-                    className="text-lg font-bold leading-none text-stone-400 transition hover:text-rose-400 active:scale-95"
+                    className="text-lg font-bold leading-none ui-text-soft transition active:scale-95"
                     aria-label="查看上个月"
                   >
                     ‹
                   </button>
                   <h2
                     id={titleId}
-                    className="min-w-[7.2rem] text-center text-lg font-semibold leading-6 tracking-tight text-stone-700"
+                    className="min-w-[7.2rem] text-center text-lg font-semibold leading-6 tracking-tight ui-text-main"
                   >
                     {formatMonthLabel(viewMonth)}
                   </h2>
                   <button
                     type="button"
                     onClick={onNextMonth}
-                    className="text-lg font-bold leading-none text-stone-400 transition hover:text-rose-400 active:scale-95"
+                    className="text-lg font-bold leading-none ui-text-soft transition active:scale-95"
                     aria-label="查看下个月"
                   >
                     ›
@@ -203,7 +203,7 @@ export function GrowthLog() {
                   ))}
                 </div>
               ) : (
-                <div className="rounded-[1rem] border border-white/70 bg-white/55 px-4 py-6 text-center text-sm font-semibold text-stone-500">
+                <div className="ui-soft-panel px-4 py-6 text-center text-sm font-semibold ui-text-muted">
                   这个月还没有成长记录
                 </div>
               )}

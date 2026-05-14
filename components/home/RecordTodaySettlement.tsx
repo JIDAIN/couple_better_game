@@ -34,20 +34,20 @@ function SoftField({
 }) {
   return (
     <label className="block min-w-0">
-      <span className="text-[11px] font-semibold text-stone-600">{label}</span>
+      <span className="text-[11px] font-semibold ui-text-muted">{label}</span>
       {hint ? (
-        <span className="mt-0.5 block text-[10px] text-stone-400">{hint}</span>
+        <span className="mt-0.5 block text-[10px] ui-text-soft">{hint}</span>
       ) : null}
-      <div className="mt-1 flex items-center gap-1.5 rounded-2xl border border-white/80 bg-white/65 px-3 py-2 shadow-inner shadow-rose-50/40 backdrop-blur-sm">
+      <div className="ui-input-shell mt-1 flex items-center gap-1.5 px-3 py-2">
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
-          className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums text-stone-800 outline-none placeholder:text-stone-300"
+          className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums ui-text-main outline-none placeholder:text-[var(--text-soft)]"
           placeholder="0"
         />
         {unit ? (
-          <span className="shrink-0 text-[11px] font-medium text-stone-400">
+          <span className="shrink-0 text-[11px] font-medium ui-text-soft">
             {unit}
           </span>
         ) : null}
@@ -76,14 +76,14 @@ function PartnerColumn({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2.5 rounded-2xl border border-rose-100/70 bg-gradient-to-b from-white/75 to-rose-50/40 p-3 shadow-sm backdrop-blur-sm">
-      <div className="flex items-center gap-2 border-b border-rose-100/50 pb-2">
+    <div className="ui-soft-panel flex min-w-0 flex-col gap-2.5 p-3">
+      <div className="flex items-center gap-2 pb-1.5">
         <span className="text-xl" aria-hidden>
           {emoji}
         </span>
         <div>
-          <p className="text-xs font-bold text-stone-800">{title}</p>
-          <p className="text-[10px] text-stone-400">轻轻填就好</p>
+          <p className="text-xs font-bold ui-text-main">{title}</p>
+          <p className="text-[10px] ui-text-soft">轻轻填就好</p>
         </div>
       </div>
       <SoftField
@@ -128,10 +128,10 @@ function HistoryPartnerCard({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-rose-100/70 bg-white/60 p-3 shadow-sm">
+    <div className="ui-soft-panel p-3">
       <div className="mb-2 flex items-center gap-2">
         <span aria-hidden>{emoji}</span>
-        <p className="text-xs font-bold text-stone-700">{title}</p>
+        <p className="text-xs font-bold ui-text-main">{title}</p>
       </div>
       <div className="grid grid-cols-2 gap-2.5">
         <SoftField
@@ -572,7 +572,7 @@ export function RecordTodaySettlement({
               setMode("today");
               setOpen(true);
             }}
-            className="ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-bold text-white ring-2 ring-rose-200/30 will-change-transform sm:py-4"
+            className="ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-semibold text-white will-change-transform sm:py-4"
           >
             <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
               记录今天
@@ -592,7 +592,7 @@ export function RecordTodaySettlement({
               hydrateHistoryInputs(nextRecord);
               setOpen(true);
             }}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-white/80 bg-white/70 px-3 py-3 text-sm font-bold text-stone-700 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:scale-[0.98]"
+            className="ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
           >
             <span aria-hidden>📝</span>
             <span>补录记录</span>
@@ -605,7 +605,7 @@ export function RecordTodaySettlement({
           <button
             type="button"
             aria-label="关闭"
-            className={`absolute inset-0 bg-stone-900/30 backdrop-blur-[2px] transition-opacity duration-300 ${
+            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
               entered ? "opacity-100" : "opacity-0"
             }`}
             onClick={() => setOpen(false)}
@@ -614,20 +614,20 @@ export function RecordTodaySettlement({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`relative flex max-h-[min(92dvh,640px)] w-full max-w-lg flex-col overflow-hidden rounded-[1.45rem] border border-white/80 bg-gradient-to-b from-rose-50/98 via-white/90 to-amber-50/85 shadow-2xl shadow-rose-200/40 transition-all duration-300 ease-out ${
+            className={`ui-sheet relative flex max-h-[min(92dvh,640px)] w-full max-w-lg flex-col overflow-hidden transition-all duration-300 ease-out ${
               entered
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-6 opacity-0 sm:translate-y-0 sm:scale-95"
             }`}
           >
-            <div className="shrink-0 border-b border-rose-100/60 px-4 pb-3 pt-4 text-center">
-              <p className="text-[10px] font-bold tracking-[0.2em] text-rose-400/90">
+            <div className="shrink-0 px-4 pb-3 pt-4 text-center">
+              <p className="text-[10px] font-bold tracking-[0.2em] ui-text-primary">
                 {mode === "today" ? "今日收工啦" : "补记一颗星"}
               </p>
-              <h2 id={titleId} className="mt-1 text-lg font-bold text-stone-800">
+              <h2 id={titleId} className="mt-1 text-lg font-bold ui-text-main">
                 {mode === "today" ? "双人结算面板" : "历史记录补记"}
               </h2>
-              <p className="mt-1 text-xs text-stone-500">
+              <p className="mt-1 text-xs ui-text-muted">
                 {mode === "today"
                   ? "一起把今天轻轻收进小背包"
                   : "支持单人补记，也支持双人同时更新"}
@@ -660,45 +660,45 @@ export function RecordTodaySettlement({
                     />
                   </div>
 
-                  <div className="mt-4 rounded-2xl border border-amber-100/80 bg-white/55 p-3.5 shadow-inner shadow-amber-50/50 backdrop-blur-sm">
-                    <p className="text-center text-[11px] font-bold text-amber-700/90">
+                  <div className="ui-soft-panel mt-4 p-3.5">
+                    <p className="text-center text-[11px] font-bold ui-text-reward">
                       结算预览
                     </p>
-                    <ul className="mt-3 space-y-2 text-xs font-semibold text-stone-700">
-                      <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
+                    <ul className="mt-3 space-y-2 text-xs font-semibold ui-text-main">
+                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐟 今日宝石</span>
-                        <span className="tabular-nums text-rose-600">
+                        <span className="tabular-nums ui-text-primary">
                           +{preview.fg}
                         </span>
                       </li>
-                      <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
+                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐱 今日宝石</span>
-                        <span className="tabular-nums text-rose-600">
+                        <span className="tabular-nums ui-text-primary">
                           +{preview.cg}
                         </span>
                       </li>
-                      <li className="flex flex-col gap-1 rounded-xl bg-gradient-to-r from-pink-50/80 to-amber-50/70 px-2.5 py-2">
+                      <li className="ui-tinted-reward flex flex-col gap-1 rounded-2xl px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
                           <span>情侣 bonus</span>
-                          <span className="tabular-nums text-pink-600">
+                          <span className="tabular-nums ui-text-primary">
                             {preview.couple.gems > 0
                               ? `+${preview.couple.gems}`
                               : "—"}
                           </span>
                         </div>
-                        <p className="text-[10px] font-medium text-stone-400">
+                        <p className="text-[10px] font-medium ui-text-soft">
                           {preview.couple.reasons[0] ??
                             "双方都运动 30 分钟以上时触发"}
                         </p>
                       </li>
-                      <li className="flex flex-col gap-0.5 rounded-xl bg-amber-50/55 px-2.5 py-2">
+                      <li className="ui-tinted-reward flex flex-col gap-0.5 rounded-2xl px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
                           <span>金币变化</span>
                           <span
                             className={
                               preview.coin.delta > 0
-                                ? "tabular-nums text-amber-700"
-                                : "text-[11px] font-medium text-stone-400"
+                                ? "tabular-nums ui-text-reward"
+                                : "text-[11px] font-medium ui-text-soft"
                             }
                           >
                             {preview.coin.delta > 0
@@ -706,7 +706,7 @@ export function RecordTodaySettlement({
                               : "未触发"}
                           </span>
                         </div>
-                        <p className="text-[10px] font-medium leading-relaxed text-stone-500">
+                        <p className="text-[10px] font-medium leading-relaxed ui-text-muted">
                           {preview.coin.hint}
                         </p>
                       </li>
@@ -717,7 +717,7 @@ export function RecordTodaySettlement({
                     <button
                       type="button"
                       onClick={() => setOpen(false)}
-                      className="flex-1 rounded-2xl border border-white/80 bg-white/50 py-3 text-sm font-bold text-stone-500 transition hover:bg-white/80"
+                      className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
                     >
                       下次再记
                     </button>
@@ -725,7 +725,7 @@ export function RecordTodaySettlement({
                       type="button"
                       disabled={!hasAnyEffort}
                       onClick={onConfirm}
-                      className="flex-[1.35] rounded-2xl border border-rose-200/80 bg-gradient-to-r from-rose-400 to-pink-400 py-3 text-sm font-bold text-white shadow-md shadow-rose-200/50 transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+                      className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       确认记录今天
                     </button>
@@ -734,7 +734,7 @@ export function RecordTodaySettlement({
               ) : (
                 <div className="space-y-3">
                   <label className="block">
-                    <span className="text-[11px] font-semibold text-stone-600">
+                    <span className="text-[11px] font-semibold ui-text-muted">
                       日期
                     </span>
                     <input
@@ -750,12 +750,12 @@ export function RecordTodaySettlement({
                         setHistoryDate(nextDate);
                         hydrateHistoryInputs(nextRecord);
                       }}
-                      className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none"
+                      className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                     />
                   </label>
 
                   <div>
-                    <p className="text-[11px] font-semibold text-stone-600">
+                    <p className="text-[11px] font-semibold ui-text-muted">
                       编辑方式
                     </p>
                     <div className="mt-1 grid grid-cols-2 gap-2">
@@ -764,8 +764,8 @@ export function RecordTodaySettlement({
                         onClick={() => setHistoryMode("single")}
                         className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                           historyMode === "single"
-                            ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
-                            : "border-white/80 bg-white/60 text-stone-500"
+                            ? "ui-chip-primary"
+                            : "ui-chip-plain"
                         }`}
                       >
                         单人
@@ -775,8 +775,8 @@ export function RecordTodaySettlement({
                         onClick={() => setHistoryMode("both")}
                         className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                           historyMode === "both"
-                            ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
-                            : "border-white/80 bg-white/60 text-stone-500"
+                            ? "ui-chip-primary"
+                            : "ui-chip-plain"
                         }`}
                       >
                         双人
@@ -787,7 +787,7 @@ export function RecordTodaySettlement({
                   {historyMode === "single" ? (
                     <>
                       <div>
-                        <p className="text-[11px] font-semibold text-stone-600">
+                        <p className="text-[11px] font-semibold ui-text-muted">
                           用户
                         </p>
                         <div className="mt-1 grid grid-cols-2 gap-2">
@@ -796,8 +796,8 @@ export function RecordTodaySettlement({
                             onClick={() => setHistoryPerson("fish")}
                             className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                               historyPerson === "fish"
-                                ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
-                                : "border-white/80 bg-white/60 text-stone-500"
+                                ? "ui-chip-primary"
+                                : "ui-chip-plain"
                             }`}
                           >
                             🐟 鱼鱼
@@ -807,8 +807,8 @@ export function RecordTodaySettlement({
                             onClick={() => setHistoryPerson("cat")}
                             className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                               historyPerson === "cat"
-                                ? "border-rose-200/90 bg-rose-50/85 text-rose-700"
-                                : "border-white/80 bg-white/60 text-stone-500"
+                                ? "ui-chip-primary"
+                                : "ui-chip-plain"
                             }`}
                           >
                             🐱 猫猫
@@ -866,45 +866,45 @@ export function RecordTodaySettlement({
                     </div>
                   )}
 
-                  <div className="rounded-2xl border border-amber-100/80 bg-white/55 p-3.5 shadow-inner shadow-amber-50/50 backdrop-blur-sm">
-                    <p className="text-center text-[11px] font-bold text-amber-700/90">
+                  <div className="ui-soft-panel p-3.5">
+                    <p className="text-center text-[11px] font-bold ui-text-reward">
                       历史结算预览
                     </p>
-                    <ul className="mt-3 space-y-2 text-xs font-semibold text-stone-700">
-                      <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
+                    <ul className="mt-3 space-y-2 text-xs font-semibold ui-text-main">
+                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐟 鱼鱼宝石</span>
-                        <span className="tabular-nums text-rose-600">
+                        <span className="tabular-nums ui-text-primary">
                           +{historyPreview.fg}
                         </span>
                       </li>
-                      <li className="flex items-center justify-between gap-2 rounded-xl bg-rose-50/60 px-2.5 py-1.5">
+                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐱 猫猫宝石</span>
-                        <span className="tabular-nums text-rose-600">
+                        <span className="tabular-nums ui-text-primary">
                           +{historyPreview.cg}
                         </span>
                       </li>
-                      <li className="flex flex-col gap-1 rounded-xl bg-gradient-to-r from-pink-50/80 to-amber-50/70 px-2.5 py-2">
+                      <li className="ui-tinted-reward flex flex-col gap-1 rounded-2xl px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
                           <span>情侣 bonus</span>
-                          <span className="tabular-nums text-pink-600">
+                          <span className="tabular-nums ui-text-primary">
                             {historyPreview.couple.gems > 0
                               ? `+${historyPreview.couple.gems}`
                               : "—"}
                           </span>
                         </div>
-                        <p className="text-[10px] font-medium text-stone-400">
+                        <p className="text-[10px] font-medium ui-text-soft">
                           {historyPreview.couple.reasons[0] ??
                             "当天双方都达到 30 分钟运动时触发"}
                         </p>
                       </li>
-                      <li className="flex flex-col gap-0.5 rounded-xl bg-amber-50/55 px-2.5 py-2">
+                      <li className="ui-tinted-reward flex flex-col gap-0.5 rounded-2xl px-2.5 py-2">
                         <div className="flex items-center justify-between gap-2">
                           <span>金币变化</span>
                           <span
                             className={
                               historyPreview.coin.delta > 0
-                                ? "tabular-nums text-amber-700"
-                                : "text-[11px] font-medium text-stone-400"
+                                ? "tabular-nums ui-text-reward"
+                                : "text-[11px] font-medium ui-text-soft"
                             }
                           >
                             {historyPreview.coin.delta > 0
@@ -912,13 +912,13 @@ export function RecordTodaySettlement({
                               : "未触发"}
                           </span>
                         </div>
-                        <p className="text-[10px] font-medium leading-relaxed text-stone-500">
+                        <p className="text-[10px] font-medium leading-relaxed ui-text-muted">
                           {historyPreview.coin.hint}
                         </p>
                       </li>
                     </ul>
                     {existingHistoryRecord ? (
-                      <p className="mt-2 text-center text-[10px] font-medium text-stone-500">
+                      <p className="mt-2 text-center text-[10px] font-medium ui-text-muted">
                         这一天已有记录，保存会覆盖你当前编辑到的那一侧或整天数据。
                       </p>
                     ) : null}
@@ -928,7 +928,7 @@ export function RecordTodaySettlement({
                     <button
                       type="button"
                       onClick={() => setOpen(false)}
-                      className="flex-1 rounded-2xl border border-white/80 bg-white/50 py-3 text-sm font-bold text-stone-500 transition hover:bg-white/80"
+                      className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
                     >
                       取消
                     </button>
@@ -940,7 +940,7 @@ export function RecordTodaySettlement({
                         historyDate > maxHistoryDate
                       }
                       onClick={onSaveHistory}
-                      className="flex-[1.35] rounded-2xl border border-rose-200/80 bg-gradient-to-r from-rose-400 to-pink-400 py-3 text-sm font-bold text-white shadow-md shadow-rose-200/50 transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+                      className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
                     >
                       保存历史记录
                     </button>
@@ -955,7 +955,7 @@ export function RecordTodaySettlement({
       {toast ? (
         <div
           role="status"
-          className="pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,20rem)] -translate-x-1/2 rounded-2xl border border-white/80 bg-white/92 px-4 py-3 text-center text-xs font-semibold text-stone-700 shadow-lg shadow-rose-200/40 backdrop-blur-md"
+          className="ui-dialog pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
         >
           {toast}
         </div>

@@ -20,7 +20,7 @@ function CampaignProgressBadge() {
 
   if (!hasStartDate) {
     return (
-      <div className="ui-card-soft mx-auto w-full max-w-[28rem] bg-gradient-to-r from-white via-rose-50/90 to-amber-50/90 px-4 py-3 text-center text-[12px] font-semibold text-stone-500 shadow-sm">
+      <div className="ui-card-soft mx-auto w-full max-w-[28rem] px-4 py-3 text-center text-[12px] font-semibold ui-text-muted">
         设置作战开始日后，就能记录我们的第几天啦 ✨
       </div>
     );
@@ -28,18 +28,18 @@ function CampaignProgressBadge() {
 
   if (!hasStarted) {
     return (
-      <div className="ui-card-soft mx-auto w-full max-w-[28rem] bg-gradient-to-r from-white via-rose-50/90 to-amber-50/90 px-4 py-3 text-center text-[12px] font-semibold text-stone-600 shadow-sm">
+      <div className="ui-card-soft mx-auto w-full max-w-[28rem] px-4 py-3 text-center text-[12px] font-semibold ui-text-main">
         变美变瘦大作战即将开启 ✨
       </div>
     );
   }
 
   return (
-    <div className="ui-card-soft mx-auto w-full max-w-[28rem] bg-gradient-to-r from-rose-100 via-white to-amber-100 px-4 py-3 text-center shadow-[0_10px_24px_rgba(244,114,182,0.08)]">
-      <span className="text-[12px] font-semibold text-rose-500/90">
+    <div className="ui-card-soft mx-auto w-full max-w-[28rem] px-4 py-3 text-center">
+      <span className="text-[12px] font-semibold ui-text-primary">
         变美变瘦大作战已开启
       </span>
-      <span className="ml-2 text-[1.03rem] font-black tabular-nums text-stone-800">
+      <span className="ml-2 text-[1.03rem] font-black tabular-nums ui-text-main">
         第 {campaignDayCount} 天 ✨
       </span>
     </div>
@@ -49,18 +49,18 @@ function CampaignProgressBadge() {
 export function HomeScreen() {
   return (
     <HomeResourcesProvider>
-      <div className="relative min-h-dvh overflow-x-hidden bg-gradient-to-b from-rose-50 via-orange-50/35 to-amber-50/85 pb-8 pt-7">
+      <div className="relative min-h-dvh overflow-x-hidden pb-8 pt-7">
         <div
           aria-hidden
-          className="pointer-events-none absolute -right-20 top-10 h-56 w-56 rounded-full bg-fuchsia-200/24 blur-3xl"
+          className="ui-ambient-primary pointer-events-none absolute -right-20 top-10 h-56 w-56 rounded-full blur-3xl"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-24 top-1/3 h-64 w-64 rounded-full bg-amber-200/24 blur-3xl"
+          className="ui-ambient-reward pointer-events-none absolute -left-24 top-1/3 h-64 w-64 rounded-full blur-3xl"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute bottom-0 right-1/4 h-48 w-48 rounded-full bg-emerald-200/20 blur-3xl"
+          className="ui-ambient-growth pointer-events-none absolute bottom-0 right-1/4 h-48 w-48 rounded-full blur-3xl"
         />
 
         <div className="relative mx-auto flex w-full max-w-md flex-col gap-4.5 px-4 sm:px-5">

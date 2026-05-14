@@ -15,21 +15,21 @@ function StatBubble({
 }) {
   const toneRing =
     tone === "gem"
-      ? "from-fuchsia-200/80 to-amber-100/90"
+      ? "ui-tinted-primary"
       : tone === "coin"
-        ? "from-amber-200/90 to-orange-100/90"
-        : "from-rose-200/90 to-pink-100/90";
+        ? "ui-tinted-reward"
+        : "ui-tinted-growth";
 
   return (
     <div
-      className={`ui-card-soft relative overflow-hidden bg-gradient-to-br ${toneRing} p-3`}
+      className={`ui-card-soft relative overflow-hidden ${toneRing} p-3`}
     >
-      <p className="text-[11px] font-semibold tracking-wide text-stone-600/85">
+      <p className="text-[11px] font-semibold tracking-wide ui-text-muted">
         {label}
       </p>
-      <p className="mt-0.5 text-[1.1rem] font-bold tabular-nums text-stone-800">
+      <p className="mt-0.5 text-[1.1rem] font-bold tabular-nums ui-text-main">
         {value}
-        <span className="ml-0.5 text-xs font-semibold text-stone-600">
+        <span className="ml-0.5 text-xs font-semibold ui-text-muted">
           {unit}
         </span>
       </p>
@@ -48,24 +48,24 @@ function GemTreasureBar({
   return (
     <div className="ui-card-soft p-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-bold text-stone-800">宝石小宝箱</span>
-        <span className="text-[11px] font-semibold tabular-nums text-stone-500">
+        <span className="text-[13px] font-bold ui-text-main">宝石小宝箱</span>
+        <span className="text-[11px] font-semibold tabular-nums ui-text-muted">
           {current} / {max}
         </span>
       </div>
       <div
-        className="mt-2 h-2.5 overflow-hidden rounded-full bg-stone-200/80"
+        className="ui-progress-track mt-2 h-2.5 overflow-hidden rounded-full"
         role="progressbar"
         aria-valuenow={current}
         aria-valuemin={0}
         aria-valuemax={max}
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 via-violet-400 to-amber-300 transition-[width] duration-700 ease-out"
+          className="ui-progress-fill h-full rounded-full transition-[width] duration-700 ease-out"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="mt-1.5 text-[10px] font-medium text-stone-500">
+      <p className="mt-1.5 text-[10px] font-medium ui-text-muted">
         装满会有小惊喜哦
       </p>
     </div>
@@ -88,14 +88,14 @@ export function CoupleGrowthPanel() {
       aria-label="情侣成长资源"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[13px] font-bold tracking-wide text-stone-700">
+        <h2 className="text-[13px] font-bold tracking-wide ui-text-main">
           成长补给站
         </h2>
         <span className="text-lg" aria-hidden>
           📝
         </span>
       </div>
-      <p className="mt-0.5 text-[10px] font-medium text-stone-500">
+      <p className="mt-0.5 text-[10px] font-medium ui-text-muted">
         两个人的小小收获面板
       </p>
 
@@ -113,15 +113,15 @@ export function CoupleGrowthPanel() {
         <StatBubble label="金币存钱罐" value={coinStock} unit="枚" tone="coin" />
       </div>
 
-      <div className="ui-card-soft mt-3 bg-gradient-to-r from-rose-50/85 to-amber-50/70 p-3">
+      <div className="ui-card-soft ui-tinted-primary mt-3 p-3">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <p className="text-[10px] font-semibold tracking-wide text-rose-500/90">
+            <p className="text-[10px] font-semibold tracking-wide ui-text-primary">
               双人热量缺口连击
             </p>
-            <p className="mt-0.5 text-2xl font-bold tabular-nums text-stone-800">
+            <p className="mt-0.5 text-2xl font-bold tabular-nums ui-text-main">
               {cumulativeSuccessDays}
-              <span className="ml-1 text-sm font-semibold text-stone-600">天</span>
+              <span className="ml-1 text-sm font-semibold ui-text-muted">天</span>
             </p>
           </div>
           <span className="text-2xl" aria-hidden>

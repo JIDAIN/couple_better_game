@@ -1,11 +1,10 @@
 import type { ExerciseTag, HeatLevel } from "./types";
 
 const levelClass: Record<HeatLevel, string> = {
-  none: "bg-stone-200/85 border-stone-300/50",
-  ok: "bg-emerald-200/95 border-emerald-300/55",
-  good: "bg-emerald-600/90 border-emerald-700/35",
-  perfect:
-    "bg-gradient-to-br from-amber-300 via-yellow-300 to-amber-400 border-amber-400/60",
+  none: "heat-cell-none",
+  ok: "heat-cell-ok",
+  good: "heat-cell-good",
+  perfect: "heat-cell-perfect",
 };
 
 const exerciseIcon: Record<ExerciseTag, string> = {
@@ -29,10 +28,9 @@ export function HeatmapCell({
     <div
       title={title}
       className={[
-        "relative mx-auto h-3 w-full max-w-[18px] rounded-[3px] border sm:h-4 sm:max-w-[22px]",
-        "transition duration-200 ease-out",
-        "hover:z-10 hover:scale-125 hover:shadow-md hover:shadow-amber-200/40",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-300/80",
+        "heat-cell relative mx-auto h-3 w-full max-w-[18px] rounded-[5px] border sm:h-4 sm:max-w-[22px] sm:rounded-md",
+        "hover:z-10 hover:scale-125",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1",
         levelClass[level],
       ].join(" ")}
       role="img"

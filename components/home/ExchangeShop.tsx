@@ -64,9 +64,7 @@ function resourceLabel(kind: ResourceKind) {
 }
 
 function categoryTone(kind: ResourceKind) {
-  return kind === "gem"
-    ? "border-rose-100/75 bg-rose-50/75 text-rose-700"
-    : "border-amber-100/75 bg-amber-50/75 text-amber-700";
+  return kind === "gem" ? "ui-chip-primary" : "ui-chip-reward";
 }
 
 function categoryPriceLabel(category: ExchangeCategory) {
@@ -85,9 +83,7 @@ function formFromCategory(category?: ExchangeCategory | null): CategoryFormState
 }
 
 function getCategoryChipClass(kind: ResourceKind) {
-  return kind === "gem"
-    ? "border-fuchsia-200/80 bg-fuchsia-50/85 text-fuchsia-700"
-    : "border-amber-200/80 bg-amber-50/85 text-amber-700";
+  return kind === "gem" ? "ui-chip-primary" : "ui-chip-reward";
 }
 
 export function ExchangeShop() {
@@ -343,40 +339,32 @@ export function ExchangeShop() {
     const renderCategoryCard = (category: ExchangeCategory) => {
       const affordable = canAfford(category);
       const isGem = category.resourceKind === "gem";
-      const cardClass = isGem
-        ? "border-fuchsia-100/70 bg-white/60 hover:bg-fuchsia-50/40"
-        : "border-amber-100/70 bg-white/60 hover:bg-amber-50/40";
-      const iconClass = isGem
-        ? "border-rose-100 bg-rose-50 text-rose-500"
-        : "border-amber-100 bg-amber-50 text-amber-500";
-      const priceClass = isGem
-        ? "border-fuchsia-100 bg-fuchsia-50/80 text-fuchsia-600"
-        : "border-amber-100 bg-amber-50/80 text-amber-600";
-      const buttonClass = isGem
-        ? "border-fuchsia-100/80 bg-white/70 text-fuchsia-600 hover:bg-fuchsia-50/70"
-        : "border-amber-100/80 bg-white/70 text-amber-600 hover:bg-amber-50/70";
+      const cardClass = isGem ? "ui-tinted-primary" : "ui-tinted-reward";
+      const iconClass = isGem ? "ui-chip-primary" : "ui-chip-reward";
+      const priceClass = isGem ? "ui-chip-primary" : "ui-chip-reward";
+      const buttonClass = "ui-button-secondary";
       return (
         <article
           key={category.id}
-          className={`rounded-[1rem] border px-2.5 py-2.5 shadow-sm shadow-rose-100/20 transition ${cardClass}`}
+          className={`ui-card-soft px-2.5 py-2.5 transition ${cardClass}`}
         >
           <div className="flex min-w-0 items-start gap-2">
             <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-base ${iconClass}`}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${iconClass}`}
               aria-hidden
             >
               {category.icon}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-bold leading-4 text-stone-700 sm:text-[13px]">
+              <p className="truncate text-[12px] font-bold leading-4 ui-text-main sm:text-[13px]">
                 {category.title}
               </p>
-              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 text-stone-400">
+              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft">
                 {category.description}
               </p>
               <div className="mt-1.5 flex items-center justify-between gap-1.5">
                 <span
-                  className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold tabular-nums ${priceClass}`}
+                  className={`inline-flex shrink-0 items-center px-2 py-0.5 text-[10px] font-semibold tabular-nums ${priceClass}`}
                 >
                   {categoryPriceLabel(category)}
                 </span>
@@ -384,7 +372,7 @@ export function ExchangeShop() {
                   type="button"
                   disabled={!affordable}
                   onClick={() => openRecord(category.id)}
-                  className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:border-stone-200/80 disabled:bg-stone-100/70 disabled:text-stone-400 disabled:shadow-none ${buttonClass}`}
+                  className={`shrink-0 px-2.5 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${buttonClass}`}
                 >
                   {affordable ? "兑换" : "差一点"}
                 </button>
@@ -400,7 +388,7 @@ export function ExchangeShop() {
         <div className="flex items-center justify-between gap-3 px-1">
           <p
             className={`text-sm font-bold tracking-wide ${
-              title.includes("宝石") ? "text-fuchsia-500" : "text-amber-600"
+              title.includes("宝石") ? "ui-text-primary" : "ui-text-reward"
             }`}
           >
             {title}
@@ -409,7 +397,7 @@ export function ExchangeShop() {
         {items.length > 0 ? (
           <div className="space-y-1.5">{items.map(renderCategoryCard)}</div>
         ) : (
-          <div className="rounded-[1rem] border border-white/70 bg-white/45 px-3 py-5 text-center text-[11px] font-semibold text-stone-400">
+          <div className="ui-soft-panel px-3 py-5 text-center text-[11px] font-semibold ui-text-soft">
             {title.includes("宝石") ? "还没有宝石商品" : "还没有金币商品"}
           </div>
         )}
@@ -425,18 +413,18 @@ export function ExchangeShop() {
 
         <section className="mt-2.5 space-y-1.5">
           <div className="flex items-center justify-between gap-3">
-            <p className="px-1 text-[11px] font-semibold tracking-wide text-stone-500">
+            <p className="px-1 text-[11px] font-semibold tracking-wide ui-text-muted">
               已兑换记录
             </p>
             <button
               type="button"
               onClick={openHistory}
-              className="rounded-full border border-white/80 bg-white/65 px-3 py-1.5 text-[11px] font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
+              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold"
             >
               查看记录
             </button>
           </div>
-          <div className="rounded-[1.05rem] border border-white/75 bg-white/45 px-3 py-2.5 text-[11px] font-medium text-stone-400">
+          <div className="ui-soft-panel px-3 py-2.5 text-[11px] font-medium ui-text-soft">
             每一笔小奖励，都是认真生活的痕迹。
           </div>
         </section>
@@ -455,7 +443,7 @@ export function ExchangeShop() {
     const renderCategoryCard = (category: ExchangeCategory) => (
       <article
         key={category.id}
-        className="rounded-[1.05rem] border border-white/80 bg-white/58 px-3 py-2.5 shadow-sm shadow-stone-100/25"
+        className="ui-card-soft px-3 py-2.5"
       >
         <div className="flex items-center gap-2.5">
           <span
@@ -467,10 +455,10 @@ export function ExchangeShop() {
             {category.icon}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold text-stone-700">
+            <p className="truncate text-[13px] font-semibold ui-text-main">
               {category.title}
             </p>
-            <p className="mt-0.5 line-clamp-1 text-[10px] font-medium text-stone-400">
+            <p className="mt-0.5 line-clamp-1 text-[10px] font-medium ui-text-soft">
               {category.description}
             </p>
             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -481,7 +469,7 @@ export function ExchangeShop() {
               >
                 {resourceLabel(category.resourceKind)}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2 py-0.5 text-[10px] font-semibold text-stone-500">
+              <span className="ui-chip-plain inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold">
                 消耗 {categoryPriceLabel(category)}
               </span>
             </div>
@@ -490,14 +478,14 @@ export function ExchangeShop() {
             <button
               type="button"
               onClick={() => openCategoryForm(category.id)}
-              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold text-stone-600"
+              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold"
             >
               编辑
             </button>
             <button
               type="button"
               onClick={() => deleteCategory(category.id)}
-              className="rounded-full border border-stone-200/75 bg-white/55 px-3 py-1.5 text-[11px] font-semibold text-stone-500 transition hover:bg-white/80"
+              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold opacity-80"
             >
               删除
             </button>
@@ -509,10 +497,10 @@ export function ExchangeShop() {
     const renderSection = (title: string, items: ExchangeCategory[]) => (
       <section className="space-y-1.5">
         <div className="flex items-center justify-between gap-3 px-1">
-          <p className="text-[11px] font-semibold tracking-wide text-stone-500">
+          <p className="text-[11px] font-semibold tracking-wide ui-text-muted">
             {title}
           </p>
-          <span className="text-[10px] font-semibold text-stone-400">
+          <span className="text-[10px] font-semibold ui-text-soft">
             {items.length} 项
           </span>
         </div>
@@ -525,13 +513,13 @@ export function ExchangeShop() {
     return (
       <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
         <div className="flex items-center justify-between gap-3">
-          <p className="px-1 text-[11px] font-semibold tracking-wide text-stone-500">
+          <p className="px-1 text-[11px] font-semibold tracking-wide ui-text-muted">
             奖励模板
           </p>
           <button
             type="button"
             onClick={() => openCategoryForm(null)}
-            className="ui-button-secondary px-3 py-1.5 text-xs font-semibold text-stone-600"
+            className="ui-button-secondary px-3 py-1.5 text-xs font-semibold"
           >
             新增类别
           </button>
@@ -553,7 +541,7 @@ export function ExchangeShop() {
           <button
             type="button"
             aria-label="关闭已兑换记录"
-            className={`absolute inset-0 bg-stone-900/20 backdrop-blur-[1px] transition-opacity duration-300 ${
+            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
               overlayEnter ? "opacity-100" : "opacity-0"
             }`}
             onClick={closeOverlay}
@@ -562,20 +550,20 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={overlayTitleId}
-            className={`relative w-full max-w-md rounded-[1.25rem] border border-white/85 bg-gradient-to-b from-white/96 to-amber-50/88 p-3.5 shadow-xl shadow-stone-300/25 transition-all duration-300 ease-out ${
+            className={`ui-dialog relative w-full max-w-md p-3.5 transition-all duration-300 ease-out ${
               overlayEnter
                 ? "translate-y-0 opacity-100"
                 : "translate-y-4 opacity-0"
             }`}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-stone-100/80 pb-3">
+            <div className="flex items-start justify-between gap-3 pb-3">
               <div>
-                <p className="text-[11px] font-semibold tracking-wide text-stone-400">
+                <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
                   已兑换记录
                 </p>
                 <h3
                   id={overlayTitleId}
-                  className="mt-0.5 text-base font-semibold tracking-tight text-stone-800"
+                  className="mt-0.5 text-base font-semibold tracking-tight ui-text-main"
                 >
                   轻量时间线
                 </h3>
@@ -583,7 +571,7 @@ export function ExchangeShop() {
               <button
                 type="button"
                 onClick={closeOverlay}
-                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold text-stone-500"
+                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
               >
                 返回
               </button>
@@ -594,18 +582,18 @@ export function ExchangeShop() {
                 exchangeRecords.map((record) => (
                   <article
                     key={record.id}
-                    className="rounded-[1.1rem] border border-white/75 bg-white/58 px-3 py-3 shadow-sm shadow-stone-100/30"
+                    className="ui-soft-panel px-3 py-3"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold tracking-wide text-stone-400">
+                        <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
                           {record.date}
                         </p>
-                        <p className="mt-1 text-sm font-medium text-stone-700">
+                        <p className="mt-1 text-sm font-medium ui-text-main">
                           {record.icon} {record.category}
                           {record.remark ? ` · ${record.remark}` : ""}
                         </p>
-                        <p className="mt-1 text-[11px] font-semibold text-stone-500">
+                        <p className="mt-1 text-[11px] font-semibold ui-text-muted">
                           消耗 {record.price} {resourceLabel(record.resourceKind)}
                         </p>
                       </div>
@@ -613,7 +601,7 @@ export function ExchangeShop() {
                         <button
                           type="button"
                           onClick={() => openEditRecord(record.id)}
-                          className="ui-button-secondary px-3 py-1 text-[11px] font-semibold text-stone-600"
+                          className="ui-button-secondary px-3 py-1 text-[11px] font-semibold"
                         >
                           编辑
                         </button>
@@ -623,7 +611,7 @@ export function ExchangeShop() {
                             const ok = deleteExchangeRecord(record.id);
                             if (ok) setToast("已删除兑换记录");
                           }}
-                          className="rounded-full border border-stone-200/75 bg-white/55 px-3 py-1 text-[11px] font-semibold text-stone-500 transition hover:bg-white/80"
+                          className="ui-button-secondary px-3 py-1 text-[11px] font-semibold opacity-80"
                         >
                           删除
                         </button>
@@ -632,7 +620,7 @@ export function ExchangeShop() {
                   </article>
                 ))
               ) : (
-                <div className="rounded-[1.1rem] border border-white/75 bg-white/58 px-3 py-5 text-center text-xs font-semibold text-stone-500 shadow-sm shadow-stone-100/30">
+                <div className="ui-soft-panel px-3 py-5 text-center text-xs font-semibold ui-text-muted">
                   还没有兑换记录，攒到喜欢的奖励再来换一笔。
                 </div>
               )}
@@ -661,7 +649,7 @@ export function ExchangeShop() {
           <button
             type="button"
             aria-label={isEditing ? "关闭记录编辑" : "关闭记录兑换"}
-            className={`absolute inset-0 bg-stone-900/20 backdrop-blur-[1px] transition-opacity duration-300 ${
+            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
               overlayEnter ? "opacity-100" : "opacity-0"
             }`}
             onClick={closeOverlay}
@@ -670,20 +658,20 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={overlayTitleId}
-            className={`relative w-full max-w-md rounded-[1.25rem] border border-white/85 bg-gradient-to-b from-white/96 to-amber-50/88 p-3.5 shadow-xl shadow-stone-300/25 transition-all duration-300 ease-out ${
+            className={`ui-dialog relative w-full max-w-md p-3.5 transition-all duration-300 ease-out ${
               overlayEnter
                 ? "translate-y-0 opacity-100"
                 : "translate-y-4 opacity-0"
             }`}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-stone-100/80 pb-3">
+            <div className="flex items-start justify-between gap-3 pb-3">
               <div>
-                <p className="text-[11px] font-semibold tracking-wide text-stone-400">
+                <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
                   {isEditing ? "编辑兑换记录" : "记录兑换"}
                 </p>
                 <h3
                   id={overlayTitleId}
-                  className="mt-0.5 text-base font-semibold tracking-tight text-stone-800"
+                  className="mt-0.5 text-base font-semibold tracking-tight ui-text-main"
                 >
                   {displayIcon} {displayTitle}
                 </h3>
@@ -691,7 +679,7 @@ export function ExchangeShop() {
               <button
                 type="button"
                 onClick={closeOverlay}
-                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold text-stone-500"
+                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
               >
                 取消
               </button>
@@ -705,13 +693,13 @@ export function ExchangeShop() {
               >
                 {resourceLabel(displayResource)}
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-stone-200/70 bg-stone-50/80 px-2.5 py-1 text-[11px] font-semibold text-stone-600">
+              <span className="ui-chip-plain inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold">
                 消耗 {displayPrice} {resourceLabel(displayResource)}
               </span>
             </div>
 
             <label className="mt-3 block">
-              <span className="text-[11px] font-semibold text-stone-600">
+              <span className="text-[11px] font-semibold ui-text-muted">
                 时间
               </span>
               <input
@@ -723,12 +711,12 @@ export function ExchangeShop() {
                     occurredAt: e.target.value,
                   }))
                 }
-                className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none"
+                className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
               />
             </label>
 
             <label className="mt-3 block">
-              <span className="text-[11px] font-semibold text-stone-600">
+              <span className="text-[11px] font-semibold ui-text-muted">
                 备注
               </span>
               <input
@@ -739,7 +727,7 @@ export function ExchangeShop() {
                     remark: e.target.value,
                   }))
                 }
-                className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none placeholder:text-stone-300"
+                className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                 placeholder="例如：下午茶 / 小奖励 / 周末加餐"
               />
             </label>
@@ -748,7 +736,7 @@ export function ExchangeShop() {
               <button
                 type="button"
                 onClick={closeOverlay}
-                className="flex-1 rounded-2xl border border-stone-200/75 bg-white/55 py-2.5 text-sm font-semibold text-stone-500 transition hover:bg-white/80"
+                className="ui-button-secondary flex-1 py-2.5 text-sm font-semibold"
               >
                 取消
               </button>
@@ -772,7 +760,7 @@ export function ExchangeShop() {
           <button
             type="button"
             aria-label="关闭类别表单"
-            className={`absolute inset-0 bg-stone-900/20 backdrop-blur-[1px] transition-opacity duration-300 ${
+            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
               overlayEnter ? "opacity-100" : "opacity-0"
             }`}
             onClick={closeOverlay}
@@ -781,20 +769,20 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={overlayTitleId}
-            className={`relative w-full max-w-md rounded-[1.25rem] border border-white/85 bg-gradient-to-b from-white/96 to-amber-50/88 p-3.5 shadow-xl shadow-stone-300/25 transition-all duration-300 ease-out ${
+            className={`ui-dialog relative w-full max-w-md p-3.5 transition-all duration-300 ease-out ${
               overlayEnter
                 ? "translate-y-0 opacity-100"
                 : "translate-y-4 opacity-0"
             }`}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-stone-100/80 pb-3">
+            <div className="flex items-start justify-between gap-3 pb-3">
               <div>
-                <p className="text-[11px] font-semibold tracking-wide text-stone-400">
+                <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
                   {isEdit ? "编辑类别" : "新增类别"}
                 </p>
                 <h3
                   id={overlayTitleId}
-                  className="mt-0.5 text-base font-semibold tracking-tight text-stone-800"
+                  className="mt-0.5 text-base font-semibold tracking-tight ui-text-main"
                 >
                   {isEdit ? "修改一个小奖励模板" : "添加一个新的小奖励模板"}
                 </h3>
@@ -802,7 +790,7 @@ export function ExchangeShop() {
               <button
                 type="button"
                 onClick={closeOverlay}
-                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold text-stone-500"
+                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
               >
                 返回
               </button>
@@ -810,7 +798,7 @@ export function ExchangeShop() {
 
             <div className="mt-3 space-y-3">
               <label className="block">
-                <span className="text-[11px] font-semibold text-stone-600">
+                <span className="text-[11px] font-semibold ui-text-muted">
                   类别名称
                 </span>
                 <input
@@ -821,14 +809,14 @@ export function ExchangeShop() {
                       title: e.target.value,
                     }))
                   }
-                  className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none placeholder:text-stone-300"
+                  className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                   placeholder="例如：小零食"
                 />
               </label>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[6rem_minmax(0,1fr)]">
                 <label className="block">
-                  <span className="text-[11px] font-semibold text-stone-600">
+                  <span className="text-[11px] font-semibold ui-text-muted">
                     图标
                   </span>
                   <input
@@ -839,13 +827,13 @@ export function ExchangeShop() {
                         icon: e.target.value,
                       }))
                     }
-                    className="mt-1 w-full rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-semibold text-stone-800 outline-none placeholder:text-stone-300"
+                    className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                     placeholder="🍦"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="text-[11px] font-semibold text-stone-600">
+                  <span className="text-[11px] font-semibold ui-text-muted">
                     消耗资源
                   </span>
                   <div className="mt-1 flex gap-2">
@@ -859,8 +847,8 @@ export function ExchangeShop() {
                       }
                       className={`flex-1 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                         categoryForm.resourceKind === "gem"
-                          ? "border-fuchsia-200/90 bg-fuchsia-50/85 text-fuchsia-700"
-                          : "border-white/80 bg-white/60 text-stone-500"
+                          ? "ui-chip-primary"
+                          : "ui-chip-plain"
                       }`}
                     >
                       宝石
@@ -875,8 +863,8 @@ export function ExchangeShop() {
                       }
                       className={`flex-1 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                         categoryForm.resourceKind === "coin"
-                          ? "border-amber-200/90 bg-amber-50/85 text-amber-700"
-                          : "border-white/80 bg-white/60 text-stone-500"
+                          ? "ui-chip-reward"
+                          : "ui-chip-plain"
                       }`}
                     >
                       金币
@@ -886,10 +874,10 @@ export function ExchangeShop() {
               </div>
 
               <label className="block">
-                <span className="text-[11px] font-semibold text-stone-600">
+                <span className="text-[11px] font-semibold ui-text-muted">
                   消耗数量
                 </span>
-                <div className="mt-1 flex items-center gap-2 rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5">
+                <div className="ui-input-shell mt-1 flex items-center gap-2 px-3 py-2.5">
                   <input
                     value={categoryForm.price}
                     onChange={(e) =>
@@ -899,17 +887,17 @@ export function ExchangeShop() {
                       }))
                     }
                     inputMode="numeric"
-                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-stone-800 outline-none placeholder:text-stone-300"
+                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold ui-text-main outline-none"
                     placeholder="5"
                   />
-                  <span className="shrink-0 text-[11px] font-medium text-stone-400">
+                  <span className="shrink-0 text-[11px] font-medium ui-text-soft">
                     {resourceLabel(categoryForm.resourceKind)}
                   </span>
                 </div>
               </label>
 
               <label className="block">
-                <span className="text-[11px] font-semibold text-stone-600">
+                <span className="text-[11px] font-semibold ui-text-muted">
                   描述
                 </span>
                 <textarea
@@ -921,7 +909,7 @@ export function ExchangeShop() {
                     }))
                   }
                   rows={3}
-                  className="mt-1 w-full resize-none rounded-2xl border border-white/80 bg-white/70 px-3 py-2.5 text-sm font-medium text-stone-700 outline-none placeholder:text-stone-300"
+                  className="ui-input mt-1 w-full resize-none px-3 py-2.5 text-sm font-medium outline-none"
                   placeholder="简单写一句这个奖励为什么可爱"
                 />
               </label>
@@ -931,7 +919,7 @@ export function ExchangeShop() {
               <button
                 type="button"
                 onClick={closeOverlay}
-                className="flex-1 rounded-2xl border border-stone-200/75 bg-white/55 py-2.5 text-sm font-semibold text-stone-500 transition hover:bg-white/80"
+                className="ui-button-secondary flex-1 py-2.5 text-sm font-semibold"
               >
                 取消
               </button>
@@ -957,7 +945,7 @@ export function ExchangeShop() {
         <button
           type="button"
           onClick={openShop}
-          className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-white/80 bg-white/70 px-3 py-3 text-[12px] font-bold text-stone-700 shadow-sm shadow-rose-100/25 transition duration-200 hover:-translate-y-0.5 hover:bg-white/85 active:scale-[0.98] sm:text-sm"
+          className="ui-nav-button inline-flex w-full whitespace-nowrap text-[12px] sm:text-sm"
         >
           <span aria-hidden>🎁</span>
           <span>兑换商店</span>
@@ -969,7 +957,7 @@ export function ExchangeShop() {
           <button
             type="button"
             aria-label="关闭兑换"
-            className={`absolute inset-0 bg-stone-900/30 backdrop-blur-[2px] transition-opacity duration-300 ${
+            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
               sheetEnter ? "opacity-100" : "opacity-0"
             }`}
             onClick={closeShop}
@@ -978,28 +966,28 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`relative flex h-[78dvh] w-full max-w-lg flex-col overflow-hidden rounded-[1.45rem] border border-white/80 bg-gradient-to-b from-rose-50/98 via-white/90 to-amber-50/85 px-4 pt-3 shadow-2xl shadow-rose-200/40 transition-all duration-300 ease-out will-change-transform ${
+            className={`ui-sheet relative flex h-[78dvh] w-full max-w-lg flex-col overflow-hidden px-4 pt-3 transition-all duration-300 ease-out will-change-transform ${
               sheetEnter
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-full opacity-90 sm:translate-y-2 sm:scale-95"
             } pb-[max(1.25rem,env(safe-area-inset-bottom))]`}
           >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300/70" aria-hidden />
+            <div className="ui-sheet-handle mx-auto mb-3 h-1 w-10 rounded-full" aria-hidden />
 
-            <div className="relative overflow-hidden rounded-[1.15rem] border border-white/75 bg-gradient-to-r from-rose-50/85 via-white/82 to-amber-50/70 px-3.5 py-2.5 shadow-sm shadow-rose-100/40">
+            <div className="ui-soft-panel relative overflow-hidden px-3.5 py-2.5">
               <div
                 aria-hidden
-                className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/40 blur-xl"
+                className="ui-ambient-white pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full blur-xl"
               />
               <div className="relative flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2
                     id={titleId}
-                    className="mt-0.5 text-base font-extrabold text-stone-700"
+                    className="mt-0.5 text-base font-extrabold ui-text-main"
                   >
                     🎁 恋爱宝库
                   </h2>
-                  <p className="mt-0.5 text-[11px] font-medium text-stone-400">
+                  <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
                     把每天的认真，换成小小奖励
                   </p>
                 </div>
@@ -1008,7 +996,7 @@ export function ExchangeShop() {
                     <button
                       type="button"
                       onClick={() => setMode("manage")}
-                      className="rounded-full border border-white/80 bg-white/65 px-3 py-1 text-xs font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
+                      className="ui-button-secondary px-3 py-1 text-xs font-semibold"
                     >
                       管理类别
                     </button>
@@ -1016,7 +1004,7 @@ export function ExchangeShop() {
                     <button
                       type="button"
                       onClick={closeCategoryMode}
-                      className="rounded-full border border-white/80 bg-white/65 px-3 py-1 text-xs font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
+                      className="ui-button-secondary px-3 py-1 text-xs font-semibold"
                     >
                       返回
                     </button>
@@ -1024,7 +1012,7 @@ export function ExchangeShop() {
                   <button
                     type="button"
                     onClick={closeShop}
-                    className="rounded-full border border-white/80 bg-white/65 px-3 py-1 text-xs font-semibold text-stone-500 shadow-sm transition hover:bg-white/85"
+                    className="ui-button-secondary px-3 py-1 text-xs font-semibold"
                   >
                     收起
                   </button>
@@ -1032,11 +1020,11 @@ export function ExchangeShop() {
               </div>
 
               <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center gap-1 rounded-full border border-fuchsia-100 bg-fuchsia-50/80 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-600">
+                <span className="ui-chip-primary inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold">
                   <span aria-hidden>💎</span>
                   {gemStock}/{GEM_CAP}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-100 bg-amber-50/80 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
+                <span className="ui-chip-reward inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold">
                   <span aria-hidden>🪙</span>
                   {coinStock}
                 </span>
@@ -1053,7 +1041,7 @@ export function ExchangeShop() {
       {toast ? (
         <div
           role="status"
-          className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,22rem)] -translate-x-1/2 rounded-2xl border border-white/80 bg-white/90 px-4 py-3 text-center text-xs font-semibold leading-relaxed text-stone-700 shadow-lg shadow-rose-200/40 backdrop-blur-md"
+          className="ui-dialog pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,22rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold leading-relaxed ui-text-main"
         >
           {toast}
         </div>
