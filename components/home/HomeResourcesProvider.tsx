@@ -14,6 +14,26 @@ import {
   snapshotFromHomeResourcesState,
   type AppDataStore,
 } from "@/lib/home/app-data-store";
+import {
+  formatExchangeDateLabel,
+  formatExchangeTimeLabel,
+  formatRecordDateFromIso,
+  isoDateFromMayDay,
+  normalizeExchangeDateTime,
+  parseIsoDate,
+  previousIsoDate,
+  todayIsoDate,
+} from "@/lib/home/date-utils";
+import {
+  buildHeatmapOverrides,
+  findRecordByIso,
+  normalizeDailyRecord,
+  normalizeHistoricalSideInput,
+  orderDailyRecords,
+  recordGems,
+  recordIsoDate,
+  sideInputFromRecordSide,
+} from "@/lib/home/daily-record-utils";
 import { DEFAULT_EXCHANGE_CATEGORIES } from "@/lib/home/home-default-config";
 import {
   MAY_HISTORY_IMPORT_PREFIX,
@@ -39,7 +59,6 @@ import {
   DEFAULT_COIN_RULES,
   DEFAULT_VISUAL_RULES,
   GEM_CAP,
-  getCurrentIsoDate,
   gemsForPerson,
   isInCoinWeek,
   type CoinRulesConfig,
@@ -339,68 +358,6 @@ function writeLocalState(state: HomeResourcesState, dataStore: AppDataStore) {
   dataStore.save(snapshotFromHomeResourcesState(state));
 }
 
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function todayIsoDate() {
-  return getCurrentIsoDate();
-}
-
-function isoDateFromMayDay(day: number) {
-  return `2026-05-${pad2(day)}`;
-}
-
-function parseIsoDate(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-  return { year, month, day };
-}
-
-function formatRecordDateFromIso(recordDate: string) {
-  const parsed = parseIsoDate(recordDate);
-  if (!parsed) return recordDate;
-  return `${parsed.year}年${parsed.month}月${parsed.day}日`;
-}
-
-function formatExchangeDateLabel(date: Date) {
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
-function formatExchangeTimeLabel(date: Date) {
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
-function parseDateTimeInput(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function normalizeExchangeDateTime(
-  value?: string | null,
-  fallback = new Date(),
-) {
-  const parsed = value ? parseDateTimeInput(value) : null;
-  const date = parsed ?? fallback;
-  return {
-    date,
-    occurredAt: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
-      date.getDate(),
-    )}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`,
-  };
-}
-
 function normalizeExchangeRecord(record: ExchangeRecord): ExchangeRecord {
   const normalized = normalizeExchangeDateTime(
     record.occurredAt ?? record.createdAt,
@@ -427,42 +384,6 @@ function zeroSide(): DailyRecordSide {
     minutes: 0,
     gems: 0,
   };
-}
-
-function normalizeDailyRecord(record: DailyRecord): DailyRecord {
-  const recordDate = record.recordDate ?? isoDateFromMayDay(record.day);
-  return {
-    ...record,
-    date: record.date ?? formatRecordDateFromIso(recordDate),
-    recordDate,
-  };
-}
-
-function sideInputFromRecordSide(side: DailyRecordSide): SideLogInput {
-  return {
-    weightKg: side.weightKg,
-    deficit: side.deficit,
-    minutes: side.minutes,
-  };
-}
-
-function normalizeHistoricalSideInput(
-  input?: TodayRecordSidePayload | null,
-): TodayRecordSidePayload | null {
-  if (!input) return null;
-  return {
-    weightKg: input.weightKg,
-    deficit: Math.max(0, Math.floor(input.deficit)),
-    minutes: Math.max(0, Math.floor(input.minutes)),
-  };
-}
-
-function recordGems(record: DailyRecord) {
-  return record.fish.gems + record.cat.gems + record.bonus;
-}
-
-function recordIsoDate(record: DailyRecord) {
-  return record.recordDate ?? isoDateFromMayDay(record.day);
 }
 
 function isSuccessfulCheckIn(
@@ -499,38 +420,6 @@ function countSuccessfulCheckInsTotal(
       isSuccessfulCheckIn(record, visualRules) ? total + 1 : total,
     0,
   );
-}
-
-function findRecordByIso(records: DailyRecord[], recordDate: string) {
-  return records.find((record) => recordIsoDate(record) === recordDate) ?? null;
-}
-
-function previousIsoDate(recordDate: string) {
-  const parsed = parseIsoDate(recordDate);
-  if (!parsed) return null;
-  const date = new Date(parsed.year, parsed.month - 1, parsed.day);
-  date.setDate(date.getDate() - 1);
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
-    date.getDate(),
-  )}`;
-}
-
-function orderDailyRecords(records: DailyRecord[]) {
-  return [...records].sort((a, b) =>
-    recordIsoDate(b).localeCompare(recordIsoDate(a)),
-  );
-}
-
-function buildHeatmapOverrides(
-  records: DailyRecord[],
-  person: "fish" | "cat",
-): HeatmapDayOverrides {
-  return records.reduce<HeatmapDayOverrides>((acc, record) => {
-    const parsed = parseIsoDate(recordIsoDate(record));
-    if (!parsed || parsed.year !== 2026 || parsed.month !== 5) return acc;
-    acc[record.day] = person === "fish" ? record.fishHeat : record.catHeat;
-    return acc;
-  }, {});
 }
 
 function sumRecordCoins(records: DailyRecord[]) {
