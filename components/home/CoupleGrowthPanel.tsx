@@ -1,6 +1,6 @@
 "use client";
 
-import { GEM_CAP, useHomeResources } from "./HomeResourcesProvider";
+import { GEM_CAP, useHomeResources } from "./HomeResourcesProvider.fixed";
 
 function StatBubble({
   label,
@@ -77,13 +77,10 @@ export function CoupleGrowthPanel() {
     gemStock,
     coinStock,
     cumulativeSuccessDays,
-    todayFishGems,
-    todayCatGems,
-    todayBonusGems,
+    yesterdayGemTotal,
     weekGemTotal,
     weekCoinTotal,
   } = useHomeResources();
-  const todayGemSum = todayFishGems + todayCatGems + todayBonusGems;
 
   return (
     <section
@@ -103,7 +100,7 @@ export function CoupleGrowthPanel() {
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <StatBubble label="今日宝石" value={todayGemSum} unit="颗" tone="gem" />
+        <StatBubble label="昨日宝石" value={yesterdayGemTotal} unit="颗" tone="gem" />
         <StatBubble label="本周宝石" value={weekGemTotal} unit="颗" tone="gem" />
       </div>
 
