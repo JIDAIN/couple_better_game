@@ -1,11 +1,11 @@
 import { CoupleGrowthPanel } from "./CoupleGrowthPanel";
 import { DualMonthlyHeatmaps } from "./DualMonthlyHeatmaps";
 import { EncouragementQuote } from "./EncouragementQuote";
-import { ExchangeShop } from "./ExchangeShop";
+import { ExchangeShop } from "./ExchangeShop.fixed";
 import { GameTitle } from "./GameTitle";
-import { GrowthLog } from "./GrowthLog";
+import { GrowthLog } from "./GrowthLog.fixed";
 import { HomeResourcesProvider } from "./HomeResourcesProvider.fixed";
-import { RecordTodayButton } from "./RecordTodayButton";
+import { RecordTodaySettlement as RecordTodayButton } from "./RecordTodaySettlement.fixed";
 
 export function HomeScreen() {
   return (
