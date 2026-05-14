@@ -9,36 +9,26 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  homeStatePatchFromSnapshot,
-  snapshotFromHomeResourcesState,
-  type AppDataStore,
-} from "@/lib/home/app-data-store";
 import { parseIsoDate } from "@/lib/home/date-utils";
 import {
   createExchangeRecordFromPayload,
   deleteExchangeCategoryFromList,
-  normalizeExchangeCategories,
   normalizeExchangeRecord,
   orderExchangeRecords,
   type ExchangeRedeemPayload,
   upsertExchangeCategoryInList,
 } from "@/lib/home/exchange-service";
-import {
-  normalizeDailyRecord,
-} from "@/lib/home/daily-record-utils";
-import { DEFAULT_EXCHANGE_CATEGORIES } from "@/lib/home/home-default-config";
 import { createLocalStorageAppDataStore } from "@/lib/home/local-storage-app-data-store";
-import {
-  computeGemWallet,
-  importMayHistoryRecords,
-  recalculateCoinsWithCurrentRules,
-} from "@/lib/home/home-stat-service";
+import { computeGemWallet } from "@/lib/home/home-stat-service";
 import {
   applyTodayRecordToState,
   deleteHistoricalRecordFromState,
   upsertHistoricalRecordInState,
 } from "@/lib/home/daily-record-service";
+import {
+  readHomeResourcesState,
+  writeHomeResourcesState,
+} from "@/lib/home/home-state-service";
 import type {
   DailyRecord,
   ExchangeCategory,
@@ -48,13 +38,7 @@ import type {
   TodayRecordSidePayload,
   Wallet,
 } from "@/lib/home/types";
-import { defaultHeatmapStartDate } from "./mockHeatmapData";
-import {
-  DEFAULT_COIN_RULES,
-  DEFAULT_VISUAL_RULES,
-  type CoinRulesConfig,
-  type SettlementVisualRules,
-} from "./settlement-rules";
+import { type CoinRulesConfig, type SettlementVisualRules } from "./settlement-rules";
 
 export { GEM_CAP } from "./settlement-rules";
 export type {
@@ -173,158 +157,6 @@ type ProviderProps = {
   initialCoins?: number;
 };
 
-function createDefaultState(
-  initialGems: number,
-  initialCoins: number,
-): HomeResourcesState {
-  return {
-    wallet: {
-      gems: initialGems,
-      coins: initialCoins,
-    },
-    streakDays: 0,
-    weeklySuccessDays: 0,
-    cumulativeSuccessDays: 0,
-    yesterdayGemTotal: 0,
-    todayFishGems: 0,
-    todayCatGems: 0,
-    todayBonusGems: 0,
-    weekGemTotal: 0,
-    weekCoinTotal: 0,
-    heatmapStartDate: defaultHeatmapStartDate(),
-    coinRules: DEFAULT_COIN_RULES,
-    visualRules: DEFAULT_VISUAL_RULES,
-    fishHeatmapOverrides: {},
-    catHeatmapOverrides: {},
-    dailyRecords: [],
-    exchangeRecords: [],
-    exchangeCategories: DEFAULT_EXCHANGE_CATEGORIES,
-  };
-}
-
-function safeNumber(value: unknown, fallback = 0) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? value
-    : fallback;
-}
-
-function normalizeVisualRules(
-  value: unknown,
-  fallback: SettlementVisualRules,
-): SettlementVisualRules {
-  const source = value as Partial<SettlementVisualRules> | null | undefined;
-  return {
-    heatmap: {
-      fish: {
-        ...fallback.heatmap.fish,
-        ...(source?.heatmap?.fish ?? {}),
-      },
-      cat: {
-        ...fallback.heatmap.cat,
-        ...(source?.heatmap?.cat ?? {}),
-      },
-    },
-    exerciseTag: {
-      ...fallback.exerciseTag,
-      ...(source?.exerciseTag ?? {}),
-    },
-  };
-}
-
-function normalizeCoinRules(
-  value: unknown,
-  fallback: CoinRulesConfig,
-): CoinRulesConfig {
-  const source = value as Partial<CoinRulesConfig> | null | undefined;
-  return {
-    weekStartDay: safeNumber(source?.weekStartDay, fallback.weekStartDay),
-    deficitStreakDays: safeNumber(
-      source?.deficitStreakDays,
-      fallback.deficitStreakDays,
-    ),
-  };
-}
-
-function readLocalState(
-  initialGems: number,
-  initialCoins: number,
-  dataStore: AppDataStore,
-): HomeResourcesState {
-  const fallback = createDefaultState(initialGems, initialCoins);
-
-  try {
-    const snapshot = dataStore.load();
-    if (!snapshot) {
-      const next = recalculateCoinsWithCurrentRules(
-        importMayHistoryRecords(fallback),
-      );
-      writeLocalState(next, dataStore);
-      return next;
-    }
-    const parsed = homeStatePatchFromSnapshot(snapshot);
-
-    const restored: HomeResourcesState = {
-      wallet: {
-        gems: safeNumber(parsed.wallet?.gems, fallback.wallet.gems),
-        coins: safeNumber(parsed.wallet?.coins, fallback.wallet.coins),
-      },
-      streakDays: safeNumber(parsed.streakDays),
-      weeklySuccessDays: safeNumber(
-        (parsed as Partial<HomeResourcesState>).weeklySuccessDays,
-        safeNumber(parsed.streakDays),
-      ),
-      cumulativeSuccessDays: safeNumber(
-        (parsed as Partial<HomeResourcesState>).cumulativeSuccessDays,
-        safeNumber(parsed.streakDays),
-      ),
-      yesterdayGemTotal: safeNumber(
-        (parsed as Partial<HomeResourcesState>).yesterdayGemTotal,
-      ),
-      todayFishGems: safeNumber(parsed.todayFishGems),
-      todayCatGems: safeNumber(parsed.todayCatGems),
-      todayBonusGems: safeNumber(parsed.todayBonusGems),
-      weekGemTotal: safeNumber(parsed.weekGemTotal),
-      weekCoinTotal: safeNumber(parsed.weekCoinTotal),
-      heatmapStartDate:
-        typeof parsed.heatmapStartDate === "string"
-          ? parsed.heatmapStartDate
-          : fallback.heatmapStartDate,
-      coinRules: normalizeCoinRules(parsed.coinRules, fallback.coinRules),
-      visualRules: normalizeVisualRules(parsed.visualRules, fallback.visualRules),
-      fishHeatmapOverrides:
-        parsed.fishHeatmapOverrides ?? fallback.fishHeatmapOverrides,
-      catHeatmapOverrides:
-        parsed.catHeatmapOverrides ?? fallback.catHeatmapOverrides,
-      dailyRecords: Array.isArray(parsed.dailyRecords)
-        ? parsed.dailyRecords.map(normalizeDailyRecord)
-        : fallback.dailyRecords,
-      exchangeRecords: Array.isArray(parsed.exchangeRecords)
-        ? parsed.exchangeRecords.map((record) =>
-            normalizeExchangeRecord(record as ExchangeRecord),
-          )
-        : fallback.exchangeRecords,
-      exchangeCategories: Array.isArray(parsed.exchangeCategories)
-        ? normalizeExchangeCategories(parsed.exchangeCategories)
-        : fallback.exchangeCategories,
-    };
-    const next = recalculateCoinsWithCurrentRules(
-      importMayHistoryRecords(restored),
-    );
-    writeLocalState(next, dataStore);
-    return next;
-  } catch {
-    const next = recalculateCoinsWithCurrentRules(
-      importMayHistoryRecords(fallback),
-    );
-    writeLocalState(next, dataStore);
-    return next;
-  }
-}
-
-function writeLocalState(state: HomeResourcesState, dataStore: AppDataStore) {
-  dataStore.save(snapshotFromHomeResourcesState(state));
-}
-
 export function HomeResourcesProvider({
   children,
   initialGems = 0,
@@ -332,7 +164,7 @@ export function HomeResourcesProvider({
 }: ProviderProps) {
   const dataStore = useMemo(() => createLocalStorageAppDataStore(), []);
   const [homeState, setHomeState] = useState<HomeResourcesState>(() =>
-    readLocalState(initialGems, initialCoins, dataStore),
+    readHomeResourcesState(dataStore, { initialGems, initialCoins }),
   );
   const stateRef = useRef(homeState);
 
@@ -341,7 +173,7 @@ export function HomeResourcesProvider({
       const next = updater(stateRef.current);
       stateRef.current = next;
       setHomeState(next);
-      writeLocalState(next, dataStore);
+      writeHomeResourcesState(dataStore, next);
     },
     [dataStore],
   );
