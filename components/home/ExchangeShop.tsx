@@ -1062,7 +1062,7 @@ export function ExchangeShop() {
                     id={titleId}
                     className="mt-0.5 text-base font-extrabold ui-text-main"
                   >
-                    🎁 恋爱宝库
+                    🎁 兑换商店
                   </h2>
                   <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
                     把每天的认真，换成小小奖励
