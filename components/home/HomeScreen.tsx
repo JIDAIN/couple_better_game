@@ -7,11 +7,11 @@ import { getCampaignDayCount } from "./mockHeatmapData";
 import { CoupleGrowthPanel } from "./CoupleGrowthPanel";
 import { DualMonthlyHeatmaps } from "./DualMonthlyHeatmaps";
 import { EncouragementQuote } from "./EncouragementQuote";
-import { ExchangeShop } from "./ExchangeShop";
+import { ExchangeShop } from "./ExchangeShop.fixed";
 import { GameTitle } from "./GameTitle";
-import { GrowthLog } from "./GrowthLog";
-import { HomeResourcesProvider } from "./HomeResourcesProvider";
-import { RecordTodayButton } from "./RecordTodayButton";
+import { GrowthLog } from "./GrowthLog.fixed";
+import { HomeResourcesProvider } from "./HomeResourcesProvider.safe";
+import { RecordTodaySettlement as RecordTodayButton } from "./RecordTodaySettlement.fixed";
 
 function CampaignProgressBadge() {
   const { heatmapStartDate } = useHomeResources();

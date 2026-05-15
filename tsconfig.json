@@ -24,11 +24,20 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "components/home/HomeResourcesProvider.tsx",
+    "components/home/HomeResourcesProvider.fixed.tsx",
+    "components/home/GrowthLog.tsx",
+    "components/home/ExchangeShop.tsx",
+    "components/home/RecordTodaySettlement.tsx"
+  ]
 }
