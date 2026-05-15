@@ -8,7 +8,7 @@ import {
 } from "./mockHeatmapData";
 import { HeatmapLegend } from "./HeatmapLegend";
 import { PlayerHeatmap } from "./PlayerHeatmap";
-import { useHomeResources } from "./HomeResourcesProvider.safe";
+import { useHomeResources } from "./HomeResourcesProvider";
 import type { HeatmapDay } from "./types";
 
 function lastDateOfMonth(date: Date) {
@@ -119,9 +119,9 @@ export function DualMonthlyHeatmaps() {
               type="button"
               onClick={handlePrevMonth}
               className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
-              aria-label="查看上个月"
+              aria-label="查看上个�?
             >
-              ‹
+              �?
             </button>
             <h2 className="text-[1rem] font-bold tracking-tight ui-text-main sm:text-[1.08rem]">
               {monthLabel} · 成长地图
@@ -130,13 +130,13 @@ export function DualMonthlyHeatmaps() {
               type="button"
               onClick={handleNextMonth}
               className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
-              aria-label="查看下个月"
+              aria-label="查看下个�?
             >
-              ›
+              �?
             </button>
           </div>
           <p className="mt-2 text-[13px] font-semibold ui-text-primary sm:text-[14px]">
-            本周已坚持 {weeklySuccessDays} 天 🌷
+            本周已坚�?{weeklySuccessDays} �?🌷
           </p>
         </div>
       </div>
