@@ -100,10 +100,13 @@ function formatCoinHint(hint: string) {
     .join(" · ");
 }
 
-/** 金币展示为「🪙 +n」或「🪙 0」 */
+function signedAmount(value: number) {
+  return value > 0 ? `+${value}` : "0";
+}
+
+/** 金币展示不依赖 emoji，避免部分字体不支持金币符号时语义丢失。 */
 function coinAmountLabel(value: number) {
-  if (value > 0) return `🪙 +${value}`;
-  return "🪙 0";
+  return `金币 ${signedAmount(value)}`;
 }
 
 function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
@@ -185,9 +188,7 @@ function PersonDetailCard({
         <h3 className="ui-text-main">
           <span aria-hidden>{emoji}</span> {title}
         </h3>
-        <span className="ui-price-pill ui-chip-primary">
-          💎 +{gems}
-        </span>
+        <span className="ui-price-pill ui-chip-primary">宝石 +{gems}</span>
       </div>
       <div className="growth-person-metrics">
         <span>{deficit} kcal</span>
@@ -694,10 +695,12 @@ export function GrowthLog() {
                 <div className="space-y-2.5">
                   <div className="growth-detail-summary">
                     <span className="growth-summary-pill ui-chip-primary ui-text-primary">
-                      💎 +{totalGems(selectedRecord)}
+                      <span aria-hidden>💎</span>
+                      <span>本日宝石 +{totalGems(selectedRecord)}</span>
                     </span>
                     <span className="growth-summary-pill ui-chip-reward ui-text-reward">
-                      {coinAmountLabel(selectedRecord.coins)}
+                      <span aria-hidden>🪙</span>
+                      <span>本日{coinAmountLabel(selectedRecord.coins)}</span>
                     </span>
                   </div>
 
@@ -726,7 +729,7 @@ export function GrowthLog() {
                         <span className="growth-detail-extra-title">🔥 一起加成</span>
                         {selectedRecord.bonus > 0 ? (
                           <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
-                            💎 +{selectedRecord.bonus}
+                            宝石 +{selectedRecord.bonus}
                           </span>
                         ) : (
                           <span className="growth-detail-extra-value growth-detail-extra-value--muted">
@@ -800,7 +803,7 @@ export function GrowthLog() {
                         <span className="flex items-center justify-between gap-2">
                           <span aria-hidden>🐟</span>
                           <span className="tabular-nums ui-text-primary">
-                            💎 +{editPreview.fishBreakdown.total}
+                            宝石 +{editPreview.fishBreakdown.total}
                           </span>
                         </span>
                         <GemBreakdownText lines={editPreview.fishBreakdown.lines} />
@@ -809,7 +812,7 @@ export function GrowthLog() {
                         <span className="flex items-center justify-between gap-2">
                           <span aria-hidden>🐱</span>
                           <span className="tabular-nums ui-text-primary">
-                            💎 +{editPreview.catBreakdown.total}
+                            宝石 +{editPreview.catBreakdown.total}
                           </span>
                         </span>
                         <GemBreakdownText lines={editPreview.catBreakdown.lines} />
@@ -819,7 +822,7 @@ export function GrowthLog() {
                           <span className="growth-detail-extra-title">🔥 一起加成</span>
                           {editPreview.couple.gems > 0 ? (
                             <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
-                              💎 +{editPreview.couple.gems}
+                              宝石 +{editPreview.couple.gems}
                             </span>
                           ) : (
                             <span className="growth-detail-extra-value growth-detail-extra-value--muted">
