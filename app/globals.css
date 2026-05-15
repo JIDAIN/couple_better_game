@@ -16,10 +16,10 @@
   --card-bg-strong: rgb(255 255 255 / 0.88);
   --card-bg-warm: rgb(255 248 241 / 0.82);
   --card-border: rgb(255 255 255 / 0.72);
-  --cell-empty: #eee8dc;
-  --cell-normal: #d9efd8;
-  --cell-good: #9fd3a8;
-  --cell-great: #4fa96f;
+  --cell-empty: #efe7da;
+  --cell-normal: #ddf0dd;
+  --cell-good: #b9ddbb;
+  --cell-great: #82bf8e;
   --shadow-card: 0 12px 32px rgb(120 80 60 / 0.075);
   --shadow-soft: 0 8px 22px rgb(120 80 60 / 0.06);
   --shadow-float: 0 24px 58px rgb(76 54 42 / 0.16);
@@ -430,22 +430,22 @@ body::before {
 }
 
 .heat-cell-normal {
-  border-color: rgb(159 211 168 / 0.38);
+  border-color: rgb(189 225 191 / 0.44);
   background: var(--cell-normal);
 }
 
 .heat-cell-good {
-  border-color: rgb(100 185 122 / 0.38);
+  border-color: rgb(157 203 160 / 0.42);
   background: var(--cell-good);
 }
 
 .heat-cell-great {
-  border-color: rgb(79 169 111 / 0.42);
+  border-color: rgb(114 180 126 / 0.46);
   background: var(--cell-great);
 }
 
 .heat-cell-streak {
-  border-color: rgb(79 169 111 / 0.45);
+  border-color: rgb(114 180 126 / 0.5);
   background: var(--cell-great);
 }
 

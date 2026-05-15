@@ -3,6 +3,7 @@
 import {
   createContext,
   useCallback,
+  useEffect,
   useContext,
   useMemo,
   useRef,
@@ -26,6 +27,7 @@ import {
   upsertHistoricalRecordInState,
 } from "@/lib/home/daily-record-service";
 import {
+  createDefaultHomeResourcesState,
   readHomeResourcesState,
   writeHomeResourcesState,
 } from "@/lib/home/home-state-service";
@@ -164,9 +166,21 @@ export function HomeResourcesProvider({
 }: ProviderProps) {
   const dataStore = useMemo(() => createLocalStorageAppDataStore(), []);
   const [homeState, setHomeState] = useState<HomeResourcesState>(() =>
-    readHomeResourcesState(dataStore, { initialGems, initialCoins }),
+    createDefaultHomeResourcesState(initialGems, initialCoins),
   );
   const stateRef = useRef(homeState);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const next = readHomeResourcesState(dataStore, {
+        initialGems,
+        initialCoins,
+      });
+      stateRef.current = next;
+      setHomeState(next);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [dataStore, initialGems, initialCoins]);
 
   const commitHomeState = useCallback(
     (updater: (current: HomeResourcesState) => HomeResourcesState) => {

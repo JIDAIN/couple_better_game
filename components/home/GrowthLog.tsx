@@ -38,10 +38,6 @@ function totalGems(entry: GrowthLogEntry) {
   return entry.fish.gems + entry.cat.gems + entry.bonus;
 }
 
-function resourceIcon(kind: "gem" | "coin") {
-  return kind === "gem" ? "💎" : "🪙";
-}
-
 function formatCoinDelta(value: number) {
   return value > 0 ? `+${value}` : "0";
 }
@@ -64,16 +60,16 @@ function LogCard({ entry }: { entry: GrowthLogEntry }) {
 
         <span className="ui-chip-primary inline-flex h-6 w-[3.45rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
           <span aria-hidden className="text-[0.95em]">
-            {resourceIcon("gem")}
+            💎
           </span>
-          +{totalGems(entry)}
+          <span>+{totalGems(entry)}</span>
         </span>
 
         <span className="ui-chip-reward inline-flex h-6 w-[3rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
           <span aria-hidden className="text-[0.95em]">
-            {resourceIcon("coin")}
+            🪙
           </span>
-          {formatCoinDelta(entry.coins)}
+          <span>{formatCoinDelta(entry.coins)}</span>
         </span>
       </div>
     </article>
@@ -182,10 +178,10 @@ export function GrowthLog() {
                   <button
                     type="button"
                     onClick={onPrevMonth}
-                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-lg font-bold leading-none"
+                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
                     aria-label="查看上个月"
                   >
-                    ←
+                    ‹
                   </button>
                   <h2
                     id={titleId}
@@ -196,10 +192,10 @@ export function GrowthLog() {
                   <button
                     type="button"
                     onClick={onNextMonth}
-                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-lg font-bold leading-none"
+                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
                     aria-label="查看下个月"
                   >
-                    →
+                    ›
                   </button>
                 </div>
               </div>

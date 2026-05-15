@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useHomeResources } from "./HomeResourcesProvider";
 import { getCampaignDayCount } from "./mockHeatmapData";
 
@@ -14,14 +15,22 @@ import { RecordTodayButton } from "./RecordTodayButton";
 
 function CampaignProgressBadge() {
   const { heatmapStartDate } = useHomeResources();
-  const campaignDayCount = getCampaignDayCount(heatmapStartDate, new Date());
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
+  const campaignDayCount = mounted
+    ? getCampaignDayCount(heatmapStartDate, new Date())
+    : null;
   const hasStartDate = heatmapStartDate.length > 0;
   const hasStarted = campaignDayCount != null && campaignDayCount > 0;
 
   if (!hasStartDate) {
     return (
       <div className="ui-card-soft ui-card-compact mx-auto w-full max-w-[28rem] text-center text-[12px] font-semibold ui-text-muted">
-        设置作战开始日后，就能记录我们的第几天啦 ✨
+        设置作战开始日后，就能记录我们的第几天啦
       </div>
     );
   }
@@ -29,16 +38,14 @@ function CampaignProgressBadge() {
   if (!hasStarted) {
     return (
       <div className="ui-card-soft ui-card-compact mx-auto w-full max-w-[28rem] text-center text-[12px] font-semibold ui-text-main">
-        变美变瘦大作战即将开启 ✨
+        变美变瘦大作战即将开始
       </div>
     );
   }
 
   return (
     <div className="ui-card-soft ui-card-compact mx-auto w-full max-w-[28rem] text-center">
-      <span className="ui-badge ui-chip-primary">
-        变美变瘦大作战已开启
-      </span>
+      <span className="ui-badge ui-chip-primary">变美变瘦大作战已开启</span>
       <span className="ml-2 text-[1.03rem] font-black tabular-nums ui-text-main">
         第 {campaignDayCount} 天 ✨
       </span>

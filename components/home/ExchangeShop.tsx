@@ -72,11 +72,11 @@ function categoryTone(kind: ResourceKind) {
 }
 
 function categoryPriceLabel(category: ExchangeCategory) {
-  return `${category.price}${resourceIcon(category.resourceKind)}`;
+  return `${resourceIcon(category.resourceKind)} ${category.price}`;
 }
 
 function recordPriceLabel(price: number, kind: ResourceKind) {
-  return `${price}${resourceIcon(kind)}`;
+  return `${resourceIcon(kind)} ${price}`;
 }
 
 function formFromCategory(category?: ExchangeCategory | null): CategoryFormState {
@@ -370,7 +370,7 @@ export function ExchangeShop() {
               <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft">
                 {category.description}
               </p>
-              <div className="mt-1.5 flex items-center justify-between gap-1.5">
+              <div className="mt-1.5 flex flex-col items-end gap-1.5 sm:items-stretch">
                 <span
                   className={`ui-badge shrink-0 py-0.5 text-[10px] tabular-nums ${priceClass}`}
                 >
@@ -380,7 +380,7 @@ export function ExchangeShop() {
                   type="button"
                   disabled={!affordable}
                   onClick={() => openRecord(category.id)}
-                  className={`shrink-0 px-2.5 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${buttonClass}`}
+                  className={`shrink-0 px-2.5 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-full ${buttonClass}`}
                 >
                   {affordable ? "兑换" : "差一点"}
                 </button>

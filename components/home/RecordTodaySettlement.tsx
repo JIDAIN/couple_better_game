@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useHomeResources } from "./HomeResourcesProvider";
@@ -35,9 +35,7 @@ function SoftField({
   return (
     <label className="block min-w-0">
       <span className="ui-field-label">{label}</span>
-      {hint ? (
-        <span className="ui-field-hint">{hint}</span>
-      ) : null}
+      {hint ? <span className="ui-field-hint">{hint}</span> : null}
       <div className="ui-input-shell mt-1 flex items-center gap-1.5 px-3 py-2">
         <input
           value={value}
@@ -443,12 +441,7 @@ export function RecordTodaySettlement({
     return historyPerson === "fish"
       ? historyFishInput.deficit > 0 || historyFishInput.minutes > 0
       : historyCatInput.deficit > 0 || historyCatInput.minutes > 0;
-  }, [
-    historyCatInput,
-    historyFishInput,
-    historyMode,
-    historyPerson,
-  ]);
+  }, [historyCatInput, historyFishInput, historyMode, historyPerson]);
 
   useEffect(() => {
     if (!open) {
@@ -506,15 +499,7 @@ export function RecordTodaySettlement({
     setCatD("0");
     setCatM("0");
     setToast("今天已经存好啦，明天继续并肩");
-  }, [
-    applyTodayRecord,
-    catInput,
-    fishInput,
-    hasAnyEffort,
-    preview,
-    settlementDay,
-    visualRules,
-  ]);
+  }, [applyTodayRecord, catInput, fishInput, hasAnyEffort, preview, settlementDay, visualRules]);
 
   const onSaveHistory = useCallback(() => {
     if (!hasAnyHistoryEffort || historyDay == null) return;
@@ -538,11 +523,7 @@ export function RecordTodaySettlement({
           : null,
     });
     if (!result.ok) {
-      setToast(
-        result.reason === "future-date"
-          ? "不能补记未来日期"
-          : "请选择有效日期",
-      );
+      setToast(result.reason === "future-date" ? "不能补记未来日期" : "请选择有效日期");
       return;
     }
     setOpen(false);
@@ -551,16 +532,7 @@ export function RecordTodaySettlement({
     setHistoryCatD("0");
     setHistoryCatM("0");
     setToast(result.updatedExisting ? "这一天已经更新完成" : "历史记录已保存");
-  }, [
-    hasAnyHistoryEffort,
-    historyCatInput,
-    historyDate,
-    historyDay,
-    historyFishInput,
-    historyMode,
-    historyPerson,
-    upsertHistoricalRecord,
-  ]);
+  }, [hasAnyHistoryEffort, historyCatInput, historyDate, historyDay, historyFishInput, historyMode, historyPerson, upsertHistoricalRecord]);
 
   return (
     <>
@@ -664,51 +636,34 @@ export function RecordTodaySettlement({
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       今日小奖励
                     </p>
-                    <ul className="mt-3 space-y-2 text-xs font-semibold ui-text-main">
+                    <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐟 今日宝石</span>
-                        <span className="tabular-nums ui-text-primary">
-                          💎 +{preview.fg}
-                        </span>
+                        <span className="tabular-nums ui-text-primary">💎 +{preview.fg}</span>
                       </li>
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐱 今日宝石</span>
+                        <span className="tabular-nums ui-text-primary">💎 +{preview.cg}</span>
+                      </li>
+                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                        <span>情侣 bonus</span>
                         <span className="tabular-nums ui-text-primary">
-                          💎 +{preview.cg}
+                          {preview.couple.gems > 0 ? `💎 +${preview.couple.gems}` : "—"}
                         </span>
                       </li>
-                      <li className="ui-tinted-reward flex flex-col gap-1 rounded-2xl px-2.5 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>情侣 bonus</span>
-                          <span className="tabular-nums ui-text-primary">
-                            {preview.couple.gems > 0
-                              ? `+${preview.couple.gems}`
-                              : "—"}
-                          </span>
-                        </div>
-                        <p className="text-[10px] font-medium ui-text-soft">
-                          {preview.couple.reasons[0] ??
-                            "双方都运动 30 分钟以上时触发"}
-                        </p>
-                      </li>
-                      <li className="ui-tinted-reward flex flex-col gap-0.5 rounded-2xl px-2.5 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>金币变化</span>
-                          <span
-                            className={
-                              preview.coin.delta > 0
-                                ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                                : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
-                            }
-                          >
-                            {preview.coin.delta > 0
-                              ? `🪙 +${preview.coin.delta}`
-                              : "未触发"}
-                          </span>
-                        </div>
-                        <p className="text-[10px] font-medium leading-relaxed ui-text-muted">
-                          {preview.coin.hint}
-                        </p>
+                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                        <span>金币变化</span>
+                        <span
+                          className={
+                            preview.coin.delta > 0
+                              ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
+                              : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
+                          }
+                        >
+                          {preview.coin.delta > 0
+                            ? `🪙 +${preview.coin.delta}`
+                            : "未触发"}
+                        </span>
                       </li>
                     </ul>
                   </div>
@@ -734,9 +689,7 @@ export function RecordTodaySettlement({
               ) : (
                 <div className="space-y-3">
                   <label className="block">
-                    <span className="ui-field-label">
-                      日期
-                    </span>
+                    <span className="ui-field-label">日期</span>
                     <input
                       type="date"
                       value={historyDate}
@@ -744,9 +697,8 @@ export function RecordTodaySettlement({
                       onChange={(event) => {
                         const nextDate = event.target.value;
                         const nextRecord =
-                          dailyRecords.find(
-                            (record) => recordIsoDate(record) === nextDate,
-                          ) ?? null;
+                          dailyRecords.find((record) => recordIsoDate(record) === nextDate) ??
+                          null;
                         setHistoryDate(nextDate);
                         hydrateHistoryInputs(nextRecord);
                       }}
@@ -755,17 +707,13 @@ export function RecordTodaySettlement({
                   </label>
 
                   <div>
-                    <p className="ui-field-label">
-                      编辑方式
-                    </p>
+                    <p className="ui-field-label">编辑方式</p>
                     <div className="mt-1 grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => setHistoryMode("single")}
                         className={`ui-tab flex text-sm transition ${
-                          historyMode === "single"
-                            ? "ui-tab-active"
-                            : "ui-tab-idle"
+                          historyMode === "single" ? "ui-tab-active" : "ui-tab-idle"
                         }`}
                       >
                         单人
@@ -774,9 +722,7 @@ export function RecordTodaySettlement({
                         type="button"
                         onClick={() => setHistoryMode("both")}
                         className={`ui-tab flex text-sm transition ${
-                          historyMode === "both"
-                            ? "ui-tab-active"
-                            : "ui-tab-idle"
+                          historyMode === "both" ? "ui-tab-active" : "ui-tab-idle"
                         }`}
                       >
                         双人
@@ -787,17 +733,13 @@ export function RecordTodaySettlement({
                   {historyMode === "single" ? (
                     <>
                       <div>
-                        <p className="ui-field-label">
-                          用户
-                        </p>
+                        <p className="ui-field-label">用户</p>
                         <div className="mt-1 grid grid-cols-2 gap-2">
                           <button
                             type="button"
                             onClick={() => setHistoryPerson("fish")}
                             className={`ui-tab flex text-sm transition ${
-                              historyPerson === "fish"
-                                ? "ui-tab-active"
-                                : "ui-tab-idle"
+                              historyPerson === "fish" ? "ui-tab-active" : "ui-tab-idle"
                             }`}
                           >
                             🐟 鱼鱼
@@ -806,9 +748,7 @@ export function RecordTodaySettlement({
                             type="button"
                             onClick={() => setHistoryPerson("cat")}
                             className={`ui-tab flex text-sm transition ${
-                              historyPerson === "cat"
-                                ? "ui-tab-active"
-                                : "ui-tab-idle"
+                              historyPerson === "cat" ? "ui-tab-active" : "ui-tab-idle"
                             }`}
                           >
                             🐱 猫猫
@@ -819,26 +759,18 @@ export function RecordTodaySettlement({
                       <div className="grid grid-cols-2 gap-2.5">
                         <SoftField
                           label="热量缺口"
-                          value={
-                            historyPerson === "fish" ? historyFishD : historyCatD
-                          }
+                          value={historyPerson === "fish" ? historyFishD : historyCatD}
                           onChange={
-                            historyPerson === "fish"
-                              ? setHistoryFishD
-                              : setHistoryCatD
+                            historyPerson === "fish" ? setHistoryFishD : setHistoryCatD
                           }
                           inputMode="numeric"
                           unit="kcal"
                         />
                         <SoftField
                           label="运动时长"
-                          value={
-                            historyPerson === "fish" ? historyFishM : historyCatM
-                          }
+                          value={historyPerson === "fish" ? historyFishM : historyCatM}
                           onChange={
-                            historyPerson === "fish"
-                              ? setHistoryFishM
-                              : setHistoryCatM
+                            historyPerson === "fish" ? setHistoryFishM : setHistoryCatM
                           }
                           inputMode="numeric"
                           unit="分钟"
@@ -870,51 +802,34 @@ export function RecordTodaySettlement({
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       补记后的小奖励
                     </p>
-                    <ul className="mt-3 space-y-2 text-xs font-semibold ui-text-main">
+                    <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐟 鱼鱼宝石</span>
-                        <span className="tabular-nums ui-text-primary">
-                          💎 +{historyPreview.fg}
-                        </span>
+                        <span className="tabular-nums ui-text-primary">💎 +{historyPreview.fg}</span>
                       </li>
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐱 猫猫宝石</span>
+                        <span className="tabular-nums ui-text-primary">💎 +{historyPreview.cg}</span>
+                      </li>
+                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                        <span>情侣 bonus</span>
                         <span className="tabular-nums ui-text-primary">
-                          💎 +{historyPreview.cg}
+                          {historyPreview.couple.gems > 0 ? `💎 +${historyPreview.couple.gems}` : "—"}
                         </span>
                       </li>
-                      <li className="ui-tinted-reward flex flex-col gap-1 rounded-2xl px-2.5 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>情侣 bonus</span>
-                          <span className="tabular-nums ui-text-primary">
-                            {historyPreview.couple.gems > 0
-                              ? `+${historyPreview.couple.gems}`
-                              : "—"}
-                          </span>
-                        </div>
-                        <p className="text-[10px] font-medium ui-text-soft">
-                          {historyPreview.couple.reasons[0] ??
-                            "当天双方都达到 30 分钟运动时触发"}
-                        </p>
-                      </li>
-                      <li className="ui-tinted-reward flex flex-col gap-0.5 rounded-2xl px-2.5 py-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>金币变化</span>
-                          <span
-                            className={
-                              historyPreview.coin.delta > 0
-                                ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                                : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
-                            }
-                          >
-                            {historyPreview.coin.delta > 0
-                              ? `🪙 +${historyPreview.coin.delta}`
-                              : "未触发"}
-                          </span>
-                        </div>
-                        <p className="text-[10px] font-medium leading-relaxed ui-text-muted">
-                          {historyPreview.coin.hint}
-                        </p>
+                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                        <span>金币变化</span>
+                        <span
+                          className={
+                            historyPreview.coin.delta > 0
+                              ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
+                              : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
+                          }
+                        >
+                          {historyPreview.coin.delta > 0
+                            ? `🪙 +${historyPreview.coin.delta}`
+                            : "未触发"}
+                        </span>
                       </li>
                     </ul>
                     {existingHistoryRecord ? (
