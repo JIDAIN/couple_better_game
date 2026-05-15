@@ -357,23 +357,25 @@ export function ExchangeShop() {
           className={`ui-card-soft ui-card-compact transition ${cardClass}`}
         >
           <div className="flex min-w-0 items-center gap-3">
-            <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${iconClass}`}
-              aria-hidden
-            >
-              {category.icon}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[12px] font-bold leading-4 ui-text-main sm:text-[13px]">
-                {category.title}
-              </p>
-              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft sm:text-[11px]">
-                {category.description}
-              </p>
-            </div>
-            <div className="flex w-[4.75rem] shrink-0 flex-col items-end gap-1.5 sm:items-stretch">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
               <span
-                className={`ui-badge shrink-0 py-0.5 text-[10px] tabular-nums ${priceClass}`}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${iconClass}`}
+                aria-hidden
+              >
+                {category.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[12px] font-bold leading-4 ui-text-main sm:text-[13px]">
+                  {category.title}
+                </p>
+                <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft sm:text-[11px]">
+                  {category.description}
+                </p>
+              </div>
+            </div>
+            <div className="flex w-[4.5rem] shrink-0 flex-col items-center gap-1.5">
+              <span
+                className={`ui-badge ui-price-pill shrink-0 text-[10px] tabular-nums ${priceClass}`}
               >
                 {categoryPriceLabel(category)}
               </span>
@@ -381,7 +383,7 @@ export function ExchangeShop() {
                 type="button"
                 disabled={!affordable}
                 onClick={() => openRecord(category.id)}
-                className={`shrink-0 px-2.5 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-full ${buttonClass}`}
+                className={`ui-action-pill shrink-0 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${buttonClass}`}
               >
                 {affordable ? "兑换" : "差一点"}
               </button>
@@ -447,7 +449,7 @@ export function ExchangeShop() {
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                       <span
-                        className={`ui-badge py-0.5 text-[10px] tabular-nums ${getCategoryChipClass(
+                        className={`ui-badge ui-price-pill text-[10px] tabular-nums ${getCategoryChipClass(
                           record.resourceKind,
                         )}`}
                       >
@@ -456,7 +458,7 @@ export function ExchangeShop() {
                       <button
                         type="button"
                         onClick={() => openEditRecord(record.id)}
-                        className="ui-button-secondary px-3 py-1 text-[11px] font-semibold"
+                        className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
                       >
                         编辑
                       </button>
@@ -466,7 +468,7 @@ export function ExchangeShop() {
                           const ok = deleteExchangeRecord(record.id);
                           if (ok) setToast("已删除兑换记录");
                         }}
-                        className="ui-button-secondary px-3 py-1 text-[11px] font-semibold opacity-80"
+                        className="ui-button-secondary ui-action-pill text-[11px] font-semibold opacity-80"
                       >
                         删除
                       </button>
@@ -649,7 +651,7 @@ export function ExchangeShop() {
                       </div>
                       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
                         <span
-                          className={`ui-badge py-0.5 text-[10px] tabular-nums ${getCategoryChipClass(
+                          className={`ui-badge ui-price-pill text-[10px] tabular-nums ${getCategoryChipClass(
                             record.resourceKind,
                           )}`}
                         >
@@ -658,7 +660,7 @@ export function ExchangeShop() {
                         <button
                           type="button"
                           onClick={() => openEditRecord(record.id)}
-                          className="ui-button-secondary px-3 py-1 text-[11px] font-semibold"
+                          className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
                         >
                           编辑
                         </button>
@@ -668,7 +670,7 @@ export function ExchangeShop() {
                             const ok = deleteExchangeRecord(record.id);
                             if (ok) setToast("已删除兑换记录");
                           }}
-                          className="ui-button-secondary px-3 py-1 text-[11px] font-semibold opacity-80"
+                          className="ui-button-secondary ui-action-pill text-[11px] font-semibold opacity-80"
                         >
                           删除
                         </button>
@@ -750,7 +752,9 @@ export function ExchangeShop() {
               >
                 {resourceLabel(displayResource)}
               </span>
-              <span className={`ui-badge ui-chip-plain py-1 text-[11px] tabular-nums ${getCategoryChipClass(displayResource)}`}>
+              <span
+                className={`ui-badge ui-price-pill ui-chip-plain text-[11px] tabular-nums ${getCategoryChipClass(displayResource)}`}
+              >
                 {recordPriceLabel(displayPrice, displayResource)}
               </span>
             </div>

@@ -369,6 +369,29 @@ body::before {
   color: var(--text-muted);
 }
 
+.ui-price-pill,
+.ui-action-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.ui-price-pill {
+  min-width: 3.6rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
+  border-radius: 999px;
+}
+
+.ui-action-pill {
+  min-width: 3.6rem;
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+}
+
 .ui-text-main {
   color: var(--text-main);
 }
