@@ -148,7 +148,7 @@ body::before {
 
 .ui-record-sheet {
   width: 100%;
-  max-width: 36rem;
+  max-width: 32rem;
   min-height: 28rem;
   max-height: min(86dvh, 680px);
 }
@@ -198,6 +198,14 @@ body::before {
   background: rgb(255 255 255 / 0.68);
   box-shadow: var(--shadow-soft);
   padding: 0.875rem 1rem;
+}
+
+.growth-detail-person-card {
+  border-radius: var(--radius-panel);
+  border: 1px solid rgb(255 255 255 / 0.72);
+  background: rgb(255 255 255 / 0.64);
+  box-shadow: var(--shadow-soft);
+  padding: 0.85rem;
 }
 
 .growth-log-item {
@@ -296,6 +304,67 @@ body::before {
   min-width: 3.55rem;
 }
 
+.compact-field {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.compact-field-label {
+  min-width: 0;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
+.compact-field-input {
+  display: flex;
+  min-height: 2.25rem;
+  min-width: 0;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--card-border);
+  background: rgb(255 255 255 / 0.62);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.72);
+  padding: 0 0.75rem;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.compact-field-input:focus-within {
+  border-color: rgb(255 107 147 / 0.34);
+  background: rgb(255 255 255 / 0.78);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 0 0 3px rgb(255 228 236 / 0.68);
+}
+
+.compact-field-input input {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 0.875rem;
+  font-weight: 700;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-field-input input::placeholder {
+  color: var(--text-soft);
+}
+
+.compact-field-input span {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
 @media (max-width: 560px) {
   .growth-log-line {
     grid-template-columns: 1fr auto auto auto;
@@ -311,6 +380,11 @@ body::before {
     min-width: 3.2rem;
     padding-inline: 0.45rem;
     font-size: 0.6875rem;
+  }
+
+  .compact-field {
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: 0.5rem;
   }
 }
 

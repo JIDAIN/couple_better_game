@@ -56,46 +56,56 @@ function totalRecordGems(record: DailyRecord) {
   return record.fish.gems + record.cat.gems + record.bonus;
 }
 
+function formatBreakdownLines(lines: string[]) {
+  const labels: Record<string, string> = {
+    缺口宝石: "缺口",
+    运动宝石: "运动",
+    恢复日奖励: "恢复",
+  };
+  const formatted = lines
+    .map((line) => {
+      const match = /^(缺口宝石|运动宝石|恢复日奖励) \+(\d+)$/.exec(line);
+      if (!match) return line;
+      const value = Number(match[2]);
+      if (value <= 0) return null;
+      return `${labels[match[1]]} +${value}`;
+    })
+    .filter((line): line is string => Boolean(line));
+  return formatted.length > 0 ? formatted : ["还没有额外加成"];
+}
+
 function DetailLines({ lines }: { lines: string[] }) {
   return (
     <span className="mt-1 block text-[10px] font-medium leading-4 ui-text-muted">
-      {lines.join(" · ")}
+      {formatBreakdownLines(lines).join(" · ")}
     </span>
   );
 }
 
-function SoftField({
+function CompactField({
   label,
-  hint,
   value,
   onChange,
   inputMode,
   unit,
 }: {
   label: string;
-  hint?: string;
   value: string;
   onChange: (value: string) => void;
   inputMode?: "decimal" | "numeric" | "text";
   unit?: string;
 }) {
   return (
-    <label className="block min-w-0">
-      <span className="ui-field-label">{label}</span>
-      {hint ? <span className="ui-field-hint">{hint}</span> : null}
-      <div className="ui-input-shell mt-1 flex items-center gap-1.5 px-3 py-2">
+    <label className="compact-field">
+      <span className="compact-field-label">{label}</span>
+      <div className="compact-field-input">
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
-          className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums ui-text-main outline-none placeholder:text-[var(--text-soft)]"
           placeholder="0"
         />
-        {unit ? (
-          <span className="shrink-0 text-[11px] font-medium ui-text-soft">
-            {unit}
-          </span>
-        ) : null}
+        {unit ? <span>{unit}</span> : null}
       </div>
     </label>
   );
@@ -131,22 +141,21 @@ function PartnerColumn({
           <p className="text-[10px] ui-text-soft">轻轻填就好</p>
         </div>
       </div>
-      <SoftField
+      <CompactField
         label="今日体重"
-        hint="不想称也可以空着"
         value={weight}
         onChange={setWeight}
         inputMode="decimal"
         unit="kg"
       />
-      <SoftField
+      <CompactField
         label="运动时长"
         value={minutes}
         onChange={setMinutes}
         inputMode="numeric"
-        unit="分钟"
+        unit="min"
       />
-      <SoftField
+      <CompactField
         label="热量缺口"
         value={deficit}
         onChange={setDeficit}
@@ -412,7 +421,7 @@ export function RecordTodaySettlement({
                 {recordDate === todayDate ? "今天的小记录" : "保存这一天"}
               </h2>
               <p className="mt-1 text-xs ui-text-muted">
-                选择日期后填写双人数据，已有记录会自动带出来。
+                轻轻记一下今天的努力
               </p>
             </div>
 

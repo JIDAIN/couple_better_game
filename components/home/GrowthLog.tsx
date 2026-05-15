@@ -67,6 +67,24 @@ function formatCoinDelta(value: number) {
   return value > 0 ? `+${value}` : "0";
 }
 
+function formatBreakdownLines(lines: string[]) {
+  const labels: Record<string, string> = {
+    缺口宝石: "缺口",
+    运动宝石: "运动",
+    恢复日奖励: "恢复",
+  };
+  const formatted = lines
+    .map((line) => {
+      const match = /^(缺口宝石|运动宝石|恢复日奖励) \+(\d+)$/.exec(line);
+      if (!match) return line;
+      const value = Number(match[2]);
+      if (value <= 0) return null;
+      return `${labels[match[1]]} +${value}`;
+    })
+    .filter((line): line is string => Boolean(line));
+  return formatted.length > 0 ? formatted : ["还没有额外加成"];
+}
+
 function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
   return {
     weightKg: record[side].weightKg,
@@ -76,16 +94,17 @@ function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
 }
 
 function DetailLines({ lines }: { lines: string[] }) {
+  const displayLines = formatBreakdownLines(lines);
   return (
-    <ul className="mt-2 space-y-1 text-[11px] font-medium leading-4 ui-text-muted">
-      {lines.map((line) => (
+    <ul className="mt-2 space-y-1 text-[11px] font-medium leading-4 ui-text-soft">
+      {displayLines.map((line) => (
         <li key={line}>{line}</li>
       ))}
     </ul>
   );
 }
 
-function Field({
+function CompactField({
   label,
   value,
   onChange,
@@ -99,23 +118,52 @@ function Field({
   unit?: string;
 }) {
   return (
-    <label className="block min-w-0">
-      <span className="ui-field-label">{label}</span>
-      <div className="ui-input-shell mt-1 flex items-center gap-1.5 px-3 py-2">
+    <label className="compact-field">
+      <span className="compact-field-label">{label}</span>
+      <div className="compact-field-input">
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
-          className="min-w-0 flex-1 bg-transparent text-sm font-semibold tabular-nums ui-text-main outline-none placeholder:text-[var(--text-soft)]"
           placeholder="0"
         />
-        {unit ? (
-          <span className="shrink-0 text-[11px] font-medium ui-text-soft">
-            {unit}
-          </span>
-        ) : null}
+        {unit ? <span>{unit}</span> : null}
       </div>
     </label>
+  );
+}
+
+function PersonDetailCard({
+  emoji,
+  title,
+  deficit,
+  minutes,
+  gems,
+  lines,
+}: {
+  emoji: string;
+  title: string;
+  deficit: number;
+  minutes: number;
+  gems: number;
+  lines: string[];
+}) {
+  return (
+    <div className="growth-detail-person-card">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-bold ui-text-main">
+          <span aria-hidden>{emoji}</span> {title}
+        </h3>
+        <span className="ui-price-pill ui-chip-primary">💎 +{gems}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold ui-text-muted">
+        <span>{deficit} kcal</span>
+        <span>{minutes} min</span>
+      </div>
+      <p className="mt-2 text-[11px] font-medium leading-4 ui-text-soft">
+        {formatBreakdownLines(lines).join(" · ")}
+      </p>
+    </div>
   );
 }
 
@@ -143,21 +191,21 @@ function EditSide({
       <p className="text-xs font-bold ui-text-main">
         <span aria-hidden>{emoji}</span> {title}
       </p>
-      <Field
+      <CompactField
         label="今日体重"
         value={weight}
         onChange={setWeight}
         inputMode="decimal"
         unit="kg"
       />
-      <Field
+      <CompactField
         label="运动时长"
         value={minutes}
         onChange={setMinutes}
         inputMode="numeric"
-        unit="分钟"
+        unit="min"
       />
-      <Field
+      <CompactField
         label="热量缺口"
         value={deficit}
         onChange={setDeficit}
@@ -599,10 +647,10 @@ export function GrowthLog() {
                 {detailMode === "detail" ? "记录详情" : "编辑已有记录"}
               </p>
               <h2 id={detailTitleId} className="mt-1 text-lg font-bold ui-text-main">
-                记录日期：{formatFullDate(selectedRecord.recordDate)}
+                {formatFullDate(selectedRecord.recordDate)}
               </h2>
               <p className="mt-1 text-xs ui-text-muted">
-                日期不可修改；要补录其他日期，请从“记录今天”进入。
+                这一天的小努力都在这里
               </p>
             </div>
 
@@ -614,37 +662,27 @@ export function GrowthLog() {
                       💎 总宝石 +{totalGems(selectedRecord)}
                     </div>
                     <div className="ui-tinted-reward rounded-2xl px-3 py-2 text-center text-sm font-bold ui-text-reward">
-                      🪙 金币变化 {formatCoinDelta(selectedRecord.coins)}
+                      🪙 金币 {formatCoinDelta(selectedRecord.coins)}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                    <div className="ui-soft-panel ui-card-item">
-                      <p className="text-xs font-bold ui-text-main">🐟 鱼鱼详情</p>
-                      <p className="mt-2 text-xs ui-text-muted">
-                        热量缺口：{selectedRecord.fish.deficit} kcal
-                      </p>
-                      <p className="mt-1 text-xs ui-text-muted">
-                        运动时长：{selectedRecord.fish.minutes} 分钟
-                      </p>
-                      <p className="mt-2 text-xs font-bold ui-text-primary">
-                        宝石：+{selectedRecord.fish.gems}
-                      </p>
-                      <DetailLines lines={detailPreview.fishBreakdown.lines} />
-                    </div>
-                    <div className="ui-soft-panel ui-card-item">
-                      <p className="text-xs font-bold ui-text-main">🐱 猫猫详情</p>
-                      <p className="mt-2 text-xs ui-text-muted">
-                        热量缺口：{selectedRecord.cat.deficit} kcal
-                      </p>
-                      <p className="mt-1 text-xs ui-text-muted">
-                        运动时长：{selectedRecord.cat.minutes} 分钟
-                      </p>
-                      <p className="mt-2 text-xs font-bold ui-text-primary">
-                        宝石：+{selectedRecord.cat.gems}
-                      </p>
-                      <DetailLines lines={detailPreview.catBreakdown.lines} />
-                    </div>
+                    <PersonDetailCard
+                      emoji="🐟"
+                      title="鱼鱼"
+                      deficit={selectedRecord.fish.deficit}
+                      minutes={selectedRecord.fish.minutes}
+                      gems={selectedRecord.fish.gems}
+                      lines={detailPreview.fishBreakdown.lines}
+                    />
+                    <PersonDetailCard
+                      emoji="🐱"
+                      title="猫猫"
+                      deficit={selectedRecord.cat.deficit}
+                      minutes={selectedRecord.cat.minutes}
+                      gems={selectedRecord.cat.gems}
+                      lines={detailPreview.catBreakdown.lines}
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2.5">
@@ -660,7 +698,7 @@ export function GrowthLog() {
                       <DetailLines
                         lines={
                           selectedRecord.bonus > 0
-                            ? ["一起运动：双方各 +1，共 +2"]
+                            ? ["🔥 bonus 已触发"]
                             : ["双方都运动满 30 分钟时触发"]
                         }
                       />
@@ -722,7 +760,7 @@ export function GrowthLog() {
 
                   <div className="ui-soft-panel ui-card-item">
                     <p className="text-center text-[11px] font-bold ui-text-reward">
-                      修改后的结算预览
+                      修改后的小奖励
                     </p>
                     <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
                       <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
