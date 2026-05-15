@@ -206,12 +206,13 @@ body::before {
 
 .growth-log-line {
   display: grid;
-  grid-template-columns: 4.4rem minmax(3.8rem, 1fr) minmax(3.4rem, 1fr) 3.4rem;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
-  column-gap: 0.65rem;
+  column-gap: 0.5rem;
 }
 
 .growth-log-date {
+  justify-self: start;
   white-space: nowrap;
   font-size: 0.875rem;
   font-weight: 700;
@@ -238,12 +239,14 @@ body::before {
 
 .growth-log-pill {
   justify-self: end;
-  min-width: 3.7rem;
+  min-width: 3.55rem;
 }
 
 .growth-log-action {
   justify-self: end;
-  min-width: 3.4rem;
+  min-width: 3.2rem;
+  color: var(--text-muted);
+  background: rgb(255 255 255 / 0.58);
 }
 
 .exchange-record-item {
@@ -295,7 +298,7 @@ body::before {
 
 @media (max-width: 560px) {
   .growth-log-line {
-    grid-template-columns: 4.2rem minmax(3.6rem, 1fr) minmax(3.2rem, 1fr) 3.25rem;
+    grid-template-columns: 1fr auto auto auto;
     column-gap: 0.45rem;
   }
 

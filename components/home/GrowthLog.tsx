@@ -14,14 +14,10 @@ import {
 
 type GrowthLogEntry = DailyRecord;
 type DetailMode = "detail" | "edit";
+const FALLBACK_MONTH_KEY = "2026-05";
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
-}
-
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 }
 
 function monthKeyFromDate(value: string) {
@@ -194,7 +190,7 @@ function LogCard({
           🪙 {formatCoinDelta(entry.coins)}
         </span>
         <span className="ui-action-pill ui-chip-plain growth-log-action">
-          详情
+          详情 ›
         </span>
       </span>
     </button>
@@ -289,7 +285,9 @@ export function GrowthLog() {
     const latestRecord = [...dailyRecords].sort((a, b) =>
       b.recordDate.localeCompare(a.recordDate),
     )[0];
-    return latestRecord ? monthKeyFromDate(latestRecord.recordDate) : currentMonthKey();
+    return latestRecord
+      ? monthKeyFromDate(latestRecord.recordDate)
+      : FALLBACK_MONTH_KEY;
   });
   const titleId = useId();
   const detailTitleId = useId();
@@ -379,6 +377,18 @@ export function GrowthLog() {
     );
     return () => cancelAnimationFrame(id);
   }, [open]);
+
+  useEffect(() => {
+    if (dailyRecords.length === 0 || viewMonth !== FALLBACK_MONTH_KEY) return;
+    const latestRecord = [...dailyRecords].sort((a, b) =>
+      b.recordDate.localeCompare(a.recordDate),
+    )[0];
+    if (!latestRecord) return;
+    const timeout = window.setTimeout(() => {
+      setViewMonth(monthKeyFromDate(latestRecord.recordDate));
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [dailyRecords, viewMonth]);
 
   useEffect(() => {
     if (!open && !selectedRecord) return;
@@ -676,13 +686,6 @@ export function GrowthLog() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirmDeleteOpen(true)}
-                      className="flex-1 rounded-[var(--radius-control)] border border-rose-100 bg-rose-50/40 px-4 py-3 text-sm font-semibold text-rose-500 transition active:scale-[0.99]"
-                    >
-                      删除
-                    </button>
-                    <button
-                      type="button"
                       onClick={enterEditMode}
                       className="ui-button-primary flex-[1.2] py-3 text-sm font-semibold text-white transition active:scale-[0.99]"
                     >
@@ -778,6 +781,13 @@ export function GrowthLog() {
                   </div>
 
                   <div className="ui-modal-footer">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteOpen(true)}
+                      className="rounded-[var(--radius-control)] border border-rose-100 bg-rose-50/40 px-3 py-3 text-sm font-semibold text-rose-500 transition active:scale-[0.99]"
+                    >
+                      删除
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
