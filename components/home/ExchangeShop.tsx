@@ -652,47 +652,47 @@ export function ExchangeShop() {
 
             <div className="record-sheet-body">
               {exchangeRecords.length > 0 ? (
-                <div className="space-y-2">
+                <div className="record-list">
                   {exchangeRecords.map((record) => (
                     <article
                       key={record.id}
-                      className="ui-soft-panel flex items-center justify-between gap-3 px-4 py-3"
+                      className="record-item"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-[10px] font-semibold tracking-wide ui-text-soft">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium ui-text-muted">
                           {record.date}
                         </p>
-                        <p className="mt-0.5 truncate text-[12px] font-semibold ui-text-main">
-                          {record.icon} {record.category}
-                          {record.remark ? ` · ${record.remark}` : ""}
-                        </p>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <span
+                            className={`ui-badge ui-price-pill text-[10px] tabular-nums ${getCategoryChipClass(
+                              record.resourceKind,
+                            )}`}
+                          >
+                            {recordPriceLabel(record.price, record.resourceKind)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => openEditRecord(record.id)}
+                            className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
+                          >
+                            编辑
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ok = deleteExchangeRecord(record.id);
+                              if (ok) setToast("已删除兑换记录");
+                            }}
+                            className="ui-button-secondary ui-action-pill text-[11px] font-semibold opacity-80"
+                          >
+                            删除
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                        <span
-                          className={`ui-badge ui-price-pill text-[10px] tabular-nums ${getCategoryChipClass(
-                            record.resourceKind,
-                          )}`}
-                        >
-                          {recordPriceLabel(record.price, record.resourceKind)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => openEditRecord(record.id)}
-                          className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
-                        >
-                          编辑
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const ok = deleteExchangeRecord(record.id);
-                            if (ok) setToast("已删除兑换记录");
-                          }}
-                          className="ui-button-secondary ui-action-pill text-[11px] font-semibold opacity-80"
-                        >
-                          删除
-                        </button>
-                      </div>
+                      <p className="mt-1 truncate text-[12px] font-semibold ui-text-main">
+                        {record.icon} {record.category}
+                        {record.remark ? ` · ${record.remark}` : ""}
+                      </p>
                     </article>
                   ))}
                 </div>

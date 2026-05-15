@@ -44,29 +44,24 @@ function formatCoinDelta(value: number) {
 
 function LogCard({ entry }: { entry: GrowthLogEntry }) {
   return (
-    <article className="ui-card-soft ui-card-compact transition active:scale-[0.995]">
-      <div className="grid h-full grid-cols-[4.4rem_minmax(0,1fr)_minmax(0,1fr)_3.45rem_3rem] items-center gap-2">
-        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-bold leading-4 tabular-nums tracking-tight ui-text-main">
+    <article className="record-item">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium ui-text-muted">
           {formatMonthDay(entry.recordDate)}
         </p>
-        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
-          🐟 {entry.fish.deficit}kcal/{entry.fish.minutes}min
-        </p>
-        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
-          🐱 {entry.cat.deficit}kcal/{entry.cat.minutes}min
-        </p>
-        <span className="ui-chip-primary inline-flex h-6 w-[3.45rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
-          <span aria-hidden className="text-[0.95em]">
-            💎
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          <span className="ui-price-pill ui-chip-primary text-[10px] tabular-nums">
+            💎 +{totalGems(entry)}
           </span>
-          <span>+{totalGems(entry)}</span>
-        </span>
-        <span className="ui-chip-reward inline-flex h-6 w-[3rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
-          <span aria-hidden className="text-[0.95em]">
-            🪙
+          <span className="ui-price-pill ui-chip-reward text-[10px] tabular-nums">
+            🪙 {formatCoinDelta(entry.coins)}
           </span>
-          <span>{formatCoinDelta(entry.coins)}</span>
-        </span>
+        </div>
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm ui-text-muted">
+        <span>🐟 {entry.fish.deficit}kcal/{entry.fish.minutes}min</span>
+        <span>🐱 {entry.cat.deficit}kcal/{entry.cat.minutes}min</span>
       </div>
     </article>
   );
@@ -151,7 +146,7 @@ export function GrowthLog() {
             <div className="record-sheet-header">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-lg font-bold leading-6 tracking-tight ui-text-main">
+                  <p className="text-base font-bold leading-6 tracking-tight ui-text-main">
                     📒 成长日志
                   </p>
                   <p className="text-xs font-medium leading-4 ui-text-soft">
@@ -179,7 +174,7 @@ export function GrowthLog() {
                   </button>
                   <h2
                     id={titleId}
-                    className="min-w-[7.2rem] text-center text-lg font-semibold leading-6 tracking-tight ui-text-main"
+                    className="min-w-[7.2rem] text-center text-base font-semibold leading-6 tracking-tight ui-text-main"
                   >
                     {formatMonthLabel(viewMonth)}
                   </h2>
@@ -197,7 +192,7 @@ export function GrowthLog() {
 
             <div className="record-sheet-body">
               {sortedRecords.length > 0 ? (
-                <div className="space-y-2">
+                <div className="record-list">
                   {sortedRecords.map((entry) => (
                     <LogCard key={entry.id} entry={entry} />
                   ))}
