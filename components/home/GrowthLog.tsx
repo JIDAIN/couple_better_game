@@ -81,13 +81,13 @@ function formatBreakdownLines(lines: string[]) {
   return formatted;
 }
 
-function formatBreakdownOneLine(lines: string[]) {
+function personGemNoteFromLines(lines: string[]): string | null {
   const parts = formatBreakdownLines(lines);
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 function formatCoinHint(hint: string) {
-  if (hint === "本日暂未触发金币规则") return "还没有点亮";
+  if (hint === "本日暂未触发金币规则") return "还没点亮";
   return hint
     .split(" · ")
     .map((part) =>
@@ -100,9 +100,10 @@ function formatCoinHint(hint: string) {
     .join(" · ");
 }
 
-function formatCoinSigned(value: number) {
-  if (value > 0) return `+${value}`;
-  return "0";
+/** 金币展示为「🪙 +n」或「🪙 0」 */
+function coinAmountLabel(value: number) {
+  if (value > 0) return `🪙 +${value}`;
+  return "🪙 0";
 }
 
 function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
@@ -114,27 +115,23 @@ function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
 }
 
 function CoinHintText({ hint }: { hint: string }) {
-  return (
-    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
-      {formatCoinHint(hint)}
-    </p>
-  );
+  const line = formatCoinHint(hint);
+  if (!line.trim()) return null;
+  return <p className="growth-detail-extra-hint">{line}</p>;
 }
 
 function BonusHintText({ active }: { active: boolean }) {
   return (
-    <p className="mt-1 text-[10px] font-medium ui-text-muted">
+    <p className="growth-detail-extra-hint">
       {active ? "一起点亮" : "满 30 分钟时点亮"}
     </p>
   );
 }
 
 function GemBreakdownText({ lines }: { lines: string[] }) {
-  return (
-    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
-      {formatBreakdownOneLine(lines)}
-    </p>
-  );
+  const note = personGemNoteFromLines(lines);
+  if (!note) return null;
+  return <p className="growth-detail-extra-hint">{note}</p>;
 }
 
 function CompactField({
@@ -181,20 +178,22 @@ function PersonDetailCard({
   gems: number;
   lines: string[];
 }) {
+  const note = personGemNoteFromLines(lines);
   return (
-    <div className="growth-detail-person-card">
+    <div className="growth-person-card">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-bold ui-text-main">
+        <h3 className="ui-text-main">
           <span aria-hidden>{emoji}</span> {title}
         </h3>
-        <span className="ui-price-pill ui-chip-primary">💎 +{gems}</span>
+        <span className="ui-price-pill ui-chip-primary">
+          💎 +{gems}
+        </span>
       </div>
-      <p className="mt-1.5 text-sm font-semibold ui-text-muted">
-        {deficit} kcal · {minutes} min
-      </p>
-      <p className="mt-1 text-[11px] font-medium leading-snug ui-text-soft">
-        {formatBreakdownOneLine(lines)}
-      </p>
+      <div className="growth-person-metrics">
+        <span>{deficit} kcal</span>
+        <span>{minutes} min</span>
+      </div>
+      {note ? <p className="growth-person-note">{note}</p> : null}
     </div>
   );
 }
@@ -219,8 +218,8 @@ function EditSide({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="ui-soft-panel ui-card-item flex min-w-0 flex-col gap-2">
-      <p className="text-xs font-bold ui-text-main">
+    <div className="growth-partner-form ui-soft-panel ui-card-item flex min-w-0 flex-col">
+      <p className="text-[11px] font-bold ui-text-main">
         <span aria-hidden>{emoji}</span> {title}
       </p>
       <CompactField
@@ -265,7 +264,7 @@ function LogCard({
       <span className="growth-log-summary">
         <span className="ui-price-pill ui-chip-primary">💎 +{totalGems(entry)}</span>
         <span className="ui-price-pill ui-chip-reward">
-          🪙 {formatCoinSigned(entry.coins)}
+          {coinAmountLabel(entry.coins)}
         </span>
         <span className="growth-log-detail-link">详情 ›</span>
       </span>
@@ -683,24 +682,26 @@ export function GrowthLog() {
               <h2 id={detailTitleId} className="mt-1 text-lg font-bold ui-text-main">
                 {formatFullDate(selectedRecord.recordDate)}
               </h2>
-              <p className="mt-1 text-xs ui-text-muted">
-                这一天的小努力都在这里
+              <p className="mt-1 text-xs font-medium ui-text-muted">
+                {detailMode === "detail"
+                  ? "今天也攒下了一点闪光"
+                  : "轻轻改就好"}
               </p>
             </div>
 
             <div className="ui-modal-body">
               {detailMode === "detail" && detailPreview ? (
                 <div className="space-y-2.5">
-                  <div className="growth-log-overview">
-                    <div className="growth-log-overview-pill ui-tinted-primary ui-text-primary">
+                  <div className="growth-detail-summary">
+                    <span className="growth-summary-pill ui-chip-primary ui-text-primary">
                       💎 +{totalGems(selectedRecord)}
-                    </div>
-                    <div className="growth-log-overview-pill ui-tinted-reward ui-text-reward">
-                      🪙 {formatCoinSigned(selectedRecord.coins)}
-                    </div>
+                    </span>
+                    <span className="growth-summary-pill ui-chip-reward ui-text-reward">
+                      {coinAmountLabel(selectedRecord.coins)}
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
                     <PersonDetailCard
                       emoji="🐟"
                       title="鱼鱼"
@@ -719,23 +720,27 @@ export function GrowthLog() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="ui-tinted-reward rounded-2xl px-3 py-2">
-                      <div className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
-                        <span>🔥 一起加成</span>
-                        <span className="tabular-nums ui-text-primary">
-                          {selectedRecord.bonus > 0
-                            ? `💎 +${selectedRecord.bonus}`
-                            : "—"}
-                        </span>
+                  <div className="grid min-w-0 grid-cols-2 gap-2">
+                    <div className="growth-detail-extra-card">
+                      <div className="growth-detail-extra-row">
+                        <span className="growth-detail-extra-title">🔥 一起加成</span>
+                        {selectedRecord.bonus > 0 ? (
+                          <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
+                            💎 +{selectedRecord.bonus}
+                          </span>
+                        ) : (
+                          <span className="growth-detail-extra-value growth-detail-extra-value--muted">
+                            未点亮
+                          </span>
+                        )}
                       </div>
                       <BonusHintText active={selectedRecord.bonus > 0} />
                     </div>
-                    <div className="ui-tinted-reward rounded-2xl px-3 py-2">
-                      <div className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
-                        <span>🪙</span>
-                        <span className="tabular-nums text-sm font-extrabold ui-text-reward">
-                          {formatCoinSigned(selectedRecord.coins)}
+                    <div className="growth-detail-extra-card">
+                      <div className="growth-detail-extra-row">
+                        <span className="growth-detail-extra-title">🪙 金币</span>
+                        <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
+                          {coinAmountLabel(selectedRecord.coins)}
                         </span>
                       </div>
                       <CoinHintText hint={detailPreview.coin.hint} />
@@ -790,8 +795,8 @@ export function GrowthLog() {
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       修改后的小奖励
                     </p>
-                    <ul className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
-                      <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                    <ul className="mt-2 grid min-w-0 grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
+                      <li className="growth-detail-extra-card">
                         <span className="flex items-center justify-between gap-2">
                           <span aria-hidden>🐟</span>
                           <span className="tabular-nums ui-text-primary">
@@ -800,7 +805,7 @@ export function GrowthLog() {
                         </span>
                         <GemBreakdownText lines={editPreview.fishBreakdown.lines} />
                       </li>
-                      <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                      <li className="growth-detail-extra-card">
                         <span className="flex items-center justify-between gap-2">
                           <span aria-hidden>🐱</span>
                           <span className="tabular-nums ui-text-primary">
@@ -809,24 +814,28 @@ export function GrowthLog() {
                         </span>
                         <GemBreakdownText lines={editPreview.catBreakdown.lines} />
                       </li>
-                      <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
-                        <span className="flex items-center justify-between gap-2">
-                          <span>🔥 一起加成</span>
-                          <span className="tabular-nums ui-text-primary">
-                            {editPreview.couple.gems > 0
-                              ? `💎 +${editPreview.couple.gems}`
-                              : "—"}
-                          </span>
-                        </span>
+                      <li className="growth-detail-extra-card">
+                        <div className="growth-detail-extra-row">
+                          <span className="growth-detail-extra-title">🔥 一起加成</span>
+                          {editPreview.couple.gems > 0 ? (
+                            <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
+                              💎 +{editPreview.couple.gems}
+                            </span>
+                          ) : (
+                            <span className="growth-detail-extra-value growth-detail-extra-value--muted">
+                              未点亮
+                            </span>
+                          )}
+                        </div>
                         <BonusHintText active={editPreview.couple.gems > 0} />
                       </li>
-                      <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
-                        <span className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
-                          <span aria-hidden>🪙</span>
-                          <span className="tabular-nums text-sm font-extrabold ui-text-reward">
-                            {formatCoinSigned(editPreview.coin.delta)}
+                      <li className="growth-detail-extra-card">
+                        <div className="growth-detail-extra-row">
+                          <span className="growth-detail-extra-title">🪙 金币</span>
+                          <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
+                            {coinAmountLabel(editPreview.coin.delta)}
                           </span>
-                        </span>
+                        </div>
                         <CoinHintText hint={editPreview.coin.hint} />
                       </li>
                     </ul>
@@ -885,7 +894,7 @@ export function GrowthLog() {
               要删除这一天吗？
             </h3>
             <p className="mt-2 text-xs leading-relaxed ui-text-muted">
-              删除后，统计会一起更新。
+              删掉就找不回这条啦。
             </p>
             <div className="mt-5 flex gap-2">
               <button

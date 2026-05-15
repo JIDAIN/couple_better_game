@@ -75,7 +75,7 @@ function formatBreakdownLines(lines: string[]) {
 }
 
 function formatCoinHint(hint: string) {
-  if (hint === "本日暂未触发金币规则") return "还没有点亮";
+  if (hint === "本日暂未触发金币规则") return "还没点亮";
   return hint
     .split(" · ")
     .map((part) =>
@@ -88,27 +88,21 @@ function formatCoinHint(hint: string) {
     .join(" · ");
 }
 
-function formatCoinSigned(value: number) {
-  if (value > 0) return `+${value}`;
-  return "0";
+function coinAmountLabel(value: number) {
+  if (value > 0) return `🪙 +${value}`;
+  return "🪙 0";
 }
 
 function CoinHintLine({ hint }: { hint: string }) {
-  return (
-    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
-      {formatCoinHint(hint)}
-    </p>
-  );
+  const line = formatCoinHint(hint);
+  if (!line.trim()) return null;
+  return <p className="growth-detail-extra-hint">{line}</p>;
 }
 
 function DetailLines({ lines }: { lines: string[] }) {
   const parts = formatBreakdownLines(lines);
-  const text = parts.length > 0 ? parts.join(" · ") : "—";
-  return (
-    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
-      {text}
-    </p>
-  );
+  if (parts.length === 0) return null;
+  return <p className="growth-detail-extra-hint">{parts.join(" · ")}</p>;
 }
 
 function CompactField({
@@ -160,8 +154,8 @@ function PartnerColumn({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="ui-soft-panel ui-card-item flex min-w-0 flex-col gap-2">
-      <p className="text-xs font-bold ui-text-main">
+    <div className="growth-partner-form ui-soft-panel ui-card-item flex min-w-0 flex-col">
+      <p className="text-[11px] font-bold ui-text-main">
         <span aria-hidden>{emoji}</span> {title}
       </p>
       <CompactField
@@ -386,7 +380,7 @@ export function RecordTodaySettlement({
     const result = upsertDailyRecord(recordDate, fishInput, catInput);
     if (!result.ok) {
       setToast(
-        result.reason === "future-date" ? "不能记录未来日期" : "请选择有效日期",
+        result.reason === "future-date" ? "只能记到今天哦" : "日期有点不对",
       );
       return;
     }
@@ -443,7 +437,7 @@ export function RecordTodaySettlement({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`ui-sheet relative flex max-h-[min(92dvh,640px)] w-full max-w-lg flex-col overflow-hidden transition-all duration-300 ease-out ${
+            className={`ui-sheet growth-record-day-sheet relative flex max-h-[min(92dvh,640px)] w-full max-w-lg flex-col overflow-hidden transition-all duration-300 ease-out ${
               entered
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-6 opacity-0 sm:translate-y-0 sm:scale-95"
@@ -456,8 +450,8 @@ export function RecordTodaySettlement({
               <h2 id={titleId} className="mt-1 text-lg font-bold ui-text-main">
                 {recordDate === todayDate ? "今天的小记录" : "保存这一天"}
               </h2>
-              <p className="mt-1 text-xs ui-text-muted">
-                轻轻记一下今天的努力
+              <p className="mt-1 text-xs font-medium ui-text-muted">
+                把今天轻轻存起来
               </p>
             </div>
 
@@ -481,13 +475,7 @@ export function RecordTodaySettlement({
                 />
               </label>
 
-              {existingRecord ? (
-                <p className="mb-2 rounded-2xl bg-white/55 px-3 py-1.5 text-center text-[10px] font-semibold ui-text-muted">
-                  已有记录会更新
-                </p>
-              ) : null}
-
-              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+              <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
                 <PartnerColumn
                   emoji="🐟"
                   title="鱼鱼"
@@ -514,8 +502,8 @@ export function RecordTodaySettlement({
                 <p className="text-center text-[11px] font-bold ui-text-reward">
                   这一天的小奖励
                 </p>
-                <ul className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
-                  <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                <ul className="mt-2 grid min-w-0 grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
+                  <li className="growth-detail-extra-card">
                     <span className="flex items-center justify-between gap-2">
                       <span aria-hidden>🐟</span>
                       <span className="tabular-nums ui-text-primary">
@@ -524,7 +512,7 @@ export function RecordTodaySettlement({
                     </span>
                     <DetailLines lines={preview.fishBreakdown.lines} />
                   </li>
-                  <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                  <li className="growth-detail-extra-card">
                     <span className="flex items-center justify-between gap-2">
                       <span aria-hidden>🐱</span>
                       <span className="tabular-nums ui-text-primary">
@@ -533,26 +521,30 @@ export function RecordTodaySettlement({
                     </span>
                     <DetailLines lines={preview.catBreakdown.lines} />
                   </li>
-                  <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
-                    <span className="flex items-center justify-between gap-2">
-                      <span>🔥 一起加成</span>
-                      <span className="tabular-nums ui-text-primary">
-                        {preview.couple.gems > 0
-                          ? `💎 +${preview.couple.gems}`
-                          : "—"}
-                      </span>
-                    </span>
-                    <p className="mt-1 text-[10px] font-medium ui-text-muted">
+                  <li className="growth-detail-extra-card">
+                    <div className="growth-detail-extra-row">
+                      <span className="growth-detail-extra-title">🔥 一起加成</span>
+                      {preview.couple.gems > 0 ? (
+                        <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
+                          💎 +{preview.couple.gems}
+                        </span>
+                      ) : (
+                        <span className="growth-detail-extra-value growth-detail-extra-value--muted">
+                          未点亮
+                        </span>
+                      )}
+                    </div>
+                    <p className="growth-detail-extra-hint">
                       {preview.couple.gems > 0 ? "一起点亮" : "满 30 分钟时点亮"}
                     </p>
                   </li>
-                  <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
-                    <span className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
-                      <span aria-hidden>🪙</span>
-                      <span className="tabular-nums text-sm font-extrabold ui-text-reward">
-                        {formatCoinSigned(preview.coin.delta)}
+                  <li className="growth-detail-extra-card">
+                    <div className="growth-detail-extra-row">
+                      <span className="growth-detail-extra-title">🪙 金币</span>
+                      <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
+                        {coinAmountLabel(preview.coin.delta)}
                       </span>
-                    </span>
+                    </div>
                     <CoinHintLine hint={preview.coin.hint} />
                   </li>
                 </ul>
