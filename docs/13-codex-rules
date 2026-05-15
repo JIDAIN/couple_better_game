@@ -1,0 +1,865 @@
+# Codex 开发规则文档
+
+## 1. 文档目的
+
+本文档用于约束 Codex 在本项目中的开发行为，避免出现大范围重构、业务逻辑回退、UI 反复改坏、旧样式叠加、测试缺失等问题。
+
+Codex 每次改代码都必须遵守：
+
+> 小步修改、边界清晰、不自由发挥、测试验证、中文说明。
+
+---
+
+# 2. 总原则
+
+## 2.1 小步修改
+
+每次任务只解决一个明确问题。
+
+允许：
+
+```text
+只修一个 UI 问题
+只改一个组件
+只补一个测试
+只重构一个 service
+只修一个 bug
+```
+
+禁止：
+
+```text
+顺手大改多个页面
+顺手重构架构
+顺手改业务规则
+顺手改 UI 风格
+顺手删除旧功能
+```
+
+---
+
+## 2.2 保守优先
+
+如果需求不明确，优先做最小修改。
+
+不确定时：
+
+```text
+优先保留现有功能
+优先不改业务逻辑
+优先不改数据结构
+优先不改 UI 风格
+优先不新增依赖
+```
+
+不要为了“更好看”“更优雅”“更现代”自行扩大改动范围。
+
+---
+
+## 2.3 不自由发挥
+
+Codex 必须严格按任务说明执行。
+
+如果 prompt 中指定：
+
+```text
+只改 GrowthLog
+```
+
+就不能顺手修改：
+
+```text
+ExchangeShop
+HomeScreen
+热力图
+首页布局
+业务规则
+```
+
+如果任务没有要求新增功能，不得新增功能。
+
+---
+
+# 3. 禁止行为
+
+## 3.1 禁止大范围重构
+
+除非任务明确要求，否则不要：
+
+```text
+移动大量文件
+拆分大量组件
+重命名核心对象
+重写 Provider
+重写状态结构
+替换架构模式
+```
+
+尤其禁止在 UI 小修任务中做架构重构。
+
+---
+
+## 3.2 禁止擅自修改业务规则
+
+除非任务明确要求，不得修改：
+
+```text
+宝石计算规则
+金币计算规则
+恢复奖励规则
+情侣 bonus 规则
+热力图阈值
+钱包计算规则
+兑换扣除规则
+历史记录回算规则
+```
+
+这些规则一旦修改，必须补测试。
+
+---
+
+## 3.3 禁止把业务逻辑塞回 UI
+
+UI 组件只负责展示和交互。
+
+禁止在组件中直接写：
+
+```text
+宝石计算
+金币计算
+钱包回算
+热力图规则
+兑换资源扣减
+历史记录重算
+localStorage 读写
+```
+
+正确做法：
+
+```text
+UI → Provider → service → rules/stat/store
+```
+
+---
+
+## 3.4 禁止 UI 直接访问 localStorage
+
+UI 组件不得直接：
+
+```ts
+window.localStorage.getItem(...)
+window.localStorage.setItem(...)
+```
+
+本项目必须通过 Store 抽象访问数据。
+
+正确边界：
+
+```text
+UI
+→ HomeResourcesProvider
+→ AppDataStore
+→ localStorage / future API
+```
+
+---
+
+## 3.5 禁止绕过 service
+
+涉及业务状态变更时，不允许组件直接修改复杂状态。
+
+禁止：
+
+```text
+组件里直接改 dailyRecords
+组件里直接改 wallet
+组件里直接计算并写入 coins
+组件里直接拼接 exchangeRecords
+```
+
+应通过：
+
+```text
+daily-record-service
+exchange-service
+home-state-service
+home-stat-service
+settlement-rules
+```
+
+---
+
+## 3.6 禁止保留冲突旧样式
+
+修改 UI 结构时，必须同步清理旧 CSS。
+
+禁止：
+
+```text
+旧 class 还在
+新 class 又覆盖
+media query 互相打架
+同一组件有两套布局规则
+.fixed / .old / .new 长期存在
+```
+
+如果替换了组件结构，必须检查并删除对应旧样式。
+
+---
+
+# 4. UI 修改规则
+
+## 4.1 不要改 UI，除非任务明确要求
+
+如果任务是：
+
+```text
+修复结算 bug
+补测试
+整理 service
+修复 localStorage
+```
+
+不得顺手改 UI。
+
+---
+
+## 4.2 UI 修改必须遵守产品气质
+
+本项目 UI 长期原则：
+
+```text
+温暖
+简约
+治愈
+陪伴
+成长
+轻游戏化
+低压力
+```
+
+避免：
+
+```text
+后台管理感
+数据报表感
+规则说明感
+复杂表单感
+高饱和花哨感
+```
+
+---
+
+## 4.3 UI 改动必须小范围
+
+UI 任务必须限定组件，例如：
+
+```text
+只改 GrowthLog 详情弹窗
+只改 RecordTodaySettlement 输入框
+只改 ExchangeShop 商品卡片
+只改 HeatmapLegend 图例
+```
+
+不得一边改弹窗，一边改首页，一边改商店。
+
+---
+
+## 4.4 不要堆装饰
+
+禁止为了“可爱”继续堆：
+
+```text
+过多 emoji
+过多渐变
+过多阴影
+复杂动效
+大面积发光
+过多文案
+```
+
+UI 应该更清晰、更温柔，而不是更花。
+
+---
+
+# 5. 文案规则
+
+## 5.1 文案必须中文
+
+所有面向用户的文案、提交说明、变更说明、PR 描述，默认使用中文。
+
+代码变量名保持英文。
+
+---
+
+## 5.2 文案要短
+
+UI 文案要像小纸条，不要像系统说明。
+
+优先：
+
+```text
+今天也攒下了一点闪光
+这一天的小努力都在这里
+修改后的小奖励
+满 30 分钟就点亮
+```
+
+避免：
+
+```text
+日期不可修改，请从记录今天入口补录其他日期
+本日暂未触发金币规则
+缺口宝石 +2
+恢复日奖励 +1
+```
+
+---
+
+## 5.3 不要把规则都写到界面上
+
+规则说明应该弱化，不能抢主数据。
+
+原则：
+
+```text
+主界面显示结果
+详情页显示必要解释
+完整规则留给代码和文档
+```
+
+---
+
+# 6. 数据与状态规则
+
+## 6.1 区分事实数据和派生数据
+
+事实数据：
+
+```text
+recordDate
+weightKg
+deficit
+minutes
+exchange remark
+exchange occurredAt
+exchange category snapshot
+```
+
+派生数据：
+
+```text
+gems
+coins
+wallet
+weekGemTotal
+heatmap status
+streakDays
+```
+
+派生数据可以保存快照，但必须能由事实数据回算。
+
+---
+
+## 6.2 临时 UI 状态不持久化
+
+不得持久化：
+
+```text
+弹窗是否打开
+toast
+当前 tab
+动画状态
+hover 状态
+输入框未保存草稿
+selectedRecordId
+editingRecordId
+```
+
+---
+
+## 6.3 Snapshot 结构不能随意改
+
+修改以下结构必须谨慎，并补测试：
+
+```text
+AppDataSnapshot
+UserRuntimeData
+AppConfigData
+HomeResourcesState
+DailyRecord
+ExchangeRecord
+ExchangeCategory
+```
+
+---
+
+# 7. 测试规则
+
+## 7.1 改业务逻辑必须补测试
+
+以下改动必须补测试：
+
+```text
+改宝石规则
+改金币规则
+改热力图规则
+改钱包计算
+改兑换逻辑
+改每日记录逻辑
+改 snapshot 恢复
+改 localStorage / AppDataStore
+改状态恢复逻辑
+```
+
+---
+
+## 7.2 优先测试纯函数和 service
+
+优先补：
+
+```text
+settlement-rules.test.ts
+home-stat-service.test.ts
+daily-record-service.test.ts
+exchange-service.test.ts
+app-data-store.test.ts
+home-state-service.test.ts
+```
+
+UI 样式调整不强制写测试，但不能破坏已有测试。
+
+---
+
+## 7.3 每次修改后运行检查
+
+常规修改后至少运行：
+
+```bash
+npm run test
+npm run lint
+npm run build
+```
+
+如果只改文档，可以说明未运行代码检查。
+
+如果只改样式，至少运行：
+
+```bash
+npm run lint
+npm run build
+```
+
+如果改业务逻辑，必须运行：
+
+```bash
+npm run test
+```
+
+---
+
+# 8. Git 与提交规则
+
+## 8.1 小步提交
+
+一次提交只做一类修改。
+
+推荐提交粒度：
+
+```text
+fix: 修复成长日志详情页间距
+refactor: 抽取 CompactField
+test: 补充金币规则测试
+docs: 添加 API 契约文档
+```
+
+不推荐：
+
+```text
+update all
+fix ui and logic
+big refactor
+misc changes
+```
+
+---
+
+## 8.2 提交前必须自查
+
+提交前检查：
+
+```text
+是否改了无关文件？
+是否修改了业务规则？
+是否补了测试？
+是否删除了旧冲突样式？
+是否运行了必要命令？
+是否有风险说明？
+```
+
+---
+
+## 8.3 不要把临时文件提交进仓库
+
+禁止提交：
+
+```text
+.old
+.new
+.fixed
+临时备份文件
+调试截图
+本地日志
+.env.local
+数据库临时文件，除非明确要求
+```
+
+---
+
+# 9. Issue / Prompt 执行规则
+
+## 9.1 如果能读取 Issue
+
+优先按 Issue 描述执行。
+
+执行前应识别：
+
+```text
+目标
+修改范围
+禁止修改内容
+验收标准
+```
+
+---
+
+## 9.2 如果读不到 Issue
+
+如果无法读取 Issue，就按 prompt 中的明确内容执行。
+
+不要猜测隐藏需求。
+不要扩展任务范围。
+
+---
+
+## 9.3 如果需求模糊
+
+不确定时优先保守修改。
+
+可以在回复中说明：
+
+```text
+我只做了最小范围修改，未改动业务逻辑。
+```
+
+不要因为不确定就大范围重构。
+
+---
+
+# 10. 回复格式要求
+
+每次 Codex 完成任务后，回复必须包含以下内容。
+
+## 10.1 修改了哪些文件
+
+格式：
+
+```text
+修改文件：
+- components/home/GrowthLog.tsx
+- app/globals.css
+```
+
+## 10.2 做了什么修改
+
+格式：
+
+```text
+主要修改：
+- 收紧成长日志详情页顶部间距
+- 将 kcal/min 降为次级信息
+- 删除详情页中过长规则说明
+```
+
+## 10.3 新增或修改了哪些测试
+
+格式：
+
+```text
+测试变更：
+- 新增 xxx.test.ts
+- 更新 settlement-rules.test.ts
+- 本次仅样式修改，未新增测试
+```
+
+## 10.4 运行了哪些命令
+
+格式：
+
+```text
+已运行：
+- npm run test ✅
+- npm run lint ✅
+- npm run build ✅
+```
+
+如果没有运行，必须说明原因：
+
+```text
+未运行测试：本次只修改文档。
+```
+
+## 10.5 风险说明
+
+格式：
+
+```text
+风险：
+- 仅调整 UI 样式，低风险。
+- 未改业务规则。
+- 需要人工检查 375px 移动端显示。
+```
+
+---
+
+# 11. Codex 回复模板
+
+```markdown
+## 修改文件
+
+- 
+
+## 修改内容
+
+- 
+
+## 测试情况
+
+- 
+
+## 风险说明
+
+- 
+
+## 后续建议
+
+- 
+```
+
+---
+
+# 12. 常见任务边界示例
+
+## 12.1 UI 小修任务
+
+允许：
+
+```text
+改 className
+改 CSS
+改文案
+调整间距
+压缩输入框
+修复响应式
+```
+
+禁止：
+
+```text
+改宝石规则
+改金币规则
+改状态结构
+改 Store
+改 service
+新增功能
+```
+
+---
+
+## 12.2 业务规则任务
+
+允许：
+
+```text
+改 settlement-rules
+改相关 service
+补测试
+更新文档
+```
+
+禁止：
+
+```text
+顺手改 UI
+顺手改页面结构
+顺手改无关文案
+```
+
+---
+
+## 12.3 数据结构任务
+
+允许：
+
+```text
+改 types
+改 snapshot 转换
+改 state 恢复
+补迁移兼容测试
+```
+
+禁止：
+
+```text
+破坏旧数据
+不写兼容逻辑
+不补测试
+```
+
+---
+
+## 12.4 存储层任务
+
+允许：
+
+```text
+改 AppDataStore
+新增 remote store
+改 localStorage store
+补 store 测试
+```
+
+禁止：
+
+```text
+让 UI 直接 fetch
+让 UI 直接 localStorage
+绕过 Provider
+```
+
+---
+
+# 13. 架构硬性规则
+
+## 13.1 UI 层
+
+UI 层只做：
+
+```text
+展示
+交互
+弹窗
+表单
+toast
+调用 Provider action
+```
+
+不得做：
+
+```text
+业务结算
+钱包回算
+存储读写
+复杂数据恢复
+```
+
+---
+
+## 13.2 Provider 层
+
+Provider 只做：
+
+```text
+状态编排
+调用 service
+提交状态
+暴露 action
+同步 Store
+```
+
+不得变成规则大杂烩。
+
+---
+
+## 13.3 Service 层
+
+Service 负责：
+
+```text
+每日记录增删改
+兑换记录增删改
+状态重建
+钱包回算
+```
+
+不得依赖 React。
+
+---
+
+## 13.4 Rules / Stat 层
+
+Rules / Stat 必须尽量保持纯函数。
+
+不得访问：
+
+```text
+React
+DOM
+localStorage
+window
+UI 状态
+```
+
+---
+
+## 13.5 Store 层
+
+Store 负责数据来源。
+
+当前可以是：
+
+```text
+localStorage
+```
+
+未来可以替换为：
+
+```text
+Remote API
+```
+
+UI 不应感知底层存储实现。
+
+---
+
+# 14. 不确定时的决策顺序
+
+当任务不明确时，按以下顺序决策：
+
+```text
+1. 不改业务规则
+2. 不改数据结构
+3. 不改其他页面
+4. 不新增依赖
+5. 不大范围重构
+6. 做最小可验证修改
+7. 在回复中说明保守处理
+```
+
+---
+
+# 15. 最终原则
+
+Codex 在本项目中最重要的开发原则是：
+
+```text
+小步修改
+边界清楚
+业务稳定
+UI 克制
+测试验证
+中文说明
+不自由发挥
+```
+
+每次修改都应该让项目更稳定，而不是更复杂。

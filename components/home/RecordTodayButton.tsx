@@ -1,1 +1,1 @@
-export { RecordTodaySettlement as RecordTodayButton } from "./RecordTodaySettlement.fixed";
+export { RecordTodaySettlement as RecordTodayButton } from "./RecordTodaySettlement";
