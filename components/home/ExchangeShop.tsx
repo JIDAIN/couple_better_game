@@ -93,31 +93,31 @@ function ExchangeRecordCard({
 }) {
   return (
     <article className="record-item exchange-record-item">
-      <div className="exchange-record-top">
-        <p className="text-xs font-medium ui-text-muted">
+      <div className="exchange-record-content">
+        <p className="exchange-record-date">
           {formatExchangeDisplayDate(record.date)}
         </p>
-        <button
-          type="button"
-          onClick={() => onEdit(record.id)}
-          className="ui-action-pill ui-button-secondary exchange-edit-button text-[11px] font-semibold"
-        >
-          编辑
-        </button>
+        <div className="exchange-record-line">
+          <p className="exchange-record-title">
+            {record.icon} {record.category}
+            {record.remark ? ` · ${record.remark}` : ""}
+          </p>
+          <span
+            className={`ui-price-pill exchange-record-price text-[10px] tabular-nums ${getCategoryChipClass(
+              record.resourceKind,
+            )}`}
+          >
+            {recordPriceLabel(record.price, record.resourceKind)}
+          </span>
+        </div>
       </div>
-      <div className="exchange-record-main">
-        <p className="min-w-0 flex-1 truncate text-[12px] font-semibold ui-text-main">
-          {record.icon} {record.category}
-          {record.remark ? ` · ${record.remark}` : ""}
-        </p>
-        <span
-          className={`ui-price-pill exchange-record-price text-[10px] tabular-nums ${getCategoryChipClass(
-            record.resourceKind,
-          )}`}
-        >
-          {recordPriceLabel(record.price, record.resourceKind)}
-        </span>
-      </div>
+      <button
+        type="button"
+        onClick={() => onEdit(record.id)}
+        className="ui-action-pill ui-button-secondary exchange-edit-button text-[11px] font-semibold"
+      >
+        编辑
+      </button>
     </article>
   );
 }

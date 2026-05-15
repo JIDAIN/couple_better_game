@@ -201,20 +201,18 @@ body::before {
 }
 
 .growth-log-item {
-  padding: 0.8rem 0.95rem;
+  padding: 0.78rem 0.95rem;
 }
 
 .growth-log-line {
   display: grid;
-  grid-template-columns: auto auto auto auto auto;
+  grid-template-columns: 4.4rem minmax(7.25rem, 1fr) minmax(7.25rem, 1fr) 3.75rem 3.75rem;
   align-items: center;
-  justify-content: start;
-  column-gap: 0.75rem;
-  row-gap: 0.45rem;
+  column-gap: 0.65rem;
+  width: 100%;
 }
 
 .growth-log-date {
-  min-width: 0;
   white-space: nowrap;
   font-size: 0.875rem;
   font-weight: 700;
@@ -224,39 +222,40 @@ body::before {
 .growth-log-metric {
   min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-muted);
 }
 
 .growth-log-pill {
-  min-width: 3.55rem;
+  justify-self: end;
+  min-width: 3.6rem;
 }
 
 .exchange-record-item {
-  padding: 0.85rem 0.95rem;
-}
-
-.exchange-record-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.875rem;
+  padding: 0.85rem 0.95rem;
+}
+
+.exchange-record-content {
+  min-width: 0;
+  flex: 1;
 }
 
 .exchange-record-date {
+  margin-bottom: 0.35rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
-.exchange-edit-button {
-  min-width: 3.25rem;
-}
-
 .exchange-record-line {
-  margin-top: 0.45rem;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -277,19 +276,26 @@ body::before {
 
 .exchange-record-price {
   flex-shrink: 0;
-  min-width: 3.55rem;
+  min-width: 3.6rem;
+}
+
+.exchange-edit-button {
+  flex-shrink: 0;
+  align-self: center;
+  min-width: 3.25rem;
 }
 
 @media (max-width: 560px) {
   .growth-log-line {
     grid-template-columns: 1fr auto auto;
     row-gap: 0.5rem;
-    column-gap: 0.75rem;
+    column-gap: 0.45rem;
   }
 
   .growth-log-date {
     grid-column: 1;
     grid-row: 1;
+    justify-self: start;
   }
 
   .growth-log-gem {
@@ -316,7 +322,6 @@ body::before {
     grid-row: 2;
     justify-self: end;
   }
-
 }
 
 .ui-soft-panel {
