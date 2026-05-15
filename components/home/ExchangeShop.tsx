@@ -100,7 +100,7 @@ function ExchangeRecordCard({
         <button
           type="button"
           onClick={() => onEdit(record.id)}
-          className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
+          className="ui-action-pill ui-button-secondary exchange-edit-button text-[11px] font-semibold"
         >
           编辑
         </button>
@@ -111,7 +111,7 @@ function ExchangeRecordCard({
           {record.remark ? ` · ${record.remark}` : ""}
         </p>
         <span
-          className={`ui-price-pill shrink-0 text-[10px] tabular-nums ${getCategoryChipClass(
+          className={`ui-price-pill exchange-record-price text-[10px] tabular-nums ${getCategoryChipClass(
             record.resourceKind,
           )}`}
         >

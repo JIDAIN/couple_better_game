@@ -48,20 +48,16 @@ function LogCard({ entry }: { entry: GrowthLogEntry }) {
 
   return (
     <article className="record-item growth-log-item">
-      <div className="growth-log-main">
-        <div className="growth-log-date">{formatMonthDay(entry.recordDate)}</div>
-        <div className="growth-log-metrics">
-          <span className="whitespace-nowrap">{fishLabel}</span>
-          <span className="whitespace-nowrap">{catLabel}</span>
-        </div>
-        <div className="growth-log-rewards">
-          <span className="ui-price-pill ui-chip-primary text-[10px] tabular-nums">
-            💎 +{totalGems(entry)}
-          </span>
-          <span className="ui-price-pill ui-chip-reward text-[10px] tabular-nums">
-            🪙 {formatCoinDelta(entry.coins)}
-          </span>
-        </div>
+      <div className="growth-log-line">
+        <span className="growth-log-date">{formatMonthDay(entry.recordDate)}</span>
+        <span className="growth-log-metric growth-log-fish">{fishLabel}</span>
+        <span className="growth-log-metric growth-log-cat">{catLabel}</span>
+        <span className="ui-price-pill ui-chip-primary growth-log-pill growth-log-gem text-[10px] tabular-nums">
+          💎 +{totalGems(entry)}
+        </span>
+        <span className="ui-price-pill ui-chip-reward growth-log-pill growth-log-coin text-[10px] tabular-nums">
+          🪙 {formatCoinDelta(entry.coins)}
+        </span>
       </div>
     </article>
   );
