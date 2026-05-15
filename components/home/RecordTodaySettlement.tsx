@@ -5,8 +5,8 @@ import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider";
 import {
   computeCoinPreview,
   computeCoupleBonus,
+  gemBreakdownForPerson,
   getCurrentIsoDate,
-  gemsForPerson,
   isInCoinWeek,
   parseNonNegativeInt,
   parseOptionalWeight,
@@ -54,6 +54,14 @@ function recordIsoDate(record: { recordDate?: string; day: number }) {
 
 function totalRecordGems(record: DailyRecord) {
   return record.fish.gems + record.cat.gems + record.bonus;
+}
+
+function DetailLines({ lines }: { lines: string[] }) {
+  return (
+    <span className="mt-1 block text-[10px] font-medium leading-4 ui-text-muted">
+      {lines.join(" · ")}
+    </span>
+  );
 }
 
 function SoftField({
@@ -158,12 +166,8 @@ type RecordTodaySettlementProps = {
 export function RecordTodaySettlement({
   buttonVariant = "full",
 }: RecordTodaySettlementProps) {
-  const {
-    coinRules,
-    dailyRecords,
-    upsertDailyRecord,
-    visualRules,
-  } = useHomeResources();
+  const { coinRules, dailyRecords, upsertDailyRecord, visualRules } =
+    useHomeResources();
   const [open, setOpen] = useState(false);
   const [entered, setEntered] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -220,10 +224,7 @@ export function RecordTodaySettlement({
     [catD, catM, catW],
   );
 
-  const recordDay = useMemo(
-    () => parseDateInputDay(recordDate),
-    [recordDate],
-  );
+  const recordDay = useMemo(() => parseDateInputDay(recordDate), [recordDate]);
   const yesterdayRecord = useMemo(() => {
     const previousDate = previousDateInputValue(recordDate);
     if (!previousDate) return null;
@@ -234,8 +235,16 @@ export function RecordTodaySettlement({
   }, [dailyRecords, recordDate]);
 
   const preview = useMemo(() => {
-    const fg = gemsForPerson("fish", fishInput, yesterdayRecord);
-    const cg = gemsForPerson("cat", catInput, yesterdayRecord);
+    const fishBreakdown = gemBreakdownForPerson(
+      "fish",
+      fishInput,
+      yesterdayRecord,
+    );
+    const catBreakdown = gemBreakdownForPerson(
+      "cat",
+      catInput,
+      yesterdayRecord,
+    );
     const couple = computeCoupleBonus(fishInput, catInput);
     const recordsWithoutExisting = existingRecord
       ? dailyRecords.filter((record) => record.id !== existingRecord.id)
@@ -247,7 +256,8 @@ export function RecordTodaySettlement({
           : total,
       0,
     );
-    const todayGemTotal = fg + cg + couple.gems;
+    const todayGemTotal =
+      fishBreakdown.total + catBreakdown.total + couple.gems;
     const coin = computeCoinPreview({
       fish: fishInput,
       cat: catInput,
@@ -259,7 +269,14 @@ export function RecordTodaySettlement({
       coinRules,
       visualRules,
     });
-    return { fg, cg, couple, coin };
+    return {
+      fg: fishBreakdown.total,
+      cg: catBreakdown.total,
+      fishBreakdown,
+      catBreakdown,
+      couple,
+      coin,
+    };
   }, [
     catInput,
     coinRules,
@@ -323,9 +340,7 @@ export function RecordTodaySettlement({
     const result = upsertDailyRecord(recordDate, fishInput, catInput);
     if (!result.ok) {
       setToast(
-        result.reason === "future-date"
-          ? "不能记录未来日期"
-          : "请选择有效日期",
+        result.reason === "future-date" ? "不能记录未来日期" : "请选择有效日期",
       );
       return;
     }
@@ -347,8 +362,7 @@ export function RecordTodaySettlement({
     upsertDailyRecord,
   ]);
 
-  const buttonLabel =
-    buttonVariant === "history" ? "补录记录" : "记录今天";
+  const buttonLabel = buttonVariant === "history" ? "补录记录" : "记录今天";
 
   return (
     <>
@@ -455,39 +469,57 @@ export function RecordTodaySettlement({
                   这一天的小奖励
                 </p>
                 <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
-                  <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                    <span>🐟 宝石</span>
-                    <span className="tabular-nums ui-text-primary">
-                      💎 +{preview.fg}
+                  <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                    <span className="flex items-center justify-between gap-2">
+                      <span>🐟 宝石</span>
+                      <span className="tabular-nums ui-text-primary">
+                        💎 +{preview.fg}
+                      </span>
                     </span>
+                    <DetailLines lines={preview.fishBreakdown.lines} />
                   </li>
-                  <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                    <span>🐱 宝石</span>
-                    <span className="tabular-nums ui-text-primary">
-                      💎 +{preview.cg}
+                  <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                    <span className="flex items-center justify-between gap-2">
+                      <span>🐱 宝石</span>
+                      <span className="tabular-nums ui-text-primary">
+                        💎 +{preview.cg}
+                      </span>
                     </span>
+                    <DetailLines lines={preview.catBreakdown.lines} />
                   </li>
-                  <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                    <span>情侣 bonus</span>
-                    <span className="tabular-nums ui-text-primary">
-                      {preview.couple.gems > 0
-                        ? `💎 +${preview.couple.gems}`
-                        : "-"}
+                  <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
+                    <span className="flex items-center justify-between gap-2">
+                      <span>情侣 bonus</span>
+                      <span className="tabular-nums ui-text-primary">
+                        {preview.couple.gems > 0
+                          ? `💎 +${preview.couple.gems}`
+                          : "-"}
+                      </span>
                     </span>
-                  </li>
-                  <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                    <span>金币变化</span>
-                    <span
-                      className={
-                        preview.coin.delta > 0
-                          ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                          : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
+                    <DetailLines
+                      lines={
+                        preview.couple.gems > 0
+                          ? ["一起运动：双方各 +1，共 +2"]
+                          : ["双方都运动满 30 分钟时触发"]
                       }
-                    >
-                      {preview.coin.delta > 0
-                        ? `🪙 +${preview.coin.delta}`
-                        : "未触发"}
+                    />
+                  </li>
+                  <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
+                    <span className="flex items-center justify-between gap-2">
+                      <span>金币变化</span>
+                      <span
+                        className={
+                          preview.coin.delta > 0
+                            ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
+                            : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
+                        }
+                      >
+                        {preview.coin.delta > 0
+                          ? `🪙 +${preview.coin.delta}`
+                          : "未触发"}
+                      </span>
                     </span>
+                    <DetailLines lines={[preview.coin.hint]} />
                   </li>
                 </ul>
               </div>

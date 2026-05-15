@@ -110,6 +110,38 @@ export function gemsForPerson(
   );
 }
 
+export type GemBreakdown = {
+  deficit: number;
+  exercise: number;
+  recovery: number;
+  total: number;
+  lines: string[];
+};
+
+export function gemBreakdownForPerson(
+  person: PersonKey,
+  input: SideLogInput,
+  yesterdayRecord?: PreviousDailyRecord | null,
+): GemBreakdown {
+  const personHasDeficit = hasDeficit(input);
+  const deficit = gemsFromDeficit(person, input.deficit);
+  const exercise = gemsFromExercise(person, input.minutes, personHasDeficit);
+  const recovery = computeRecoveryBonus(person, input, yesterdayRecord);
+  const lines = [
+    `缺口宝石 +${deficit}`,
+    `运动宝石 +${exercise}`,
+    `恢复日奖励 +${recovery}`,
+  ];
+
+  return {
+    deficit,
+    exercise,
+    recovery,
+    total: deficit + exercise + recovery,
+    lines,
+  };
+}
+
 export const DEFAULT_VISUAL_RULES: SettlementVisualRules = {
   heatmap: {
     fish: {

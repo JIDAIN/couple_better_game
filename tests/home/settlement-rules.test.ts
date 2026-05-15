@@ -5,6 +5,7 @@ import {
   computeCoupleBonus,
   computeRecoveryBonus,
   exerciseTagFromMinutes,
+  gemBreakdownForPerson,
   gemsForPerson,
   gemsFromDeficit,
   gemsFromExercise,
@@ -102,6 +103,27 @@ describe("gem settlement rules", () => {
 
     expect(gemsForPerson("fish", side(500, 30), yesterday)).toBe(6);
     expect(gemsForPerson("cat", side(200, 60), yesterday)).toBe(5);
+  });
+
+  it("returns a detailed gem breakdown for preview UI", () => {
+    const yesterday = record(
+      "2026-05-06",
+      { deficit: 200, minutes: 30 },
+      { deficit: 100, minutes: 60 },
+    );
+
+    expect(gemBreakdownForPerson("fish", side(500, 30), yesterday)).toMatchObject({
+      deficit: 4,
+      exercise: 1,
+      recovery: 1,
+      total: 6,
+    });
+    expect(gemBreakdownForPerson("cat", side(200, 60), yesterday)).toMatchObject({
+      deficit: 2,
+      exercise: 2,
+      recovery: 1,
+      total: 5,
+    });
   });
 
   it("settles couple bonus when both exercised at least 30 minutes", () => {

@@ -5,7 +5,7 @@ import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider";
 import {
   computeCoinPreview,
   computeCoupleBonus,
-  gemsForPerson,
+  gemBreakdownForPerson,
   isInCoinWeek,
   parseNonNegativeInt,
   parseOptionalWeight,
@@ -68,6 +68,14 @@ function totalGems(entry: GrowthLogEntry) {
 
 function formatCoinDelta(value: number) {
   return value > 0 ? `+${value}` : "0";
+}
+
+function DetailLines({ lines }: { lines: string[] }) {
+  return (
+    <span className="mt-1 block text-[10px] font-medium leading-4 ui-text-muted">
+      {lines.join(" · ")}
+    </span>
+  );
 }
 
 function Field({
@@ -171,10 +179,8 @@ function LogCard({
     >
       <span className="growth-log-line">
         <span className="growth-log-date">{formatMonthDay(entry.recordDate)}</span>
-
         <span className="growth-log-metric growth-log-fish">{fishLabel}</span>
         <span className="growth-log-metric growth-log-cat">{catLabel}</span>
-
         <span className="ui-price-pill ui-chip-primary growth-log-pill">
           💎 +{totalGems(entry)}
         </span>
@@ -244,8 +250,12 @@ export function GrowthLog() {
     const previousRecord = previousDate
       ? dailyRecords.find((record) => record.recordDate === previousDate) ?? null
       : null;
-    const fg = gemsForPerson("fish", fishInput, previousRecord);
-    const cg = gemsForPerson("cat", catInput, previousRecord);
+    const fishBreakdown = gemBreakdownForPerson(
+      "fish",
+      fishInput,
+      previousRecord,
+    );
+    const catBreakdown = gemBreakdownForPerson("cat", catInput, previousRecord);
     const couple = computeCoupleBonus(fishInput, catInput);
     const recordsWithoutEditing = dailyRecords.filter(
       (record) => record.id !== editing.id,
@@ -266,13 +276,20 @@ export function GrowthLog() {
       cat: catInput,
       todayDay: editing.day,
       todayDate: editing.recordDate,
-      todayGemTotal: fg + cg + couple.gems,
+      todayGemTotal: fishBreakdown.total + catBreakdown.total + couple.gems,
       currentWeekGemTotal: weekGemTotalForDate,
       dailyRecords: recordsWithoutEditing,
       coinRules,
       visualRules,
     });
-    return { fg, cg, couple, coin };
+    return {
+      fg: fishBreakdown.total,
+      cg: catBreakdown.total,
+      fishBreakdown,
+      catBreakdown,
+      couple,
+      coin,
+    };
   }, [catInput, coinRules, dailyRecords, editing, fishInput, visualRules]);
 
   useEffect(() => {
@@ -478,39 +495,57 @@ export function GrowthLog() {
                     修改后的结算预览
                   </p>
                   <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
-                    <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                      <span>🐟 宝石</span>
-                      <span className="tabular-nums ui-text-primary">
-                        💎 +{preview.fg}
+                    <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                      <span className="flex items-center justify-between gap-2">
+                        <span>🐟 宝石</span>
+                        <span className="tabular-nums ui-text-primary">
+                          💎 +{preview.fg}
+                        </span>
                       </span>
+                      <DetailLines lines={preview.fishBreakdown.lines} />
                     </li>
-                    <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                      <span>🐱 宝石</span>
-                      <span className="tabular-nums ui-text-primary">
-                        💎 +{preview.cg}
+                    <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
+                      <span className="flex items-center justify-between gap-2">
+                        <span>🐱 宝石</span>
+                        <span className="tabular-nums ui-text-primary">
+                          💎 +{preview.cg}
+                        </span>
                       </span>
+                      <DetailLines lines={preview.catBreakdown.lines} />
                     </li>
-                    <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                      <span>情侣 bonus</span>
-                      <span className="tabular-nums ui-text-primary">
-                        {preview.couple.gems > 0
-                          ? `💎 +${preview.couple.gems}`
-                          : "-"}
+                    <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
+                      <span className="flex items-center justify-between gap-2">
+                        <span>情侣 bonus</span>
+                        <span className="tabular-nums ui-text-primary">
+                          {preview.couple.gems > 0
+                            ? `💎 +${preview.couple.gems}`
+                            : "-"}
+                        </span>
                       </span>
-                    </li>
-                    <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                      <span>金币变化</span>
-                      <span
-                        className={
-                          preview.coin.delta > 0
-                            ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                            : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
+                      <DetailLines
+                        lines={
+                          preview.couple.gems > 0
+                            ? ["一起运动：双方各 +1，共 +2"]
+                            : ["双方都运动满 30 分钟时触发"]
                         }
-                      >
-                        {preview.coin.delta > 0
-                          ? `🪙 +${preview.coin.delta}`
-                          : "未触发"}
+                      />
+                    </li>
+                    <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
+                      <span className="flex items-center justify-between gap-2">
+                        <span>金币变化</span>
+                        <span
+                          className={
+                            preview.coin.delta > 0
+                              ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
+                              : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
+                          }
+                        >
+                          {preview.coin.delta > 0
+                            ? `🪙 +${preview.coin.delta}`
+                            : "未触发"}
+                        </span>
                       </span>
+                      <DetailLines lines={[preview.coin.hint]} />
                     </li>
                   </ul>
                 </div>
