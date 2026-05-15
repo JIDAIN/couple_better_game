@@ -79,6 +79,25 @@ function recordPriceLabel(price: number, kind: ResourceKind) {
   return `${resourceIcon(kind)} ${price}`;
 }
 
+function displayCategoryDescription(category: ExchangeCategory) {
+  switch (category.id) {
+    case "snack":
+      return "轻轻奖励一下";
+    case "drink":
+      return "小甜甜奖励";
+    case "double-drink":
+      return "双人份快乐";
+    case "dinner":
+      return "热乎一顿";
+    case "deluxe-dinner":
+      return "周末小奖励";
+    case "family":
+      return "温柔奖励";
+    default:
+      return category.description;
+  }
+}
+
 function formFromCategory(category?: ExchangeCategory | null): CategoryFormState {
   if (!category) return EMPTY_CATEGORY_FORM;
   return {
@@ -369,11 +388,11 @@ export function ExchangeShop() {
                   {category.title}
                 </p>
                 <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft sm:text-[11px]">
-                  {category.description}
+                  {displayCategoryDescription(category)}
                 </p>
               </div>
             </div>
-            <div className="flex w-[4.5rem] shrink-0 flex-col items-center gap-1.5">
+            <div className="flex w-[4rem] shrink-0 flex-col items-center gap-1.5">
               <span
                 className={`ui-badge ui-price-pill shrink-0 text-[10px] tabular-nums ${priceClass}`}
               >

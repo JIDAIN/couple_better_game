@@ -16,10 +16,10 @@
   --card-bg-strong: rgb(255 255 255 / 0.88);
   --card-bg-warm: rgb(255 248 241 / 0.82);
   --card-border: rgb(255 255 255 / 0.72);
-  --cell-empty: #f1e8e2;
-  --cell-normal: #fbe1e8;
-  --cell-good: #f7b8c8;
-  --cell-great: #ea7d9a;
+  --cell-empty: #f3eae3;
+  --cell-normal: #ffe1ea;
+  --cell-good: #ffb6cb;
+  --cell-great: #ff7fa3;
   --shadow-card: 0 12px 32px rgb(120 80 60 / 0.075);
   --shadow-soft: 0 8px 22px rgb(120 80 60 / 0.06);
   --shadow-float: 0 24px 58px rgb(76 54 42 / 0.16);
@@ -379,17 +379,23 @@ body::before {
 }
 
 .ui-price-pill {
-  min-width: 3.6rem;
-  height: 1.75rem;
-  padding: 0 0.625rem;
+  min-width: 3.25rem;
+  height: 1.55rem;
+  padding: 0 0.5rem;
   border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .ui-action-pill {
-  min-width: 3.6rem;
-  height: 2rem;
-  padding: 0 0.75rem;
+  min-width: 3.25rem;
+  height: 1.75rem;
+  padding: 0 0.625rem;
   border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .ui-text-main {
@@ -453,22 +459,22 @@ body::before {
 }
 
 .heat-cell-normal {
-  border-color: rgb(251 190 205 / 0.42);
+  border-color: rgb(255 190 210 / 0.46);
   background: var(--cell-normal);
 }
 
 .heat-cell-good {
-  border-color: rgb(247 152 177 / 0.42);
+  border-color: rgb(255 150 184 / 0.46);
   background: var(--cell-good);
 }
 
 .heat-cell-great {
-  border-color: rgb(234 125 154 / 0.46);
+  border-color: rgb(255 127 163 / 0.5);
   background: var(--cell-great);
 }
 
 .heat-cell-streak {
-  border-color: rgb(234 125 154 / 0.52);
+  border-color: rgb(255 127 163 / 0.54);
   background: var(--cell-great);
 }
 
