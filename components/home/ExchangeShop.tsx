@@ -453,42 +453,34 @@ export function ExchangeShop() {
           {exchangeRecords.length > 0 ? (
             <div className="space-y-1.5">
               {exchangeRecords.slice(0, 3).map((record) => (
-                <article key={record.id} className="ui-soft-panel ui-card-item">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[10px] font-semibold tracking-wide ui-text-soft">
-                        {record.date}
-                      </p>
-                      <p className="mt-0.5 truncate text-[12px] font-semibold ui-text-main">
-                        {record.icon} {record.category}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                      <span
-                        className={`ui-badge ui-price-pill text-[10px] tabular-nums ${getCategoryChipClass(
-                          record.resourceKind,
-                        )}`}
-                      >
-                        {recordPriceLabel(record.price, record.resourceKind)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => openEditRecord(record.id)}
-                        className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const ok = deleteExchangeRecord(record.id);
-                          if (ok) setToast("已删除兑换记录");
-                        }}
-                        className="ui-button-secondary ui-action-pill text-[11px] font-semibold opacity-80"
-                      >
-                        删除
-                      </button>
-                    </div>
+                <article key={record.id} className="record-item">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium ui-text-muted">
+                      {record.date}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => openEditRecord(record.id)}
+                      className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
+                    >
+                      编辑
+                    </button>
+                  </div>
+                  <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                    <p
+                      className="min-w-0 truncate text-[12px] font-semibold ui-text-main"
+                      style={{ maxWidth: "calc(100% - 4rem)" }}
+                    >
+                      {record.icon} {record.category}
+                      {record.remark ? ` · ${record.remark}` : ""}
+                    </p>
+                    <span
+                      className={`ui-badge ui-price-pill shrink-0 text-[10px] tabular-nums ${getCategoryChipClass(
+                        record.resourceKind,
+                      )}`}
+                    >
+                      {recordPriceLabel(record.price, record.resourceKind)}
+                    </span>
                   </div>
                 </article>
               ))}
@@ -662,28 +654,19 @@ export function ExchangeShop() {
                         <p className="text-xs font-medium ui-text-muted">
                           {record.date}
                         </p>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => openEditRecord(record.id)}
-                            className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
-                          >
-                            编辑
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const ok = deleteExchangeRecord(record.id);
-                              if (ok) setToast("已删除兑换记录");
-                            }}
-                            className="ui-button-secondary ui-action-pill text-[11px] font-semibold opacity-80"
-                          >
-                            删除
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => openEditRecord(record.id)}
+                          className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
+                        >
+                          编辑
+                        </button>
                       </div>
-                      <div className="mt-1.5 flex items-center justify-between gap-2">
-                        <p className="min-w-0 truncate text-[12px] font-semibold ui-text-main">
+                      <div className="mt-1.5 flex min-w-0 items-center gap-2">
+                        <p
+                          className="min-w-0 truncate text-[12px] font-semibold ui-text-main"
+                          style={{ maxWidth: "calc(100% - 4rem)" }}
+                        >
                           {record.icon} {record.category}
                           {record.remark ? ` · ${record.remark}` : ""}
                         </p>
@@ -814,6 +797,22 @@ export function ExchangeShop() {
             </label>
 
             <div className="mt-4 flex gap-2">
+              {isEditing ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!record) return;
+                    const ok = deleteExchangeRecord(record.id);
+                    if (ok) {
+                      setToast("已删除兑换记录");
+                      closeOverlay();
+                    }
+                  }}
+                  className="ui-button-secondary flex-1 py-2.5 text-sm font-semibold text-[#b44f6f]"
+                >
+                  删除
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={closeOverlay}

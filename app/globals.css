@@ -421,9 +421,9 @@ body::before {
 }
 
 .ui-price-pill {
-  min-width: 3.25rem;
+  min-width: 3.75rem;
   height: 1.55rem;
-  padding: 0 0.55rem;
+  padding: 0 0.625rem;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -432,8 +432,8 @@ body::before {
 
 .ui-action-pill {
   min-width: 3.25rem;
-  height: 1.65rem;
-  padding: 0 0.65rem;
+  height: 1.6rem;
+  padding: 0 0.625rem;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 700;
