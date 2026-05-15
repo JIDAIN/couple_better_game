@@ -201,15 +201,14 @@ body::before {
 }
 
 .growth-log-item {
-  padding: 0.78rem 0.95rem;
+  padding: 0.8rem 0.95rem;
 }
 
 .growth-log-line {
   display: grid;
-  grid-template-columns: 4.4rem minmax(7.25rem, 1fr) minmax(7.25rem, 1fr) 3.75rem 3.75rem;
+  grid-template-columns: 4.2rem minmax(7.5rem, 1fr) minmax(7.5rem, 1fr) 3.7rem 3.7rem;
   align-items: center;
   column-gap: 0.65rem;
-  width: 100%;
 }
 
 .growth-log-date {
@@ -229,33 +228,44 @@ body::before {
   color: var(--text-muted);
 }
 
+.growth-log-fish {
+  justify-self: start;
+}
+
+.growth-log-cat {
+  justify-self: start;
+}
+
 .growth-log-pill {
   justify-self: end;
-  min-width: 3.6rem;
+  min-width: 3.7rem;
 }
 
 .exchange-record-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.875rem;
   padding: 0.85rem 0.95rem;
 }
 
-.exchange-record-content {
-  min-width: 0;
-  flex: 1;
+.exchange-record-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .exchange-record-date {
-  margin-bottom: 0.35rem;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
 }
 
+.exchange-edit-button {
+  min-width: 3.25rem;
+  height: 1.6rem;
+}
+
 .exchange-record-line {
+  margin-top: 0.45rem;
   display: flex;
   min-width: 0;
   align-items: center;
@@ -265,7 +275,6 @@ body::before {
 
 .exchange-record-title {
   min-width: 0;
-  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -276,13 +285,7 @@ body::before {
 
 .exchange-record-price {
   flex-shrink: 0;
-  min-width: 3.6rem;
-}
-
-.exchange-edit-button {
-  flex-shrink: 0;
-  align-self: center;
-  min-width: 3.25rem;
+  min-width: 3.55rem;
 }
 
 @media (max-width: 560px) {
@@ -295,26 +298,21 @@ body::before {
   .growth-log-date {
     grid-column: 1;
     grid-row: 1;
-    justify-self: start;
   }
 
-  .growth-log-gem {
+  .growth-log-pill:nth-of-type(4) {
     grid-column: 2;
     grid-row: 1;
-    justify-self: end;
   }
 
-  .growth-log-coin {
+  .growth-log-pill:nth-of-type(5) {
     grid-column: 3;
     grid-row: 1;
-    justify-self: end;
-    margin-left: 0.375rem;
   }
 
   .growth-log-fish {
-    grid-column: 1;
+    grid-column: 1 / 2;
     grid-row: 2;
-    justify-self: start;
   }
 
   .growth-log-cat {
@@ -545,7 +543,7 @@ body::before {
 }
 
 .ui-price-pill {
-  min-width: 3.75rem;
+  min-width: 3.55rem;
   height: 1.55rem;
   padding: 0 0.625rem;
   border-radius: 999px;
