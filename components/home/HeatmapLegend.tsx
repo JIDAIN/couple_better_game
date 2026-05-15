@@ -5,8 +5,8 @@ import { useHomeResources } from "./HomeResourcesProvider";
 export function HeatmapLegend() {
   const { visualRules } = useHomeResources();
   const items = [
-    { cls: "heat-cell-empty", label: "未完�? },
-    { cls: "heat-cell-normal", label: "一�? },
+    { cls: "heat-cell-empty", label: "未完成" },
+    { cls: "heat-cell-normal", label: "一般" },
     { cls: "heat-cell-good", label: "较好" },
     { cls: "heat-cell-great", label: "超棒" },
   ] as const;
@@ -29,8 +29,8 @@ export function HeatmapLegend() {
         ))}
       </div>
       <div className="flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 ui-text-soft">
-        <span>🐟 超棒 �?{visualRules.heatmap.fish.perfectMin} kcal</span>
-        <span>🐱 超棒 �?{visualRules.heatmap.cat.perfectMin} kcal</span>
+        <span>🐟 超棒 ≥ {visualRules.heatmap.fish.perfectMin} kcal</span>
+        <span>🐱 超棒 ≥ {visualRules.heatmap.cat.perfectMin} kcal</span>
       </div>
       <div className="flex w-full flex-col items-center gap-y-1 sm:w-auto sm:flex-row sm:gap-x-5 sm:gap-y-0">
         <span className="inline-flex w-full items-center justify-center gap-1 sm:w-auto">
@@ -44,10 +44,9 @@ export function HeatmapLegend() {
           <span className="text-[9px]" aria-hidden>
             🔥
           </span>
-          �?{visualRules.exerciseTag.intenseMin} min
+          ≥ {visualRules.exerciseTag.intenseMin} min
         </span>
       </div>
     </div>
   );
 }
-
