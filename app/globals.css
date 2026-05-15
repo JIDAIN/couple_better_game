@@ -206,7 +206,7 @@ body::before {
 
 .growth-log-line {
   display: grid;
-  grid-template-columns: 4.2rem minmax(7.5rem, 1fr) minmax(7.5rem, 1fr) 3.7rem 3.7rem;
+  grid-template-columns: 4.4rem minmax(3.8rem, 1fr) minmax(3.4rem, 1fr) 3.4rem;
   align-items: center;
   column-gap: 0.65rem;
 }
@@ -239,6 +239,11 @@ body::before {
 .growth-log-pill {
   justify-self: end;
   min-width: 3.7rem;
+}
+
+.growth-log-action {
+  justify-self: end;
+  min-width: 3.4rem;
 }
 
 .exchange-record-item {
@@ -290,35 +295,19 @@ body::before {
 
 @media (max-width: 560px) {
   .growth-log-line {
-    grid-template-columns: 1fr auto auto;
-    row-gap: 0.5rem;
+    grid-template-columns: 4.2rem minmax(3.6rem, 1fr) minmax(3.2rem, 1fr) 3.25rem;
     column-gap: 0.45rem;
   }
 
   .growth-log-date {
-    grid-column: 1;
-    grid-row: 1;
+    font-size: 0.8125rem;
   }
 
-  .growth-log-pill:nth-of-type(4) {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .growth-log-pill:nth-of-type(5) {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .growth-log-fish {
-    grid-column: 1 / 2;
-    grid-row: 2;
-  }
-
-  .growth-log-cat {
-    grid-column: 3;
-    grid-row: 2;
-    justify-self: end;
+  .growth-log-pill,
+  .growth-log-action {
+    min-width: 3.2rem;
+    padding-inline: 0.45rem;
+    font-size: 0.6875rem;
   }
 }
 

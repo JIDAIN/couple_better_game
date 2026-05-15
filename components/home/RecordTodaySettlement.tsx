@@ -251,7 +251,8 @@ export function RecordTodaySettlement({
       : dailyRecords;
     const weekGemTotalForDate = recordsWithoutExisting.reduce(
       (total, record) =>
-        isInCoinWeek(recordIsoDate(record), recordDate, coinRules.weekStartDay)
+        isInCoinWeek(recordIsoDate(record), recordDate, coinRules.weekStartDay) &&
+        recordIsoDate(record) < recordDate
           ? total + totalRecordGems(record)
           : total,
       0,

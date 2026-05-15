@@ -187,4 +187,48 @@ describe("home stat service", () => {
     expect(may6Count).toBe(1);
     expect(next.dailyRecords).toHaveLength(8);
   });
+
+  it("keeps May 11 and a 9-gem May 13 at zero coins after full recalculation", () => {
+    const seeded = importMayHistoryRecords(baseState());
+    const withMay13 = {
+      ...seeded,
+      dailyRecords: [
+        ...seeded.dailyRecords,
+        makeRecord("2026-05-13", 500, 200, 4, 3, 2),
+      ],
+    };
+
+    const recalculated = recalculateCoinsWithCurrentRules(withMay13);
+    const may11 = recalculated.dailyRecords.find(
+      (record) => record.recordDate === "2026-05-11",
+    );
+    const may13 = recalculated.dailyRecords.find(
+      (record) => record.recordDate === "2026-05-13",
+    );
+
+    expect(may11?.coins).toBe(0);
+    expect(may13?.coins).toBe(0);
+  });
+
+  it("moves weekly gem threshold coins to the true crossing day only", () => {
+    const state = baseState({
+      dailyRecords: [
+        makeRecord("2026-05-09", 200, 100, 5, 5),
+        makeRecord("2026-05-10", 200, 100, 5, 5),
+        makeRecord("2026-05-11", 200, 100, 3, 2),
+        makeRecord("2026-05-13", 200, 100, 20, 20),
+      ],
+    });
+
+    const recalculated = recalculateCoinsWithCurrentRules(state);
+    const may11 = recalculated.dailyRecords.find(
+      (record) => record.recordDate === "2026-05-11",
+    );
+    const may13 = recalculated.dailyRecords.find(
+      (record) => record.recordDate === "2026-05-13",
+    );
+
+    expect(may11?.coins).toBe(0);
+    expect(may13?.coins).toBe(2);
+  });
 });
