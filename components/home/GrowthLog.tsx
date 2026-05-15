@@ -45,11 +45,19 @@ function formatCoinDelta(value: number) {
 function LogCard({ entry }: { entry: GrowthLogEntry }) {
   return (
     <article className="record-item">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium ui-text-muted">
+      <div className="grid grid-cols-[4.25rem_minmax(0,1fr)_auto] items-center gap-2.5 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto]">
+        <p className="truncate text-[13px] font-semibold ui-text-main">
           {formatMonthDay(entry.recordDate)}
         </p>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm ui-text-muted">
+          <span className="whitespace-nowrap">
+            🐟 {entry.fish.deficit}kcal / {entry.fish.minutes}min
+          </span>
+          <span className="whitespace-nowrap">
+            🐱 {entry.cat.deficit}kcal / {entry.cat.minutes}min
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
           <span className="ui-price-pill ui-chip-primary text-[10px] tabular-nums">
             💎 +{totalGems(entry)}
           </span>
@@ -57,11 +65,6 @@ function LogCard({ entry }: { entry: GrowthLogEntry }) {
             🪙 {formatCoinDelta(entry.coins)}
           </span>
         </div>
-      </div>
-
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm ui-text-muted">
-        <span>🐟 {entry.fish.deficit}kcal/{entry.fish.minutes}min</span>
-        <span>🐱 {entry.cat.deficit}kcal/{entry.cat.minutes}min</span>
       </div>
     </article>
   );

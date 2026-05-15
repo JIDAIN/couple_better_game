@@ -663,13 +663,6 @@ export function ExchangeShop() {
                           {record.date}
                         </p>
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <span
-                            className={`ui-badge ui-price-pill text-[10px] tabular-nums ${getCategoryChipClass(
-                              record.resourceKind,
-                            )}`}
-                          >
-                            {recordPriceLabel(record.price, record.resourceKind)}
-                          </span>
                           <button
                             type="button"
                             onClick={() => openEditRecord(record.id)}
@@ -689,10 +682,19 @@ export function ExchangeShop() {
                           </button>
                         </div>
                       </div>
-                      <p className="mt-1 truncate text-[12px] font-semibold ui-text-main">
-                        {record.icon} {record.category}
-                        {record.remark ? ` · ${record.remark}` : ""}
-                      </p>
+                      <div className="mt-1.5 flex items-center justify-between gap-2">
+                        <p className="min-w-0 truncate text-[12px] font-semibold ui-text-main">
+                          {record.icon} {record.category}
+                          {record.remark ? ` · ${record.remark}` : ""}
+                        </p>
+                        <span
+                          className={`ui-badge ui-price-pill shrink-0 text-[10px] tabular-nums ${getCategoryChipClass(
+                            record.resourceKind,
+                          )}`}
+                        >
+                          {recordPriceLabel(record.price, record.resourceKind)}
+                        </span>
+                      </div>
                     </article>
                   ))}
                 </div>
