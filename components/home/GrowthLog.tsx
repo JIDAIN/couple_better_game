@@ -44,27 +44,23 @@ function formatCoinDelta(value: number) {
 
 function LogCard({ entry }: { entry: GrowthLogEntry }) {
   return (
-    <article className="ui-card-soft ui-card-compact h-12 transition active:scale-[0.995]">
+    <article className="ui-card-soft ui-card-compact transition active:scale-[0.995]">
       <div className="grid h-full grid-cols-[4.4rem_minmax(0,1fr)_minmax(0,1fr)_3.45rem_3rem] items-center gap-2">
-        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-bold leading-4 tabular-nums tracking-tight ui-text-primary">
+        <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-left text-[13px] font-bold leading-4 tabular-nums tracking-tight ui-text-main">
           {formatMonthDay(entry.recordDate)}
         </p>
-
         <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
           🐟 {entry.fish.deficit}kcal/{entry.fish.minutes}min
         </p>
-
         <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
           🐱 {entry.cat.deficit}kcal/{entry.cat.minutes}min
         </p>
-
         <span className="ui-chip-primary inline-flex h-6 w-[3.45rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
           <span aria-hidden className="text-[0.95em]">
             💎
           </span>
           <span>+{totalGems(entry)}</span>
         </span>
-
         <span className="ui-chip-reward inline-flex h-6 w-[3rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
           <span aria-hidden className="text-[0.95em]">
             🪙
@@ -133,7 +129,7 @@ export function GrowthLog() {
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-[55] flex items-end justify-center p-2.5 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-[55] flex items-center justify-center p-3 sm:p-4">
           <button
             type="button"
             aria-label="关闭成长日志"
@@ -146,15 +142,13 @@ export function GrowthLog() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`ui-sheet relative flex h-[78dvh] w-full max-w-lg flex-col overflow-hidden px-4 pt-3 transition-all duration-300 ease-out will-change-transform ${
+            className={`ui-sheet ui-record-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out will-change-transform ${
               sheetEnter
                 ? "translate-y-0 opacity-100 sm:scale-100"
-                : "translate-y-full opacity-90 sm:translate-y-2 sm:scale-95"
-            } pb-[max(1.25rem,env(safe-area-inset-bottom))]`}
+                : "translate-y-3 opacity-0 sm:scale-95"
+            }`}
           >
-            <div className="ui-sheet-handle mx-auto mb-3 h-1 w-10 rounded-full" aria-hidden />
-
-            <div className="ui-soft-panel ui-card-compact">
+            <div className="record-sheet-header">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-lg font-bold leading-6 tracking-tight ui-text-main">
@@ -201,7 +195,7 @@ export function GrowthLog() {
               </div>
             </div>
 
-            <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+            <div className="record-sheet-body">
               {sortedRecords.length > 0 ? (
                 <div className="space-y-2">
                   {sortedRecords.map((entry) => (
@@ -209,7 +203,7 @@ export function GrowthLog() {
                   ))}
                 </div>
               ) : (
-                <div className="ui-soft-panel ui-card-main py-6 text-center text-sm font-semibold ui-text-muted">
+                <div className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
                   这个月还没有成长记录
                 </div>
               )}

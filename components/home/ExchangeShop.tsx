@@ -608,7 +608,7 @@ export function ExchangeShop() {
 
     if (overlay.kind === "history") {
       return (
-        <div className="absolute inset-0 z-10 flex items-end justify-center p-2.5 sm:items-center sm:p-4">
+        <div className="fixed inset-0 z-10 flex items-center justify-center p-3 sm:p-4">
           <button
             type="button"
             aria-label="关闭已兑换记录"
@@ -621,42 +621,44 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={overlayTitleId}
-            className={`ui-dialog ui-dialog-content relative w-full max-w-md transition-all duration-300 ease-out ${
+            className={`ui-sheet ui-record-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out ${
               overlayEnter
                 ? "translate-y-0 opacity-100"
-                : "translate-y-4 opacity-0"
+                : "translate-y-3 opacity-0"
             }`}
           >
-            <div className="flex items-start justify-between gap-3 pb-3">
-              <div>
-                <h3
-                  id={overlayTitleId}
-                  className="text-base font-semibold tracking-tight ui-text-main"
+            <div className="record-sheet-header">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3
+                    id={overlayTitleId}
+                    className="text-base font-semibold tracking-tight ui-text-main"
+                  >
+                    兑换记录
+                  </h3>
+                  <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
+                    最近的小奖励都在这里
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeOverlay}
+                  className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
                 >
-                  兑换记录
-                </h3>
-                <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
-                  最近的小奖励都在这里
-                </p>
+                  返回
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={closeOverlay}
-                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
-              >
-                返回
-              </button>
             </div>
 
-            <div className="mt-3 space-y-2">
+            <div className="record-sheet-body">
               {exchangeRecords.length > 0 ? (
-                exchangeRecords.map((record) => (
-                  <article
-                    key={record.id}
-                    className="ui-soft-panel ui-card-item"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="min-w-0 flex-1">
+                <div className="space-y-2">
+                  {exchangeRecords.map((record) => (
+                    <article
+                      key={record.id}
+                      className="ui-soft-panel flex items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0">
                         <p className="truncate text-[10px] font-semibold tracking-wide ui-text-soft">
                           {record.date}
                         </p>
@@ -665,7 +667,7 @@ export function ExchangeShop() {
                           {record.remark ? ` · ${record.remark}` : ""}
                         </p>
                       </div>
-                      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
                         <span
                           className={`ui-badge ui-price-pill text-[10px] tabular-nums ${getCategoryChipClass(
                             record.resourceKind,
@@ -691,12 +693,12 @@ export function ExchangeShop() {
                           删除
                         </button>
                       </div>
-                    </div>
-                  </article>
-                ))
+                    </article>
+                  ))}
+                </div>
               ) : (
-                <div className="ui-soft-panel ui-card-item py-5 text-center text-xs font-semibold ui-text-muted">
-                  还没有兑换记录，攒到喜欢的奖励再来换一笔。
+                <div className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
+                  还没有兑换记录，攒到喜欢的小奖励再来换吧。
                 </div>
               )}
             </div>

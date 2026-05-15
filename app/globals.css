@@ -146,6 +146,21 @@ body::before {
   box-shadow: var(--shadow-float);
 }
 
+.ui-record-sheet {
+  width: 100%;
+  max-width: 42rem;
+  min-height: 28rem;
+  max-height: min(86dvh, 680px);
+}
+
+@media (max-width: 640px) {
+  .ui-record-sheet {
+    width: calc(100vw - 24px);
+    min-height: 70dvh;
+    max-height: 88dvh;
+  }
+}
+
 .ui-dialog {
   border-radius: var(--radius-card-sm);
   background:
@@ -156,6 +171,18 @@ body::before {
 
 .ui-dialog-content {
   padding: 0.875rem;
+}
+
+.record-sheet-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+
+.record-sheet-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 1.25rem 1.25rem;
 }
 
 .ui-soft-panel {
