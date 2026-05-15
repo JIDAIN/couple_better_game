@@ -43,29 +43,23 @@ function formatCoinDelta(value: number) {
 }
 
 function LogCard({ entry }: { entry: GrowthLogEntry }) {
-  return (
-    <article className="record-item">
-      <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[4.25rem_9rem_9rem_3.75rem_3.75rem] sm:items-center sm:gap-x-2.5 sm:gap-y-0">
-        <div className="flex items-center justify-between gap-2 sm:contents">
-          <p className="truncate text-[13px] font-semibold ui-text-main sm:col-start-1">
-            {formatMonthDay(entry.recordDate)}
-          </p>
-          <div className="flex shrink-0 items-center gap-1.5 sm:col-start-4 sm:col-span-2 sm:justify-self-end">
-            <span className="ui-price-pill ui-chip-primary text-[10px] tabular-nums">
-              💎 +{totalGems(entry)}
-            </span>
-            <span className="ui-price-pill ui-chip-reward text-[10px] tabular-nums">
-              🪙 {formatCoinDelta(entry.coins)}
-            </span>
-          </div>
-        </div>
+  const fishLabel = `🐟${entry.fish.deficit}kcal/${entry.fish.minutes}min`;
+  const catLabel = `🐱${entry.cat.deficit}kcal/${entry.cat.minutes}min`;
 
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm ui-text-muted sm:contents">
-          <span className="whitespace-nowrap sm:col-start-2">
-            🐟 {entry.fish.deficit}kcal / {entry.fish.minutes}min
+  return (
+    <article className="record-item growth-log-item">
+      <div className="growth-log-main">
+        <div className="growth-log-date">{formatMonthDay(entry.recordDate)}</div>
+        <div className="growth-log-metrics">
+          <span className="whitespace-nowrap">{fishLabel}</span>
+          <span className="whitespace-nowrap">{catLabel}</span>
+        </div>
+        <div className="growth-log-rewards">
+          <span className="ui-price-pill ui-chip-primary text-[10px] tabular-nums">
+            💎 +{totalGems(entry)}
           </span>
-          <span className="whitespace-nowrap sm:col-start-3">
-            🐱 {entry.cat.deficit}kcal / {entry.cat.minutes}min
+          <span className="ui-price-pill ui-chip-reward text-[10px] tabular-nums">
+            🪙 {formatCoinDelta(entry.coins)}
           </span>
         </div>
       </div>

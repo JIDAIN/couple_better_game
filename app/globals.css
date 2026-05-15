@@ -200,6 +200,88 @@ body::before {
   padding: 0.875rem 1rem;
 }
 
+.growth-log-item {
+  overflow: hidden;
+}
+
+.growth-log-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content) auto;
+  align-items: center;
+  column-gap: 0.875rem;
+}
+
+.growth-log-date {
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.growth-log-metrics {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.875rem;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.growth-log-rewards {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
+.growth-log-rewards .ui-price-pill {
+  min-width: 3.75rem;
+}
+
+.exchange-record-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.exchange-record-main {
+  margin-top: 0.5rem;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+@media (max-width: 560px) {
+  .growth-log-main {
+    grid-template-columns: 1fr auto;
+    row-gap: 0.5rem;
+    column-gap: 0.75rem;
+  }
+
+  .growth-log-date {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .growth-log-rewards {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .growth-log-metrics {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: space-between;
+    white-space: normal;
+  }
+}
+
 .ui-soft-panel {
   border-radius: var(--radius-panel);
   background: var(--card-bg-warm);

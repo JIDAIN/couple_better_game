@@ -5,6 +5,7 @@ import {
   GEM_CAP,
   useHomeResources,
   type ExchangeCategory,
+  type ExchangeRecord,
   type ResourceKind,
 } from "./HomeResourcesProvider";
 
@@ -77,6 +78,48 @@ function categoryPriceLabel(category: ExchangeCategory) {
 
 function recordPriceLabel(price: number, kind: ResourceKind) {
   return `${resourceIcon(kind)} ${price}`;
+}
+
+function formatExchangeDisplayDate(value: string) {
+  return value.replace(/\s+\d{2}:\d{2}$/, "");
+}
+
+function ExchangeRecordCard({
+  record,
+  onEdit,
+}: {
+  record: ExchangeRecord;
+  onEdit: (recordId: string) => void;
+}) {
+  return (
+    <article className="record-item exchange-record-item">
+      <div className="exchange-record-top">
+        <p className="text-xs font-medium ui-text-muted">
+          {formatExchangeDisplayDate(record.date)}
+        </p>
+        <button
+          type="button"
+          onClick={() => onEdit(record.id)}
+          className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
+        >
+          编辑
+        </button>
+      </div>
+      <div className="exchange-record-main">
+        <p className="min-w-0 flex-1 truncate text-[12px] font-semibold ui-text-main">
+          {record.icon} {record.category}
+          {record.remark ? ` · ${record.remark}` : ""}
+        </p>
+        <span
+          className={`ui-price-pill shrink-0 text-[10px] tabular-nums ${getCategoryChipClass(
+            record.resourceKind,
+          )}`}
+        >
+          {recordPriceLabel(record.price, record.resourceKind)}
+        </span>
+      </div>
+    </article>
+  );
 }
 
 function displayCategoryDescription(category: ExchangeCategory) {
@@ -453,36 +496,11 @@ export function ExchangeShop() {
           {exchangeRecords.length > 0 ? (
             <div className="space-y-1.5">
               {exchangeRecords.slice(0, 3).map((record) => (
-                <article key={record.id} className="record-item">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium ui-text-muted">
-                      {record.date}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => openEditRecord(record.id)}
-                      className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
-                    >
-                      编辑
-                    </button>
-                  </div>
-                  <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                    <p
-                      className="min-w-0 truncate text-[12px] font-semibold ui-text-main"
-                      style={{ maxWidth: "calc(100% - 4rem)" }}
-                    >
-                      {record.icon} {record.category}
-                      {record.remark ? ` · ${record.remark}` : ""}
-                    </p>
-                    <span
-                      className={`ui-badge ui-price-pill shrink-0 text-[10px] tabular-nums ${getCategoryChipClass(
-                        record.resourceKind,
-                      )}`}
-                    >
-                      {recordPriceLabel(record.price, record.resourceKind)}
-                    </span>
-                  </div>
-                </article>
+                <ExchangeRecordCard
+                  key={record.id}
+                  record={record}
+                  onEdit={openEditRecord}
+                />
               ))}
             </div>
           ) : (
@@ -646,39 +664,11 @@ export function ExchangeShop() {
               {exchangeRecords.length > 0 ? (
                 <div className="record-list">
                   {exchangeRecords.map((record) => (
-                    <article
+                    <ExchangeRecordCard
                       key={record.id}
-                      className="record-item"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium ui-text-muted">
-                          {record.date}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => openEditRecord(record.id)}
-                          className="ui-button-secondary ui-action-pill text-[11px] font-semibold"
-                        >
-                          编辑
-                        </button>
-                      </div>
-                      <div className="mt-1.5 flex min-w-0 items-center gap-2">
-                        <p
-                          className="min-w-0 truncate text-[12px] font-semibold ui-text-main"
-                          style={{ maxWidth: "calc(100% - 4rem)" }}
-                        >
-                          {record.icon} {record.category}
-                          {record.remark ? ` · ${record.remark}` : ""}
-                        </p>
-                        <span
-                          className={`ui-badge ui-price-pill shrink-0 text-[10px] tabular-nums ${getCategoryChipClass(
-                            record.resourceKind,
-                          )}`}
-                        >
-                          {recordPriceLabel(record.price, record.resourceKind)}
-                        </span>
-                      </div>
-                    </article>
+                      record={record}
+                      onEdit={openEditRecord}
+                    />
                   ))}
                 </div>
               ) : (
