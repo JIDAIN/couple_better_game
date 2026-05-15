@@ -16,10 +16,10 @@
   --card-bg-strong: rgb(255 255 255 / 0.88);
   --card-bg-warm: rgb(255 248 241 / 0.82);
   --card-border: rgb(255 255 255 / 0.72);
-  --cell-empty: #eee7dc;
-  --cell-normal: #d7ead1;
-  --cell-good: #a8d9b4;
-  --cell-great: #f7d977;
+  --cell-empty: #eee8dc;
+  --cell-normal: #d9efd8;
+  --cell-good: #9fd3a8;
+  --cell-great: #4fa96f;
   --shadow-card: 0 12px 32px rgb(120 80 60 / 0.075);
   --shadow-soft: 0 8px 22px rgb(120 80 60 / 0.06);
   --shadow-float: 0 24px 58px rgb(76 54 42 / 0.16);
@@ -425,28 +425,28 @@ body::before {
 }
 
 .heat-cell-empty {
-  border-color: rgb(178 167 160 / 0.32);
+  border-color: rgb(178 167 160 / 0.28);
   background: var(--cell-empty);
 }
 
 .heat-cell-normal {
-  border-color: rgb(141 214 165 / 0.34);
+  border-color: rgb(159 211 168 / 0.38);
   background: var(--cell-normal);
 }
 
 .heat-cell-good {
-  border-color: rgb(76 175 131 / 0.28);
+  border-color: rgb(100 185 122 / 0.38);
   background: var(--cell-good);
 }
 
 .heat-cell-great {
-  border-color: rgb(255 201 74 / 0.42);
-  background: linear-gradient(135deg, rgb(255 240 189 / 0.95), var(--cell-great));
+  border-color: rgb(79 169 111 / 0.42);
+  background: var(--cell-great);
 }
 
 .heat-cell-streak {
-  border-color: rgb(255 107 147 / 0.34);
-  background: linear-gradient(135deg, rgb(255 228 236 / 0.96), rgb(255 240 189 / 0.86));
+  border-color: rgb(79 169 111 / 0.45);
+  background: var(--cell-great);
 }
 
 .heat-cell {

@@ -20,7 +20,7 @@ function monthKeyFromDate(value: string) {
 
 function formatMonthLabel(monthKey: string) {
   const [year, month] = monthKey.split("-").map(Number);
-  return `${year}年${month}月`;
+  return `${year}年 ${month}月`;
 }
 
 function formatMonthDay(date: string) {
@@ -38,6 +38,10 @@ function totalGems(entry: GrowthLogEntry) {
   return entry.fish.gems + entry.cat.gems + entry.bonus;
 }
 
+function resourceIcon(kind: "gem" | "coin") {
+  return kind === "gem" ? "💎" : "🪙";
+}
+
 function formatCoinDelta(value: number) {
   return value > 0 ? `+${value}` : "0";
 }
@@ -51,19 +55,25 @@ function LogCard({ entry }: { entry: GrowthLogEntry }) {
         </p>
 
         <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
-          🐟{entry.fish.deficit}kcal/{entry.fish.minutes}min
+          🐟 {entry.fish.deficit}kcal/{entry.fish.minutes}min
         </p>
 
         <p className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] leading-4 tabular-nums tracking-tight ui-text-muted sm:text-xs">
-          🐱{entry.cat.deficit}kcal/{entry.cat.minutes}min
+          🐱 {entry.cat.deficit}kcal/{entry.cat.minutes}min
         </p>
 
-        <span className="ui-chip-primary inline-flex h-6 w-[3.45rem] items-center justify-center text-[10px] font-semibold tabular-nums">
-          💎+{totalGems(entry)}
+        <span className="ui-chip-primary inline-flex h-6 w-[3.45rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
+          <span aria-hidden className="text-[0.95em]">
+            {resourceIcon("gem")}
+          </span>
+          +{totalGems(entry)}
         </span>
 
-        <span className="ui-chip-reward inline-flex h-6 w-[3rem] items-center justify-center text-[10px] font-semibold tabular-nums">
-          🪙{formatCoinDelta(entry.coins)}
+        <span className="ui-chip-reward inline-flex h-6 w-[3rem] items-center justify-center gap-0.5 text-[10px] font-semibold tabular-nums">
+          <span aria-hidden className="text-[0.95em]">
+            {resourceIcon("coin")}
+          </span>
+          {formatCoinDelta(entry.coins)}
         </span>
       </div>
     </article>
@@ -122,7 +132,7 @@ export function GrowthLog() {
         onClick={() => setOpen(true)}
         className="ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
       >
-        <span aria-hidden>📖</span>
+        <span aria-hidden>📒</span>
         <span>成长日志</span>
       </button>
 
@@ -152,10 +162,10 @@ export function GrowthLog() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-lg font-bold leading-6 tracking-tight ui-text-main">
-                    📖 成长日志
+                    📒 成长日志
                   </p>
                   <p className="text-xs font-medium leading-4 ui-text-soft">
-                    一起攒下的小脚印
+                    一起攒下的每一天
                   </p>
                 </div>
                 <button
@@ -175,7 +185,7 @@ export function GrowthLog() {
                     className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-lg font-bold leading-none"
                     aria-label="查看上个月"
                   >
-                    ‹
+                    ←
                   </button>
                   <h2
                     id={titleId}
@@ -189,7 +199,7 @@ export function GrowthLog() {
                     className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-lg font-bold leading-none"
                     aria-label="查看下个月"
                   >
-                    ›
+                    →
                   </button>
                 </div>
               </div>

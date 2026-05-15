@@ -2,6 +2,12 @@
 
 import { GEM_CAP, useHomeResources } from "./HomeResourcesProvider";
 
+function resourceIcon(tone: "gem" | "coin" | "heart") {
+  if (tone === "gem") return "💎";
+  if (tone === "coin") return "🪙";
+  return "🔥";
+}
+
 function StatBubble({
   label,
   value,
@@ -20,18 +26,19 @@ function StatBubble({
         ? "ui-tinted-reward"
         : "ui-tinted-growth";
 
+  const icon = resourceIcon(tone);
+
   return (
-    <div
-      className={`ui-card-soft ui-card-item relative overflow-hidden ${toneRing}`}
-    >
+    <div className={`ui-card-soft ui-card-item relative overflow-hidden ${toneRing}`}>
       <p className="text-[11px] font-semibold tracking-wide ui-text-muted">
         {label}
       </p>
-      <p className="mt-0.5 text-[1.1rem] font-bold tabular-nums ui-text-main">
-        {value}
-        <span className="ml-0.5 text-xs font-semibold ui-text-muted">
-          {unit}
+      <p className="mt-0.5 flex items-baseline gap-1 text-[1.1rem] font-bold tabular-nums ui-text-main">
+        <span aria-hidden className="text-[0.95rem]">
+          {icon}
         </span>
+        <span>{value}</span>
+        <span className="text-xs font-semibold ui-text-muted">{unit}</span>
       </p>
     </div>
   );
@@ -45,10 +52,11 @@ function GemTreasureBar({
   max: number;
 }) {
   const pct = Math.min(100, Math.round((current / max) * 100));
+
   return (
     <div className="ui-card-soft ui-card-item ui-sparkle-card relative overflow-hidden">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-bold ui-text-main">宝石小宝箱</span>
+        <span className="text-[13px] font-bold ui-text-main">💎 宝石小宝箱</span>
         <span className="text-[11px] font-semibold tabular-nums ui-text-muted">
           {current} / {max}
         </span>
@@ -66,7 +74,7 @@ function GemTreasureBar({
         />
       </div>
       <p className="mt-1.5 text-[10px] font-medium ui-text-muted">
-        装满会有小惊喜哦
+        装满以后会有小惊喜
       </p>
     </div>
   );
@@ -92,7 +100,7 @@ export function CoupleGrowthPanel() {
           今日小收获
         </h2>
         <span className="text-lg" aria-hidden>
-          📝
+          📒
         </span>
       </div>
       <p className="mt-0.5 text-[10px] font-medium ui-text-muted">

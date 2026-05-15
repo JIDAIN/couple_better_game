@@ -63,12 +63,20 @@ function resourceLabel(kind: ResourceKind) {
   return kind === "gem" ? "宝石" : "金币";
 }
 
+function resourceIcon(kind: ResourceKind) {
+  return kind === "gem" ? "💎" : "🪙";
+}
+
 function categoryTone(kind: ResourceKind) {
   return kind === "gem" ? "ui-chip-primary" : "ui-chip-reward";
 }
 
 function categoryPriceLabel(category: ExchangeCategory) {
-  return `${category.price} ${resourceLabel(category.resourceKind)}`;
+  return `${category.price}${resourceIcon(category.resourceKind)}`;
+}
+
+function recordPriceLabel(price: number, kind: ResourceKind) {
+  return `${price}${resourceIcon(kind)}`;
 }
 
 function formFromCategory(category?: ExchangeCategory | null): CategoryFormState {
@@ -424,9 +432,54 @@ export function ExchangeShop() {
               查看记录
             </button>
           </div>
-          <div className="ui-soft-panel ui-card-compact text-[11px] font-medium ui-text-soft">
-            每一笔小奖励，都是认真生活的痕迹。
-          </div>
+          {exchangeRecords.length > 0 ? (
+            <div className="space-y-1.5">
+              {exchangeRecords.slice(0, 3).map((record) => (
+                <article key={record.id} className="ui-soft-panel ui-card-item">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[10px] font-semibold tracking-wide ui-text-soft">
+                        {record.date}
+                      </p>
+                      <p className="mt-0.5 truncate text-[12px] font-semibold ui-text-main">
+                        {record.icon} {record.category}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                      <span
+                        className={`ui-badge py-0.5 text-[10px] tabular-nums ${getCategoryChipClass(
+                          record.resourceKind,
+                        )}`}
+                      >
+                        {recordPriceLabel(record.price, record.resourceKind)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openEditRecord(record.id)}
+                        className="ui-button-secondary px-3 py-1 text-[11px] font-semibold"
+                      >
+                        编辑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ok = deleteExchangeRecord(record.id);
+                          if (ok) setToast("已删除兑换记录");
+                        }}
+                        className="ui-button-secondary px-3 py-1 text-[11px] font-semibold opacity-80"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="ui-soft-panel ui-card-compact text-[11px] font-medium ui-text-soft">
+              还没有兑换记录，攒到喜欢的奖励再来换吧。
+            </div>
+          )}
         </section>
       </div>
     );
@@ -470,7 +523,7 @@ export function ExchangeShop() {
                 {resourceLabel(category.resourceKind)}
               </span>
               <span className="ui-badge ui-chip-plain py-0.5 text-[10px]">
-                消耗 {categoryPriceLabel(category)}
+                {categoryPriceLabel(category)}
               </span>
             </div>
           </div>
@@ -558,15 +611,15 @@ export function ExchangeShop() {
           >
             <div className="flex items-start justify-between gap-3 pb-3">
               <div>
-                <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
-                  已兑换记录
-                </p>
                 <h3
                   id={overlayTitleId}
-                  className="mt-0.5 text-base font-semibold tracking-tight ui-text-main"
+                  className="text-base font-semibold tracking-tight ui-text-main"
                 >
-                  轻量时间线
+                  兑换记录
                 </h3>
+                <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
+                  最近的小奖励都在这里
+                </p>
               </div>
               <button
                 type="button"
@@ -584,20 +637,24 @@ export function ExchangeShop() {
                     key={record.id}
                     className="ui-soft-panel ui-card-item"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
+                        <p className="truncate text-[10px] font-semibold tracking-wide ui-text-soft">
                           {record.date}
                         </p>
-                        <p className="mt-1 text-sm font-medium ui-text-main">
+                        <p className="mt-0.5 truncate text-[12px] font-semibold ui-text-main">
                           {record.icon} {record.category}
                           {record.remark ? ` · ${record.remark}` : ""}
                         </p>
-                        <p className="mt-1 text-[11px] font-semibold ui-text-muted">
-                          消耗 {record.price} {resourceLabel(record.resourceKind)}
-                        </p>
                       </div>
-                      <div className="flex shrink-0 flex-col gap-1.5">
+                      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                        <span
+                          className={`ui-badge py-0.5 text-[10px] tabular-nums ${getCategoryChipClass(
+                            record.resourceKind,
+                          )}`}
+                        >
+                          {recordPriceLabel(record.price, record.resourceKind)}
+                        </span>
                         <button
                           type="button"
                           onClick={() => openEditRecord(record.id)}
@@ -693,8 +750,8 @@ export function ExchangeShop() {
               >
                 {resourceLabel(displayResource)}
               </span>
-              <span className="ui-badge ui-chip-plain py-1 text-[11px]">
-                消耗 {displayPrice} {resourceLabel(displayResource)}
+              <span className={`ui-badge ui-chip-plain py-1 text-[11px] tabular-nums ${getCategoryChipClass(displayResource)}`}>
+                {recordPriceLabel(displayPrice, displayResource)}
               </span>
             </div>
 

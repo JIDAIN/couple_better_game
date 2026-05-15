@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { useHomeResources } from "./HomeResourcesProvider";
@@ -668,13 +668,13 @@ export function RecordTodaySettlement({
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐟 今日宝石</span>
                         <span className="tabular-nums ui-text-primary">
-                          +{preview.fg}
+                          💎 +{preview.fg}
                         </span>
                       </li>
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐱 今日宝石</span>
                         <span className="tabular-nums ui-text-primary">
-                          +{preview.cg}
+                          💎 +{preview.cg}
                         </span>
                       </li>
                       <li className="ui-tinted-reward flex flex-col gap-1 rounded-2xl px-2.5 py-2">
@@ -697,12 +697,12 @@ export function RecordTodaySettlement({
                           <span
                             className={
                               preview.coin.delta > 0
-                                ? "tabular-nums ui-text-reward"
-                                : "text-[11px] font-medium ui-text-soft"
+                                ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
+                                : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
                             }
                           >
                             {preview.coin.delta > 0
-                              ? `+${preview.coin.delta}`
+                              ? `🪙 +${preview.coin.delta}`
                               : "未触发"}
                           </span>
                         </div>
@@ -874,13 +874,13 @@ export function RecordTodaySettlement({
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐟 鱼鱼宝石</span>
                         <span className="tabular-nums ui-text-primary">
-                          +{historyPreview.fg}
+                          💎 +{historyPreview.fg}
                         </span>
                       </li>
                       <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
                         <span>🐱 猫猫宝石</span>
                         <span className="tabular-nums ui-text-primary">
-                          +{historyPreview.cg}
+                          💎 +{historyPreview.cg}
                         </span>
                       </li>
                       <li className="ui-tinted-reward flex flex-col gap-1 rounded-2xl px-2.5 py-2">
@@ -903,12 +903,12 @@ export function RecordTodaySettlement({
                           <span
                             className={
                               historyPreview.coin.delta > 0
-                                ? "tabular-nums ui-text-reward"
-                                : "text-[11px] font-medium ui-text-soft"
+                                ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
+                                : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
                             }
                           >
                             {historyPreview.coin.delta > 0
-                              ? `+${historyPreview.coin.delta}`
+                              ? `🪙 +${historyPreview.coin.delta}`
                               : "未触发"}
                           </span>
                         </div>
