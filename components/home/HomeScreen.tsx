@@ -83,8 +83,7 @@ export function HomeScreen() {
 
           <RecordTodayButton buttonVariant="today" />
 
-          <div className="grid w-full grid-cols-3 gap-2 pt-1">
-            <RecordTodayButton buttonVariant="history" />
+          <div className="grid w-full grid-cols-2 gap-2 pt-1">
             <GrowthLog />
             <ExchangeShop />
           </div>

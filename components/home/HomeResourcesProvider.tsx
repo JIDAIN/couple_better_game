@@ -23,7 +23,10 @@ import { createLocalStorageAppDataStore } from "@/lib/home/local-storage-app-dat
 import { computeGemWallet } from "@/lib/home/home-stat-service";
 import {
   applyTodayRecordToState,
+  deleteDailyRecordFromState,
   deleteHistoricalRecordFromState,
+  updateDailyRecordInState,
+  upsertDailyRecordInState,
   upsertHistoricalRecordInState,
 } from "@/lib/home/daily-record-service";
 import {
@@ -130,6 +133,17 @@ type HomeResourcesContextValue = {
   upsertHistoricalRecord: (
     payload: HistoricalRecordDraft,
   ) => HistoricalRecordResult;
+  upsertDailyRecord: (
+    recordDate: string,
+    fish: TodayRecordSidePayload,
+    cat: TodayRecordSidePayload,
+  ) => HistoricalRecordResult;
+  updateDailyRecord: (
+    recordDate: string,
+    fish: TodayRecordSidePayload,
+    cat: TodayRecordSidePayload,
+  ) => HistoricalRecordResult;
+  deleteDailyRecord: (recordDate: string) => boolean;
   deleteHistoricalRecord: (recordId: string) => boolean;
   updateExchangeRecord: (
     recordId: string,
@@ -322,6 +336,62 @@ export function HomeResourcesProvider({
     [commitHomeState],
   );
 
+  const upsertDailyRecord = useCallback(
+    (
+      recordDate: string,
+      fish: TodayRecordSidePayload,
+      cat: TodayRecordSidePayload,
+    ): HistoricalRecordResult => {
+      let result: HistoricalRecordResult = {
+        ok: false,
+        updatedExisting: false,
+      };
+      commitHomeState((state) => {
+        const next = upsertDailyRecordInState(state, recordDate, fish, cat);
+        result = next.result;
+        if (!next.result.ok) return state;
+        return next.state;
+      });
+      return result;
+    },
+    [commitHomeState],
+  );
+
+  const updateDailyRecord = useCallback(
+    (
+      recordDate: string,
+      fish: TodayRecordSidePayload,
+      cat: TodayRecordSidePayload,
+    ): HistoricalRecordResult => {
+      let result: HistoricalRecordResult = {
+        ok: false,
+        updatedExisting: false,
+      };
+      commitHomeState((state) => {
+        const next = updateDailyRecordInState(state, recordDate, fish, cat);
+        result = next.result;
+        if (!next.result.ok) return state;
+        return next.state;
+      });
+      return result;
+    },
+    [commitHomeState],
+  );
+
+  const deleteDailyRecord = useCallback(
+    (recordDate: string) => {
+      let deleted = false;
+      commitHomeState((state) => {
+        const next = deleteDailyRecordFromState(state, recordDate);
+        deleted = next.deleted;
+        if (!next.deleted) return state;
+        return next.state;
+      });
+      return deleted;
+    },
+    [commitHomeState],
+  );
+
   const deleteHistoricalRecord = useCallback(
     (recordId: string) => {
       let deleted = false;
@@ -412,6 +482,9 @@ export function HomeResourcesProvider({
       applyTodayRecord,
       applyHistoricalRecord,
       upsertHistoricalRecord,
+      upsertDailyRecord,
+      updateDailyRecord,
+      deleteDailyRecord,
       deleteHistoricalRecord,
       updateExchangeRecord,
       deleteExchangeRecord,
@@ -426,6 +499,9 @@ export function HomeResourcesProvider({
       applyTodayRecord,
       applyHistoricalRecord,
       upsertHistoricalRecord,
+      upsertDailyRecord,
+      updateDailyRecord,
+      deleteDailyRecord,
       deleteHistoricalRecord,
       updateExchangeRecord,
       deleteExchangeRecord,

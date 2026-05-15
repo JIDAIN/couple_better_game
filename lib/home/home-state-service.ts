@@ -4,7 +4,7 @@ import {
   type AppDataStore,
 } from "./app-data-store";
 import { normalizeExchangeCategories, normalizeExchangeRecord } from "./exchange-service";
-import { normalizeDailyRecord } from "./daily-record-utils";
+import { normalizeDailyRecord, orderDailyRecords, recordIsoDate } from "./daily-record-utils";
 import {
   importMayHistoryRecords,
   recalculateCoinsWithCurrentRules,
@@ -70,6 +70,14 @@ function normalizeCoinRules(
       fallback.deficitStreakDays,
     ),
   };
+}
+
+function normalizeDailyRecords(records: HomeResourcesState["dailyRecords"]) {
+  const byDate = new Map<string, HomeResourcesState["dailyRecords"][number]>();
+  for (const record of records.map(normalizeDailyRecord)) {
+    byDate.set(recordIsoDate(record), record);
+  }
+  return orderDailyRecords([...byDate.values()]);
 }
 
 export function createDefaultHomeResourcesState(
@@ -164,7 +172,7 @@ export function readHomeResourcesState(
       catHeatmapOverrides:
         parsed.catHeatmapOverrides ?? fallback.catHeatmapOverrides,
       dailyRecords: Array.isArray(parsed.dailyRecords)
-        ? parsed.dailyRecords.map(normalizeDailyRecord)
+        ? normalizeDailyRecords(parsed.dailyRecords)
         : fallback.dailyRecords,
       exchangeRecords: Array.isArray(parsed.exchangeRecords)
         ? parsed.exchangeRecords.map((record) =>

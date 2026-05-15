@@ -3,7 +3,10 @@ import { DEFAULT_EXCHANGE_CATEGORIES } from "../../lib/home/home-default-config"
 import {
   applyTodayRecordToState,
   createTodayDailyRecord,
+  deleteDailyRecordFromState,
   deleteHistoricalRecordFromState,
+  updateDailyRecordInState,
+  upsertDailyRecordInState,
   upsertHistoricalRecordInState,
 } from "../../lib/home/daily-record-service";
 import { previousIsoDate, todayIsoDate, parseIsoDate } from "../../lib/home/date-utils";
@@ -145,6 +148,72 @@ describe("daily record service", () => {
     expect(updated.state.dailyRecords).toHaveLength(1);
     expect(updated.state.dailyRecords[0].fish.gems).toBe(5);
     expect(updated.state.dailyRecords[0].cat.gems).toBe(3);
+  });
+
+  it("upserts daily records by date without creating duplicates", () => {
+    const recordDate = previousIsoDate(todayIsoDate()) ?? todayIsoDate();
+    const initial = upsertDailyRecordInState(
+      makeState(),
+      recordDate,
+      { weightKg: 50, deficit: 300, minutes: 30 },
+      { weightKg: 44, deficit: 200, minutes: 30 },
+    );
+    const updated = upsertDailyRecordInState(
+      initial.state,
+      recordDate,
+      { weightKg: 50, deficit: 500, minutes: 60 },
+      { weightKg: 44, deficit: 100, minutes: 0 },
+    );
+
+    expect(initial.result.updatedExisting).toBe(false);
+    expect(updated.result.updatedExisting).toBe(true);
+    expect(updated.state.dailyRecords).toHaveLength(1);
+    expect(updated.state.dailyRecords[0].fish.deficit).toBe(500);
+    expect(updated.state.dailyRecords[0].cat.deficit).toBe(100);
+  });
+
+  it("updates only existing daily records by date", () => {
+    const recordDate = previousIsoDate(todayIsoDate()) ?? todayIsoDate();
+    const missing = updateDailyRecordInState(
+      makeState(),
+      recordDate,
+      { weightKg: 50, deficit: 300, minutes: 30 },
+      { weightKg: 44, deficit: 200, minutes: 30 },
+    );
+    const withRecord = upsertDailyRecordInState(
+      makeState(),
+      recordDate,
+      { weightKg: 50, deficit: 300, minutes: 30 },
+      { weightKg: 44, deficit: 200, minutes: 30 },
+    ).state;
+    const updated = updateDailyRecordInState(
+      withRecord,
+      recordDate,
+      { weightKg: 50, deficit: 500, minutes: 60 },
+      { weightKg: 44, deficit: 200, minutes: 30 },
+    );
+
+    expect(missing.result.ok).toBe(false);
+    expect(missing.state.dailyRecords).toHaveLength(0);
+    expect(updated.result.ok).toBe(true);
+    expect(updated.state.dailyRecords).toHaveLength(1);
+    expect(updated.state.dailyRecords[0].fish.deficit).toBe(500);
+  });
+
+  it("deletes daily records by date", () => {
+    const recordDate = previousIsoDate(todayIsoDate()) ?? todayIsoDate();
+    const withRecord = upsertDailyRecordInState(
+      makeState(),
+      recordDate,
+      { weightKg: 50, deficit: 300, minutes: 30 },
+      { weightKg: 44, deficit: 200, minutes: 30 },
+    ).state;
+
+    const deleted = deleteDailyRecordFromState(withRecord, recordDate);
+
+    expect(deleted.deleted).toBe(true);
+    expect(deleted.state.dailyRecords).toHaveLength(0);
+    expect(deleted.state.wallet.gems).toBe(0);
   });
 
   it("deletes historical records and recomputes summary state", () => {

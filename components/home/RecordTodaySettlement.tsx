@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { useHomeResources } from "./HomeResourcesProvider";
+import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider";
 import {
-  buildHeatmapDay,
   computeCoinPreview,
   computeCoupleBonus,
   getCurrentIsoDate,
@@ -11,11 +10,51 @@ import {
   isInCoinWeek,
   parseNonNegativeInt,
   parseOptionalWeight,
-  type PersonKey,
   type SideLogInput,
 } from "./settlement-rules";
 
-type HistoryEditMode = "single" | "both";
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function parseDateInputDay(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return day;
+}
+
+function previousDateInputValue(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
+  date.setDate(date.getDate() - 1);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
+    date.getDate(),
+  )}`;
+}
+
+function recordIsoDate(record: { recordDate?: string; day: number }) {
+  return record.recordDate ?? `2026-05-${pad2(record.day)}`;
+}
+
+function totalRecordGems(record: DailyRecord) {
+  return record.fish.gems + record.cat.gems + record.bonus;
+}
 
 function SoftField({
   label,
@@ -110,104 +149,6 @@ function PartnerColumn({
   );
 }
 
-function HistoryPartnerCard({
-  emoji,
-  title,
-  deficit,
-  setDeficit,
-  minutes,
-  setMinutes,
-}: {
-  emoji: string;
-  title: string;
-  deficit: string;
-  setDeficit: (value: string) => void;
-  minutes: string;
-  setMinutes: (value: string) => void;
-}) {
-  return (
-    <div className="ui-soft-panel ui-card-item">
-      <div className="mb-2 flex items-center gap-2">
-        <span aria-hidden>{emoji}</span>
-        <p className="text-xs font-bold ui-text-main">{title}</p>
-      </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        <SoftField
-          label="热量缺口"
-          value={deficit}
-          onChange={setDeficit}
-          inputMode="numeric"
-          unit="kcal"
-        />
-        <SoftField
-          label="运动时长"
-          value={minutes}
-          onChange={setMinutes}
-          inputMode="numeric"
-          unit="分钟"
-        />
-      </div>
-    </div>
-  );
-}
-
-function pad2(value: number) {
-  return String(value).padStart(2, "0");
-}
-
-function toDateInputValue(date: Date) {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(
-    date.getDate(),
-  )}`;
-}
-
-function getDefaultHistoryDate() {
-  const date = new Date();
-  date.setDate(date.getDate() - 1);
-  return toDateInputValue(date);
-}
-
-function parseDateInputDay(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  const date = new Date(year, month - 1, day);
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
-    return null;
-  }
-  return day;
-}
-
-function previousDateInputValue(value: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) return null;
-  const date = new Date(
-    Number(match[1]),
-    Number(match[2]) - 1,
-    Number(match[3]),
-  );
-  date.setDate(date.getDate() - 1);
-  return toDateInputValue(date);
-}
-
-function recordIsoDate(record: { recordDate?: string; day: number }) {
-  return record.recordDate ?? `2026-05-${pad2(record.day)}`;
-}
-
-function totalRecordGems(record: {
-  fish: { gems: number };
-  cat: { gems: number };
-  bonus: number;
-}) {
-  return record.fish.gems + record.cat.gems + record.bonus;
-}
-
 type RecordTodayButtonVariant = "full" | "today" | "history";
 
 type RecordTodaySettlementProps = {
@@ -218,19 +159,18 @@ export function RecordTodaySettlement({
   buttonVariant = "full",
 }: RecordTodaySettlementProps) {
   const {
-    applyTodayRecord,
     coinRules,
     dailyRecords,
-    upsertHistoricalRecord,
+    upsertDailyRecord,
     visualRules,
-    weekGemTotal,
   } = useHomeResources();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<"today" | "history">("today");
   const [entered, setEntered] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const titleId = useId();
 
+  const todayDate = useMemo(() => getCurrentIsoDate(), []);
+  const [recordDate, setRecordDate] = useState(todayDate);
   const [fishW, setFishW] = useState("");
   const [fishD, setFishD] = useState("0");
   const [fishM, setFishM] = useState("0");
@@ -238,13 +178,30 @@ export function RecordTodaySettlement({
   const [catD, setCatD] = useState("0");
   const [catM, setCatM] = useState("0");
 
-  const [historyDate, setHistoryDate] = useState(getDefaultHistoryDate);
-  const [historyMode, setHistoryMode] = useState<HistoryEditMode>("single");
-  const [historyPerson, setHistoryPerson] = useState<PersonKey>("fish");
-  const [historyFishD, setHistoryFishD] = useState("0");
-  const [historyFishM, setHistoryFishM] = useState("0");
-  const [historyCatD, setHistoryCatD] = useState("0");
-  const [historyCatM, setHistoryCatM] = useState("0");
+  const existingRecord = useMemo(
+    () =>
+      dailyRecords.find((record) => recordIsoDate(record) === recordDate) ??
+      null,
+    [dailyRecords, recordDate],
+  );
+
+  const hydrateInputs = useCallback((record: DailyRecord | null) => {
+    setFishW(record?.fish.weightKg == null ? "" : String(record.fish.weightKg));
+    setFishD(String(record?.fish.deficit ?? 0));
+    setFishM(String(record?.fish.minutes ?? 0));
+    setCatW(record?.cat.weightKg == null ? "" : String(record.cat.weightKg));
+    setCatD(String(record?.cat.deficit ?? 0));
+    setCatM(String(record?.cat.minutes ?? 0));
+  }, []);
+
+  const openSheet = useCallback(() => {
+    const date = todayDate;
+    const record =
+      dailyRecords.find((item) => recordIsoDate(item) === date) ?? null;
+    setRecordDate(date);
+    hydrateInputs(record);
+    setOpen(true);
+  }, [dailyRecords, hydrateInputs, todayDate]);
 
   const fishInput: SideLogInput = useMemo(
     () => ({
@@ -263,77 +220,42 @@ export function RecordTodaySettlement({
     [catD, catM, catW],
   );
 
-  const maxHistoryDate = useMemo(() => toDateInputValue(new Date()), []);
-  const historyFishInput: SideLogInput = useMemo(
-    () => ({
-      weightKg: null,
-      deficit: parseNonNegativeInt(historyFishD),
-      minutes: parseNonNegativeInt(historyFishM),
-    }),
-    [historyFishD, historyFishM],
-  );
-  const historyCatInput: SideLogInput = useMemo(
-    () => ({
-      weightKg: null,
-      deficit: parseNonNegativeInt(historyCatD),
-      minutes: parseNonNegativeInt(historyCatM),
-    }),
-    [historyCatD, historyCatM],
-  );
-
-  const historyDay = useMemo(() => parseDateInputDay(historyDate), [historyDate]);
-  const existingHistoryRecord = useMemo(
-    () =>
-      dailyRecords.find((record) => recordIsoDate(record) === historyDate) ??
-      null,
-    [dailyRecords, historyDate],
-  );
-  const historyYesterdayRecord = useMemo(() => {
-    const previousDate = previousDateInputValue(historyDate);
-    if (!previousDate) return null;
-    return (
-      dailyRecords.find((record) => recordIsoDate(record) === previousDate) ??
-      null
-    );
-  }, [dailyRecords, historyDate]);
-
-  const todayDate = useMemo(() => getCurrentIsoDate(), []);
-  const settlementDay = useMemo(
-    () => parseDateInputDay(todayDate) ?? new Date().getDate(),
-    [todayDate],
+  const recordDay = useMemo(
+    () => parseDateInputDay(recordDate),
+    [recordDate],
   );
   const yesterdayRecord = useMemo(() => {
-    const previousDate = previousDateInputValue(todayDate);
+    const previousDate = previousDateInputValue(recordDate);
     if (!previousDate) return null;
     return (
       dailyRecords.find((record) => recordIsoDate(record) === previousDate) ??
       null
     );
-  }, [dailyRecords, todayDate]);
-
-  const hydrateHistoryInputs = useCallback(
-    (record: typeof existingHistoryRecord) => {
-      setHistoryFishD(String(record?.fish.deficit ?? 0));
-      setHistoryFishM(String(record?.fish.minutes ?? 0));
-      setHistoryCatD(String(record?.cat.deficit ?? 0));
-      setHistoryCatM(String(record?.cat.minutes ?? 0));
-    },
-    [],
-  );
+  }, [dailyRecords, recordDate]);
 
   const preview = useMemo(() => {
     const fg = gemsForPerson("fish", fishInput, yesterdayRecord);
     const cg = gemsForPerson("cat", catInput, yesterdayRecord);
     const couple = computeCoupleBonus(fishInput, catInput);
+    const recordsWithoutExisting = existingRecord
+      ? dailyRecords.filter((record) => record.id !== existingRecord.id)
+      : dailyRecords;
+    const weekGemTotalForDate = recordsWithoutExisting.reduce(
+      (total, record) =>
+        isInCoinWeek(recordIsoDate(record), recordDate, coinRules.weekStartDay)
+          ? total + totalRecordGems(record)
+          : total,
+      0,
+    );
     const todayGemTotal = fg + cg + couple.gems;
     const coin = computeCoinPreview({
       fish: fishInput,
       cat: catInput,
-      todayDay: settlementDay,
-      todayDate,
+      todayDay: recordDay ?? 1,
+      todayDate: recordDate,
       todayGemTotal,
-      currentWeekGemTotal: weekGemTotal,
-      dailyRecords,
+      currentWeekGemTotal: weekGemTotalForDate,
+      dailyRecords: recordsWithoutExisting,
       coinRules,
       visualRules,
     });
@@ -342,80 +264,12 @@ export function RecordTodaySettlement({
     catInput,
     coinRules,
     dailyRecords,
+    existingRecord,
     fishInput,
-    settlementDay,
-    todayDate,
+    recordDate,
+    recordDay,
     visualRules,
-    weekGemTotal,
     yesterdayRecord,
-  ]);
-
-  const historyPreview = useMemo(() => {
-    const zeroInput: SideLogInput = { weightKg: null, deficit: 0, minutes: 0 };
-    const existingFish = existingHistoryRecord
-      ? {
-          weightKg: existingHistoryRecord.fish.weightKg,
-          deficit: existingHistoryRecord.fish.deficit,
-          minutes: existingHistoryRecord.fish.minutes,
-        }
-      : zeroInput;
-    const existingCat = existingHistoryRecord
-      ? {
-          weightKg: existingHistoryRecord.cat.weightKg,
-          deficit: existingHistoryRecord.cat.deficit,
-          minutes: existingHistoryRecord.cat.minutes,
-        }
-      : zeroInput;
-    const fish =
-      historyMode === "both"
-        ? historyFishInput
-        : historyPerson === "fish"
-          ? historyFishInput
-          : existingFish;
-    const cat =
-      historyMode === "both"
-        ? historyCatInput
-        : historyPerson === "cat"
-          ? historyCatInput
-          : existingCat;
-    const fg = gemsForPerson("fish", fish, historyYesterdayRecord);
-    const cg = gemsForPerson("cat", cat, historyYesterdayRecord);
-    const couple = computeCoupleBonus(fish, cat);
-    const recordsWithoutExisting = existingHistoryRecord
-      ? dailyRecords.filter((record) => record.id !== existingHistoryRecord.id)
-      : dailyRecords;
-    const weekGemTotalForHistory = recordsWithoutExisting.reduce(
-      (total, record) =>
-        isInCoinWeek(recordIsoDate(record), historyDate, coinRules.weekStartDay)
-          ? total + totalRecordGems(record)
-          : total,
-      0,
-    );
-    const todayGemTotal = fg + cg + couple.gems;
-    const coin = computeCoinPreview({
-      fish,
-      cat,
-      todayDay: historyDay ?? 1,
-      todayDate: historyDate,
-      todayGemTotal,
-      currentWeekGemTotal: weekGemTotalForHistory,
-      dailyRecords: recordsWithoutExisting,
-      coinRules,
-      visualRules,
-    });
-    return { fg, cg, couple, coin };
-  }, [
-    coinRules,
-    dailyRecords,
-    existingHistoryRecord,
-    historyCatInput,
-    historyDate,
-    historyDay,
-    historyFishInput,
-    historyMode,
-    historyPerson,
-    historyYesterdayRecord,
-    visualRules,
   ]);
 
   const hasAnyEffort = useMemo(
@@ -428,20 +282,6 @@ export function RecordTodaySettlement({
       catInput.weightKg != null,
     [catInput, fishInput],
   );
-
-  const hasAnyHistoryEffort = useMemo(() => {
-    if (historyMode === "both") {
-      return (
-        historyFishInput.deficit > 0 ||
-        historyFishInput.minutes > 0 ||
-        historyCatInput.deficit > 0 ||
-        historyCatInput.minutes > 0
-      );
-    }
-    return historyPerson === "fish"
-      ? historyFishInput.deficit > 0 || historyFishInput.minutes > 0
-      : historyCatInput.deficit > 0 || historyCatInput.minutes > 0;
-  }, [historyCatInput, historyFishInput, historyMode, historyPerson]);
 
   useEffect(() => {
     if (!open) {
@@ -479,97 +319,54 @@ export function RecordTodaySettlement({
   }, [toast]);
 
   const onConfirm = useCallback(() => {
-    if (!hasAnyEffort) return;
-    applyTodayRecord({
-      day: settlementDay,
-      fish: fishInput,
-      cat: catInput,
-      fishHeat: buildHeatmapDay("fish", fishInput, visualRules),
-      catHeat: buildHeatmapDay("cat", catInput, visualRules),
-      fishGems: preview.fg,
-      catGems: preview.cg,
-      bonusGems: preview.couple.gems,
-      coinDelta: preview.coin.delta,
-    });
-    setOpen(false);
-    setFishW("");
-    setCatW("");
-    setFishD("0");
-    setFishM("0");
-    setCatD("0");
-    setCatM("0");
-    setToast("今天已经存好啦，明天继续并肩");
-  }, [applyTodayRecord, catInput, fishInput, hasAnyEffort, preview, settlementDay, visualRules]);
-
-  const onSaveHistory = useCallback(() => {
-    if (!hasAnyHistoryEffort || historyDay == null) return;
-    const result = upsertHistoricalRecord({
-      recordDate: historyDate,
-      fish:
-        historyMode === "both" || historyPerson === "fish"
-          ? {
-              weightKg: null,
-              deficit: historyFishInput.deficit,
-              minutes: historyFishInput.minutes,
-            }
-          : null,
-      cat:
-        historyMode === "both" || historyPerson === "cat"
-          ? {
-              weightKg: null,
-              deficit: historyCatInput.deficit,
-              minutes: historyCatInput.minutes,
-            }
-          : null,
-    });
+    if (!hasAnyEffort || recordDay == null) return;
+    const result = upsertDailyRecord(recordDate, fishInput, catInput);
     if (!result.ok) {
-      setToast(result.reason === "future-date" ? "不能补记未来日期" : "请选择有效日期");
+      setToast(
+        result.reason === "future-date"
+          ? "不能记录未来日期"
+          : "请选择有效日期",
+      );
       return;
     }
     setOpen(false);
-    setHistoryFishD("0");
-    setHistoryFishM("0");
-    setHistoryCatD("0");
-    setHistoryCatM("0");
-    setToast(result.updatedExisting ? "这一天已经更新完成" : "历史记录已保存");
-  }, [hasAnyHistoryEffort, historyCatInput, historyDate, historyDay, historyFishInput, historyMode, historyPerson, upsertHistoricalRecord]);
+    setToast(
+      recordDate === todayDate
+        ? "今天已经存好啦，明天继续并肩"
+        : result.updatedExisting
+          ? "这一天已经更新完成"
+          : "这一天已经补录完成",
+    );
+  }, [
+    catInput,
+    fishInput,
+    hasAnyEffort,
+    recordDate,
+    recordDay,
+    todayDate,
+    upsertDailyRecord,
+  ]);
+
+  const buttonLabel =
+    buttonVariant === "history" ? "补录记录" : "记录今天";
 
   return (
     <>
       <div className="space-y-2 pt-1">
-        {buttonVariant === "full" || buttonVariant === "today" ? (
-          <button
-            type="button"
-            onClick={() => {
-              setMode("today");
-              setOpen(true);
-            }}
-            className="ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-semibold text-white will-change-transform sm:py-4"
-          >
-            <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
-              记录今天
-            </span>
-          </button>
-        ) : null}
-        {buttonVariant === "full" || buttonVariant === "history" ? (
-          <button
-            type="button"
-            onClick={() => {
-              setMode("history");
-              const nextDate = getDefaultHistoryDate();
-              const nextRecord =
-                dailyRecords.find((record) => recordIsoDate(record) === nextDate) ??
-                null;
-              setHistoryDate(nextDate);
-              hydrateHistoryInputs(nextRecord);
-              setOpen(true);
-            }}
-            className="ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
-          >
-            <span aria-hidden>📝</span>
-            <span>补录记录</span>
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={openSheet}
+          className={
+            buttonVariant === "history"
+              ? "ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
+              : "ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-semibold text-white will-change-transform sm:py-4"
+          }
+        >
+          <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
+            {buttonVariant === "history" ? <span aria-hidden>📝</span> : null}
+            {buttonLabel}
+          </span>
+        </button>
       </div>
 
       {open ? (
@@ -594,274 +391,126 @@ export function RecordTodaySettlement({
           >
             <div className="ui-modal-header shrink-0">
               <p className="text-[10px] font-bold tracking-[0.2em] ui-text-primary">
-                {mode === "today" ? "今日收工啦" : "补记一颗星"}
+                {recordDate === todayDate ? "今日收工啦" : "补录这一天"}
               </p>
               <h2 id={titleId} className="mt-1 text-lg font-bold ui-text-main">
-                {mode === "today" ? "今天的小记录" : "历史记录补记"}
+                {recordDate === todayDate ? "今天的小记录" : "保存这一天"}
               </h2>
               <p className="mt-1 text-xs ui-text-muted">
-                {mode === "today"
-                  ? "一起把今天轻轻收进小背包"
-                  : "支持单人补记，也支持双人同时更新"}
+                选择日期后填写双人数据，已有记录会自动带出来。
               </p>
             </div>
 
             <div className="ui-modal-body">
-              {mode === "today" ? (
-                <>
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                    <PartnerColumn
-                      emoji="🐟"
-                      title="鱼鱼这边"
-                      weight={fishW}
-                      setWeight={setFishW}
-                      deficit={fishD}
-                      setDeficit={setFishD}
-                      minutes={fishM}
-                      setMinutes={setFishM}
-                    />
-                    <PartnerColumn
-                      emoji="🐱"
-                      title="猫猫这边"
-                      weight={catW}
-                      setWeight={setCatW}
-                      deficit={catD}
-                      setDeficit={setCatD}
-                      minutes={catM}
-                      setMinutes={setCatM}
-                    />
-                  </div>
+              <label className="mb-3 block">
+                <span className="ui-field-label">记录日期</span>
+                <input
+                  type="date"
+                  value={recordDate}
+                  max={todayDate}
+                  onChange={(event) => {
+                    const nextDate = event.target.value;
+                    const nextRecord =
+                      dailyRecords.find(
+                        (record) => recordIsoDate(record) === nextDate,
+                      ) ?? null;
+                    setRecordDate(nextDate);
+                    hydrateInputs(nextRecord);
+                  }}
+                  className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
+                />
+              </label>
 
-                  <div className="ui-soft-panel ui-card-item mt-4">
-                    <p className="text-center text-[11px] font-bold ui-text-reward">
-                      今日小奖励
-                    </p>
-                    <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
-                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>🐟 今日宝石</span>
-                        <span className="tabular-nums ui-text-primary">💎 +{preview.fg}</span>
-                      </li>
-                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>🐱 今日宝石</span>
-                        <span className="tabular-nums ui-text-primary">💎 +{preview.cg}</span>
-                      </li>
-                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>情侣 bonus</span>
-                        <span className="tabular-nums ui-text-primary">
-                          {preview.couple.gems > 0 ? `💎 +${preview.couple.gems}` : "—"}
-                        </span>
-                      </li>
-                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>金币变化</span>
-                        <span
-                          className={
-                            preview.coin.delta > 0
-                              ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                              : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
-                          }
-                        >
-                          {preview.coin.delta > 0
-                            ? `🪙 +${preview.coin.delta}`
-                            : "未触发"}
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
+              {existingRecord ? (
+                <p className="mb-3 rounded-2xl bg-white/55 px-3 py-2 text-center text-[11px] font-semibold ui-text-muted">
+                  这一天已有记录，保存后会覆盖原记录
+                </p>
+              ) : null}
 
-                  <div className="ui-modal-footer">
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
-                    >
-                      下次再记
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!hasAnyEffort}
-                      onClick={onConfirm}
-                      className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      存好今天
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <div className="space-y-3">
-                  <label className="block">
-                    <span className="ui-field-label">日期</span>
-                    <input
-                      type="date"
-                      value={historyDate}
-                      max={maxHistoryDate}
-                      onChange={(event) => {
-                        const nextDate = event.target.value;
-                        const nextRecord =
-                          dailyRecords.find((record) => recordIsoDate(record) === nextDate) ??
-                          null;
-                        setHistoryDate(nextDate);
-                        hydrateHistoryInputs(nextRecord);
-                      }}
-                      className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
-                    />
-                  </label>
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                <PartnerColumn
+                  emoji="🐟"
+                  title="鱼鱼这边"
+                  weight={fishW}
+                  setWeight={setFishW}
+                  deficit={fishD}
+                  setDeficit={setFishD}
+                  minutes={fishM}
+                  setMinutes={setFishM}
+                />
+                <PartnerColumn
+                  emoji="🐱"
+                  title="猫猫这边"
+                  weight={catW}
+                  setWeight={setCatW}
+                  deficit={catD}
+                  setDeficit={setCatD}
+                  minutes={catM}
+                  setMinutes={setCatM}
+                />
+              </div>
 
-                  <div>
-                    <p className="ui-field-label">编辑方式</p>
-                    <div className="mt-1 grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setHistoryMode("single")}
-                        className={`ui-tab flex text-sm transition ${
-                          historyMode === "single" ? "ui-tab-active" : "ui-tab-idle"
-                        }`}
-                      >
-                        单人
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHistoryMode("both")}
-                        className={`ui-tab flex text-sm transition ${
-                          historyMode === "both" ? "ui-tab-active" : "ui-tab-idle"
-                        }`}
-                      >
-                        双人
-                      </button>
-                    </div>
-                  </div>
-
-                  {historyMode === "single" ? (
-                    <>
-                      <div>
-                        <p className="ui-field-label">用户</p>
-                        <div className="mt-1 grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setHistoryPerson("fish")}
-                            className={`ui-tab flex text-sm transition ${
-                              historyPerson === "fish" ? "ui-tab-active" : "ui-tab-idle"
-                            }`}
-                          >
-                            🐟 鱼鱼
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setHistoryPerson("cat")}
-                            className={`ui-tab flex text-sm transition ${
-                              historyPerson === "cat" ? "ui-tab-active" : "ui-tab-idle"
-                            }`}
-                          >
-                            🐱 猫猫
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <SoftField
-                          label="热量缺口"
-                          value={historyPerson === "fish" ? historyFishD : historyCatD}
-                          onChange={
-                            historyPerson === "fish" ? setHistoryFishD : setHistoryCatD
-                          }
-                          inputMode="numeric"
-                          unit="kcal"
-                        />
-                        <SoftField
-                          label="运动时长"
-                          value={historyPerson === "fish" ? historyFishM : historyCatM}
-                          onChange={
-                            historyPerson === "fish" ? setHistoryFishM : setHistoryCatM
-                          }
-                          inputMode="numeric"
-                          unit="分钟"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="space-y-2.5">
-                      <HistoryPartnerCard
-                        emoji="🐟"
-                        title="鱼鱼"
-                        deficit={historyFishD}
-                        setDeficit={setHistoryFishD}
-                        minutes={historyFishM}
-                        setMinutes={setHistoryFishM}
-                      />
-                      <HistoryPartnerCard
-                        emoji="🐱"
-                        title="猫猫"
-                        deficit={historyCatD}
-                        setDeficit={setHistoryCatD}
-                        minutes={historyCatM}
-                        setMinutes={setHistoryCatM}
-                      />
-                    </div>
-                  )}
-
-                  <div className="ui-soft-panel ui-card-item">
-                    <p className="text-center text-[11px] font-bold ui-text-reward">
-                      补记后的小奖励
-                    </p>
-                    <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
-                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>🐟 鱼鱼宝石</span>
-                        <span className="tabular-nums ui-text-primary">💎 +{historyPreview.fg}</span>
-                      </li>
-                      <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>🐱 猫猫宝石</span>
-                        <span className="tabular-nums ui-text-primary">💎 +{historyPreview.cg}</span>
-                      </li>
-                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>情侣 bonus</span>
-                        <span className="tabular-nums ui-text-primary">
-                          {historyPreview.couple.gems > 0 ? `💎 +${historyPreview.couple.gems}` : "—"}
-                        </span>
-                      </li>
-                      <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
-                        <span>金币变化</span>
-                        <span
-                          className={
-                            historyPreview.coin.delta > 0
-                              ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                              : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
-                          }
-                        >
-                          {historyPreview.coin.delta > 0
-                            ? `🪙 +${historyPreview.coin.delta}`
-                            : "未触发"}
-                        </span>
-                      </li>
-                    </ul>
-                    {existingHistoryRecord ? (
-                      <p className="mt-2 text-center text-[10px] font-medium ui-text-muted">
-                        这一天已有记录，保存会覆盖你当前编辑到的那一侧或整天数据。
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="ui-modal-footer">
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        !hasAnyHistoryEffort ||
-                        historyDay == null ||
-                        historyDate > maxHistoryDate
+              <div className="ui-soft-panel ui-card-item mt-4">
+                <p className="text-center text-[11px] font-bold ui-text-reward">
+                  这一天的小奖励
+                </p>
+                <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
+                  <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                    <span>🐟 宝石</span>
+                    <span className="tabular-nums ui-text-primary">
+                      💎 +{preview.fg}
+                    </span>
+                  </li>
+                  <li className="ui-tinted-primary flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                    <span>🐱 宝石</span>
+                    <span className="tabular-nums ui-text-primary">
+                      💎 +{preview.cg}
+                    </span>
+                  </li>
+                  <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                    <span>情侣 bonus</span>
+                    <span className="tabular-nums ui-text-primary">
+                      {preview.couple.gems > 0
+                        ? `💎 +${preview.couple.gems}`
+                        : "-"}
+                    </span>
+                  </li>
+                  <li className="ui-tinted-reward flex items-center justify-between gap-2 rounded-2xl px-2.5 py-1.5">
+                    <span>金币变化</span>
+                    <span
+                      className={
+                        preview.coin.delta > 0
+                          ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
+                          : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
                       }
-                      onClick={onSaveHistory}
-                      className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      保存历史记录
-                    </button>
-                  </div>
-                </div>
-              )}
+                      {preview.coin.delta > 0
+                        ? `🪙 +${preview.coin.delta}`
+                        : "未触发"}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="ui-modal-footer">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
+                >
+                  下次再记
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    !hasAnyEffort || recordDay == null || recordDate > todayDate
+                  }
+                  onClick={onConfirm}
+                  className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {recordDate === todayDate ? "存好今天" : "保存这一天"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
