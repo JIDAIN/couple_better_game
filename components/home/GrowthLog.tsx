@@ -63,10 +63,6 @@ function totalGems(entry: GrowthLogEntry) {
   return entry.fish.gems + entry.cat.gems + entry.bonus;
 }
 
-function formatCoinDelta(value: number) {
-  return value > 0 ? `+${value}` : "0";
-}
-
 function formatBreakdownLines(lines: string[]) {
   const labels: Record<string, string> = {
     缺口宝石: "缺口",
@@ -82,7 +78,31 @@ function formatBreakdownLines(lines: string[]) {
       return `${labels[match[1]]} +${value}`;
     })
     .filter((line): line is string => Boolean(line));
-  return formatted.length > 0 ? formatted : ["还没有额外加成"];
+  return formatted;
+}
+
+function formatBreakdownOneLine(lines: string[]) {
+  const parts = formatBreakdownLines(lines);
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+function formatCoinHint(hint: string) {
+  if (hint === "本日暂未触发金币规则") return "还没有点亮";
+  return hint
+    .split(" · ")
+    .map((part) =>
+      part
+        .replace(/本周新增宝石达到 30：\+1/g, "本周达标")
+        .replace(/本周新增宝石达到 50：再 \+1/g, "本周进阶")
+        .replace(/双人连续 \d+ 天达到一般打卡：\+1/g, "连续坚持")
+        .replace(/本周一起运动达到 2 次：\+1/g, "一起运动"),
+    )
+    .join(" · ");
+}
+
+function formatCoinSigned(value: number) {
+  if (value > 0) return `+${value}`;
+  return "0";
 }
 
 function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
@@ -93,14 +113,27 @@ function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
   };
 }
 
-function DetailLines({ lines }: { lines: string[] }) {
-  const displayLines = formatBreakdownLines(lines);
+function CoinHintText({ hint }: { hint: string }) {
   return (
-    <ul className="mt-2 space-y-1 text-[11px] font-medium leading-4 ui-text-soft">
-      {displayLines.map((line) => (
-        <li key={line}>{line}</li>
-      ))}
-    </ul>
+    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
+      {formatCoinHint(hint)}
+    </p>
+  );
+}
+
+function BonusHintText({ active }: { active: boolean }) {
+  return (
+    <p className="mt-1 text-[10px] font-medium ui-text-muted">
+      {active ? "一起点亮" : "满 30 分钟时点亮"}
+    </p>
+  );
+}
+
+function GemBreakdownText({ lines }: { lines: string[] }) {
+  return (
+    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
+      {formatBreakdownOneLine(lines)}
+    </p>
   );
 }
 
@@ -151,17 +184,16 @@ function PersonDetailCard({
   return (
     <div className="growth-detail-person-card">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-bold ui-text-main">
+        <h3 className="text-[13px] font-bold ui-text-main">
           <span aria-hidden>{emoji}</span> {title}
         </h3>
         <span className="ui-price-pill ui-chip-primary">💎 +{gems}</span>
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold ui-text-muted">
-        <span>{deficit} kcal</span>
-        <span>{minutes} min</span>
-      </div>
-      <p className="mt-2 text-[11px] font-medium leading-4 ui-text-soft">
-        {formatBreakdownLines(lines).join(" · ")}
+      <p className="mt-1.5 text-sm font-semibold ui-text-muted">
+        {deficit} kcal · {minutes} min
+      </p>
+      <p className="mt-1 text-[11px] font-medium leading-snug ui-text-soft">
+        {formatBreakdownOneLine(lines)}
       </p>
     </div>
   );
@@ -187,7 +219,7 @@ function EditSide({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="ui-soft-panel ui-card-item flex min-w-0 flex-col gap-2.5">
+    <div className="ui-soft-panel ui-card-item flex min-w-0 flex-col gap-2">
       <p className="text-xs font-bold ui-text-main">
         <span aria-hidden>{emoji}</span> {title}
       </p>
@@ -227,19 +259,15 @@ function LogCard({
     <button
       type="button"
       onClick={() => onOpen(entry)}
-      className="record-item growth-log-item w-full text-left transition hover:bg-white/80 active:scale-[0.995]"
+      className="growth-log-row text-left transition hover:brightness-[1.02] active:scale-[0.99]"
     >
-      <span className="growth-log-line">
-        <span className="growth-log-date">{formatMonthDay(entry.recordDate)}</span>
-        <span className="ui-price-pill ui-chip-primary growth-log-pill">
-          💎 +{totalGems(entry)}
+      <span className="growth-log-date">{formatMonthDay(entry.recordDate)}</span>
+      <span className="growth-log-summary">
+        <span className="ui-price-pill ui-chip-primary">💎 +{totalGems(entry)}</span>
+        <span className="ui-price-pill ui-chip-reward">
+          🪙 {formatCoinSigned(entry.coins)}
         </span>
-        <span className="ui-price-pill ui-chip-reward growth-log-pill">
-          🪙 {formatCoinDelta(entry.coins)}
-        </span>
-        <span className="ui-action-pill ui-chip-plain growth-log-action">
-          详情 ›
-        </span>
+        <span className="growth-log-detail-link">详情 ›</span>
       </span>
     </button>
   );
@@ -420,10 +448,16 @@ export function GrowthLog() {
 
   useEffect(() => {
     if (!open) return;
-    const id = requestAnimationFrame(() =>
-      requestAnimationFrame(() => setSheetEnter(true)),
-    );
-    return () => cancelAnimationFrame(id);
+    let cancelled = false;
+    const outerId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setSheetEnter(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(outerId);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -558,7 +592,7 @@ export function GrowthLog() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`ui-sheet ui-record-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out will-change-transform ${
+            className={`ui-sheet growth-log-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out will-change-transform ${
               sheetEnter
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-3 opacity-0 sm:scale-95"
@@ -613,7 +647,7 @@ export function GrowthLog() {
 
             <div className="record-sheet-body">
               {sortedRecords.length > 0 ? (
-                <div className="record-list">
+                <div className="record-list growth-log-record-list">
                   {sortedRecords.map((entry) => (
                     <LogCard key={entry.id} entry={entry} onOpen={openDetail} />
                   ))}
@@ -640,11 +674,11 @@ export function GrowthLog() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={detailTitleId}
-            className="ui-sheet relative flex max-h-[min(92dvh,680px)] w-full max-w-lg flex-col overflow-hidden"
+            className="ui-sheet growth-log-detail-sheet relative flex min-h-0 flex-col overflow-hidden"
           >
             <div className="ui-modal-header shrink-0">
-              <p className="text-[10px] font-bold tracking-[0.2em] ui-text-primary">
-                {detailMode === "detail" ? "记录详情" : "编辑已有记录"}
+              <p className="text-[10px] font-bold tracking-[0.18em] ui-text-primary">
+                {detailMode === "detail" ? "记录详情" : "修改这一天"}
               </p>
               <h2 id={detailTitleId} className="mt-1 text-lg font-bold ui-text-main">
                 {formatFullDate(selectedRecord.recordDate)}
@@ -656,17 +690,17 @@ export function GrowthLog() {
 
             <div className="ui-modal-body">
               {detailMode === "detail" && detailPreview ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="ui-tinted-primary rounded-2xl px-3 py-2 text-center text-sm font-bold ui-text-primary">
-                      💎 总宝石 +{totalGems(selectedRecord)}
+                <div className="space-y-2.5">
+                  <div className="growth-log-overview">
+                    <div className="growth-log-overview-pill ui-tinted-primary ui-text-primary">
+                      💎 +{totalGems(selectedRecord)}
                     </div>
-                    <div className="ui-tinted-reward rounded-2xl px-3 py-2 text-center text-sm font-bold ui-text-reward">
-                      🪙 金币 {formatCoinDelta(selectedRecord.coins)}
+                    <div className="growth-log-overview-pill ui-tinted-reward ui-text-reward">
+                      🪙 {formatCoinSigned(selectedRecord.coins)}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                     <PersonDetailCard
                       emoji="🐟"
                       title="鱼鱼"
@@ -685,32 +719,26 @@ export function GrowthLog() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="ui-tinted-reward rounded-2xl px-3 py-2">
-                      <div className="flex items-center justify-between text-xs font-bold ui-text-main">
-                        <span>情侣 bonus</span>
-                        <span className="ui-text-primary">
+                      <div className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
+                        <span>🔥 一起加成</span>
+                        <span className="tabular-nums ui-text-primary">
                           {selectedRecord.bonus > 0
                             ? `💎 +${selectedRecord.bonus}`
-                            : "-"}
+                            : "—"}
                         </span>
                       </div>
-                      <DetailLines
-                        lines={
-                          selectedRecord.bonus > 0
-                            ? ["🔥 bonus 已触发"]
-                            : ["双方都运动满 30 分钟时触发"]
-                        }
-                      />
+                      <BonusHintText active={selectedRecord.bonus > 0} />
                     </div>
                     <div className="ui-tinted-reward rounded-2xl px-3 py-2">
-                      <div className="flex items-center justify-between text-xs font-bold ui-text-main">
-                        <span>金币变化</span>
-                        <span className="ui-text-reward">
-                          🪙 {formatCoinDelta(selectedRecord.coins)}
+                      <div className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
+                        <span>🪙</span>
+                        <span className="tabular-nums text-sm font-extrabold ui-text-reward">
+                          {formatCoinSigned(selectedRecord.coins)}
                         </span>
                       </div>
-                      <DetailLines lines={[detailPreview.coin.hint]} />
+                      <CoinHintText hint={detailPreview.coin.hint} />
                     </div>
                   </div>
 
@@ -734,8 +762,8 @@ export function GrowthLog() {
               ) : null}
 
               {detailMode === "edit" && editPreview ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                     <EditSide
                       emoji="🐟"
                       title="鱼鱼"
@@ -762,87 +790,75 @@ export function GrowthLog() {
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       修改后的小奖励
                     </p>
-                    <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
+                    <ul className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
                       <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
                         <span className="flex items-center justify-between gap-2">
-                          <span>🐟 宝石</span>
+                          <span aria-hidden>🐟</span>
                           <span className="tabular-nums ui-text-primary">
                             💎 +{editPreview.fishBreakdown.total}
                           </span>
                         </span>
-                        <DetailLines lines={editPreview.fishBreakdown.lines} />
+                        <GemBreakdownText lines={editPreview.fishBreakdown.lines} />
                       </li>
                       <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
                         <span className="flex items-center justify-between gap-2">
-                          <span>🐱 宝石</span>
+                          <span aria-hidden>🐱</span>
                           <span className="tabular-nums ui-text-primary">
                             💎 +{editPreview.catBreakdown.total}
                           </span>
                         </span>
-                        <DetailLines lines={editPreview.catBreakdown.lines} />
+                        <GemBreakdownText lines={editPreview.catBreakdown.lines} />
                       </li>
                       <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
                         <span className="flex items-center justify-between gap-2">
-                          <span>情侣 bonus</span>
+                          <span>🔥 一起加成</span>
                           <span className="tabular-nums ui-text-primary">
                             {editPreview.couple.gems > 0
                               ? `💎 +${editPreview.couple.gems}`
-                              : "-"}
+                              : "—"}
                           </span>
                         </span>
-                        <DetailLines
-                          lines={
-                            editPreview.couple.gems > 0
-                              ? ["一起运动：双方各 +1，共 +2"]
-                              : ["双方都运动满 30 分钟时触发"]
-                          }
-                        />
+                        <BonusHintText active={editPreview.couple.gems > 0} />
                       </li>
                       <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
-                        <span className="flex items-center justify-between gap-2">
-                          <span>金币变化</span>
-                          <span
-                            className={
-                              editPreview.coin.delta > 0
-                                ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                                : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
-                            }
-                          >
-                            {editPreview.coin.delta > 0
-                              ? `🪙 +${editPreview.coin.delta}`
-                              : "未触发"}
+                        <span className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
+                          <span aria-hidden>🪙</span>
+                          <span className="tabular-nums text-sm font-extrabold ui-text-reward">
+                            {formatCoinSigned(editPreview.coin.delta)}
                           </span>
                         </span>
-                        <DetailLines lines={[editPreview.coin.hint]} />
+                        <CoinHintText hint={editPreview.coin.hint} />
                       </li>
                     </ul>
                   </div>
 
-                  <div className="ui-modal-footer">
+                  <div className="growth-log-edit-footer">
                     <button
                       type="button"
                       onClick={() => setConfirmDeleteOpen(true)}
-                      className="rounded-[var(--radius-control)] border border-rose-100 bg-rose-50/40 px-3 py-3 text-sm font-semibold text-rose-500 transition active:scale-[0.99]"
+                      className="growth-log-delete-btn"
                     >
                       删除
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedRecord) hydrateEditFields(selectedRecord);
-                        setDetailMode("detail");
-                      }}
-                      className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
-                    >
-                      取消编辑
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onSaveEdit}
-                      className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition active:scale-[0.99]"
-                    >
-                      保存修改
-                    </button>
+                    <div className="growth-log-edit-footer-actions">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedRecord) hydrateEditFields(selectedRecord);
+                          setDetailMode("detail");
+                        }}
+                        className="ui-button-secondary min-w-0 flex-1 py-2.5 text-sm font-semibold sm:flex-none sm:px-5"
+                      >
+                        取消编辑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={onSaveEdit}
+                        className="ui-button-primary min-w-0 flex-[1.2] py-2.5 text-sm font-semibold text-white transition active:scale-[0.99] sm:flex-none sm:px-6"
+                      >
+                        保存修改
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : null}
@@ -868,8 +884,8 @@ export function GrowthLog() {
             <h3 id={confirmTitleId} className="text-lg font-bold ui-text-main">
               要删除这一天吗？
             </h3>
-            <p className="mt-2 text-sm leading-6 ui-text-muted">
-              删除后，这一天的热力图、宝石和金币统计都会一起更新。
+            <p className="mt-2 text-xs leading-relaxed ui-text-muted">
+              删除后，统计会一起更新。
             </p>
             <div className="mt-5 flex gap-2">
               <button

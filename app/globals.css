@@ -161,6 +161,159 @@ body::before {
   }
 }
 
+/* 成长日志列表弹窗：单独收窄，不影响其他 ui-sheet */
+.growth-log-sheet {
+  width: 100%;
+  max-width: 30rem;
+  min-height: 28rem;
+  max-height: min(86dvh, 680px);
+}
+
+@media (max-width: 640px) {
+  .growth-log-sheet {
+    width: calc(100vw - 24px);
+    min-height: 70dvh;
+    max-height: 88dvh;
+  }
+}
+
+/* 成长日志详情 / 编辑：保持 max-w-lg，不额外加宽 */
+.growth-log-detail-sheet {
+  width: 100%;
+  max-width: 32rem;
+  max-height: min(88dvh, 680px);
+}
+
+@media (max-width: 640px) {
+  .growth-log-detail-sheet {
+    width: calc(100vw - 24px);
+    max-height: 88dvh;
+  }
+}
+
+.growth-log-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.growth-log-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border-radius: 18px;
+  border: 1px solid rgb(255 255 255 / 0.72);
+  background: rgb(255 255 255 / 0.68);
+  box-shadow: var(--shadow-soft);
+}
+
+.growth-log-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+.growth-log-date {
+  min-width: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+@media (max-width: 380px) {
+  .growth-log-date {
+    font-size: 0.8125rem;
+  }
+
+  .growth-log-summary .ui-price-pill {
+    min-width: 3.15rem;
+    padding-inline: 0.45rem;
+    font-size: 0.6875rem;
+  }
+}
+
+.growth-log-detail-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.55rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.55);
+  border: 1px solid rgb(255 255 255 / 0.65);
+}
+
+.growth-log-detail-link:hover {
+  background: rgb(255 255 255 / 0.78);
+  color: var(--text-main);
+}
+
+.growth-log-overview {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.growth-log-overview-pill {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius-panel);
+  padding: 0.55rem 0.65rem;
+  text-align: center;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.growth-log-edit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-top: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.growth-log-edit-footer-actions {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.growth-log-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px dashed rgb(251 165 165 / 0.65);
+  background: rgb(255 250 250 / 0.55);
+  color: rgb(190 100 110);
+  padding: 0.45rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  transition:
+    transform 220ms ease,
+    background-color 220ms ease;
+}
+
+.growth-log-delete-btn:hover {
+  background: rgb(255 242 242 / 0.85);
+}
+
+.growth-log-delete-btn:active {
+  transform: scale(0.98);
+}
+
 .ui-dialog {
   border-radius: var(--radius-card-sm);
   background:
@@ -205,56 +358,15 @@ body::before {
   border: 1px solid rgb(255 255 255 / 0.72);
   background: rgb(255 255 255 / 0.64);
   box-shadow: var(--shadow-soft);
-  padding: 0.85rem;
+  padding: 0.65rem 0.75rem;
 }
 
 .growth-log-item {
-  padding: 0.8rem 0.95rem;
+  padding: 0;
 }
 
 .growth-log-line {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  align-items: center;
-  column-gap: 0.5rem;
-}
-
-.growth-log-date {
-  justify-self: start;
-  white-space: nowrap;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: var(--text-main);
-}
-
-.growth-log-metric {
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.growth-log-fish {
-  justify-self: start;
-}
-
-.growth-log-cat {
-  justify-self: start;
-}
-
-.growth-log-pill {
-  justify-self: end;
-  min-width: 3.55rem;
-}
-
-.growth-log-action {
-  justify-self: end;
-  min-width: 3.2rem;
-  color: var(--text-muted);
-  background: rgb(255 255 255 / 0.58);
+  display: none;
 }
 
 .exchange-record-item {
@@ -366,22 +478,6 @@ body::before {
 }
 
 @media (max-width: 560px) {
-  .growth-log-line {
-    grid-template-columns: 1fr auto auto auto;
-    column-gap: 0.45rem;
-  }
-
-  .growth-log-date {
-    font-size: 0.8125rem;
-  }
-
-  .growth-log-pill,
-  .growth-log-action {
-    min-width: 3.2rem;
-    padding-inline: 0.45rem;
-    font-size: 0.6875rem;
-  }
-
   .compact-field {
     grid-template-columns: 4rem minmax(0, 1fr);
     gap: 0.5rem;

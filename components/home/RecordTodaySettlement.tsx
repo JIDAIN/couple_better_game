@@ -71,14 +71,43 @@ function formatBreakdownLines(lines: string[]) {
       return `${labels[match[1]]} +${value}`;
     })
     .filter((line): line is string => Boolean(line));
-  return formatted.length > 0 ? formatted : ["还没有额外加成"];
+  return formatted;
+}
+
+function formatCoinHint(hint: string) {
+  if (hint === "本日暂未触发金币规则") return "还没有点亮";
+  return hint
+    .split(" · ")
+    .map((part) =>
+      part
+        .replace(/本周新增宝石达到 30：\+1/g, "本周达标")
+        .replace(/本周新增宝石达到 50：再 \+1/g, "本周进阶")
+        .replace(/双人连续 \d+ 天达到一般打卡：\+1/g, "连续坚持")
+        .replace(/本周一起运动达到 2 次：\+1/g, "一起运动"),
+    )
+    .join(" · ");
+}
+
+function formatCoinSigned(value: number) {
+  if (value > 0) return `+${value}`;
+  return "0";
+}
+
+function CoinHintLine({ hint }: { hint: string }) {
+  return (
+    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
+      {formatCoinHint(hint)}
+    </p>
+  );
 }
 
 function DetailLines({ lines }: { lines: string[] }) {
+  const parts = formatBreakdownLines(lines);
+  const text = parts.length > 0 ? parts.join(" · ") : "—";
   return (
-    <span className="mt-1 block text-[10px] font-medium leading-4 ui-text-muted">
-      {formatBreakdownLines(lines).join(" · ")}
-    </span>
+    <p className="mt-1 text-[10px] font-medium leading-relaxed ui-text-muted">
+      {text}
+    </p>
   );
 }
 
@@ -131,16 +160,10 @@ function PartnerColumn({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="ui-soft-panel ui-card-item flex min-w-0 flex-col gap-2.5">
-      <div className="flex items-center gap-2 pb-1.5">
-        <span className="text-xl" aria-hidden>
-          {emoji}
-        </span>
-        <div>
-          <p className="text-xs font-bold ui-text-main">{title}</p>
-          <p className="text-[10px] ui-text-soft">轻轻填就好</p>
-        </div>
-      </div>
+    <div className="ui-soft-panel ui-card-item flex min-w-0 flex-col gap-2">
+      <p className="text-xs font-bold ui-text-main">
+        <span aria-hidden>{emoji}</span> {title}
+      </p>
       <CompactField
         label="今日体重"
         value={weight}
@@ -182,7 +205,8 @@ export function RecordTodaySettlement({
   const [toast, setToast] = useState<string | null>(null);
   const titleId = useId();
 
-  const todayDate = useMemo(() => getCurrentIsoDate(), []);
+  // Must not freeze at mount: long sessions and cross-midnight need a fresh "today".
+  const todayDate = getCurrentIsoDate();
   const [recordDate, setRecordDate] = useState(todayDate);
   const [fishW, setFishW] = useState("");
   const [fishD, setFishD] = useState("0");
@@ -312,13 +336,25 @@ export function RecordTodaySettlement({
 
   useEffect(() => {
     if (!open) {
-      const id = requestAnimationFrame(() => setEntered(false));
-      return () => cancelAnimationFrame(id);
+      let cancelled = false;
+      const id = requestAnimationFrame(() => {
+        if (!cancelled) setEntered(false);
+      });
+      return () => {
+        cancelled = true;
+        cancelAnimationFrame(id);
+      };
     }
-    const id = requestAnimationFrame(() =>
-      requestAnimationFrame(() => setEntered(true)),
-    );
-    return () => cancelAnimationFrame(id);
+    let cancelled = false;
+    const outerId = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setEntered(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(outerId);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -446,15 +482,15 @@ export function RecordTodaySettlement({
               </label>
 
               {existingRecord ? (
-                <p className="mb-3 rounded-2xl bg-white/55 px-3 py-2 text-center text-[11px] font-semibold ui-text-muted">
-                  这一天已有记录，保存后会覆盖原记录
+                <p className="mb-2 rounded-2xl bg-white/55 px-3 py-1.5 text-center text-[10px] font-semibold ui-text-muted">
+                  已有记录会更新
                 </p>
               ) : null}
 
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <PartnerColumn
                   emoji="🐟"
-                  title="鱼鱼这边"
+                  title="鱼鱼"
                   weight={fishW}
                   setWeight={setFishW}
                   deficit={fishD}
@@ -464,7 +500,7 @@ export function RecordTodaySettlement({
                 />
                 <PartnerColumn
                   emoji="🐱"
-                  title="猫猫这边"
+                  title="猫猫"
                   weight={catW}
                   setWeight={setCatW}
                   deficit={catD}
@@ -474,14 +510,14 @@ export function RecordTodaySettlement({
                 />
               </div>
 
-              <div className="ui-soft-panel ui-card-item mt-4">
+              <div className="ui-soft-panel ui-card-item mt-3">
                 <p className="text-center text-[11px] font-bold ui-text-reward">
                   这一天的小奖励
                 </p>
-                <ul className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
+                <ul className="mt-2 grid grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
                   <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
                     <span className="flex items-center justify-between gap-2">
-                      <span>🐟 宝石</span>
+                      <span aria-hidden>🐟</span>
                       <span className="tabular-nums ui-text-primary">
                         💎 +{preview.fg}
                       </span>
@@ -490,7 +526,7 @@ export function RecordTodaySettlement({
                   </li>
                   <li className="ui-tinted-primary rounded-2xl px-2.5 py-1.5">
                     <span className="flex items-center justify-between gap-2">
-                      <span>🐱 宝石</span>
+                      <span aria-hidden>🐱</span>
                       <span className="tabular-nums ui-text-primary">
                         💎 +{preview.cg}
                       </span>
@@ -499,37 +535,25 @@ export function RecordTodaySettlement({
                   </li>
                   <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
                     <span className="flex items-center justify-between gap-2">
-                      <span>情侣 bonus</span>
+                      <span>🔥 一起加成</span>
                       <span className="tabular-nums ui-text-primary">
                         {preview.couple.gems > 0
                           ? `💎 +${preview.couple.gems}`
-                          : "-"}
+                          : "—"}
                       </span>
                     </span>
-                    <DetailLines
-                      lines={
-                        preview.couple.gems > 0
-                          ? ["一起运动：双方各 +1，共 +2"]
-                          : ["双方都运动满 30 分钟时触发"]
-                      }
-                    />
+                    <p className="mt-1 text-[10px] font-medium ui-text-muted">
+                      {preview.couple.gems > 0 ? "一起点亮" : "满 30 分钟时点亮"}
+                    </p>
                   </li>
                   <li className="ui-tinted-reward rounded-2xl px-2.5 py-1.5">
-                    <span className="flex items-center justify-between gap-2">
-                      <span>金币变化</span>
-                      <span
-                        className={
-                          preview.coin.delta > 0
-                            ? "inline-flex items-baseline gap-0.5 tabular-nums ui-text-reward"
-                            : "inline-flex items-baseline gap-0.5 text-[11px] font-medium ui-text-soft"
-                        }
-                      >
-                        {preview.coin.delta > 0
-                          ? `🪙 +${preview.coin.delta}`
-                          : "未触发"}
+                    <span className="flex items-center justify-between gap-2 text-xs font-bold ui-text-main">
+                      <span aria-hidden>🪙</span>
+                      <span className="tabular-nums text-sm font-extrabold ui-text-reward">
+                        {formatCoinSigned(preview.coin.delta)}
                       </span>
                     </span>
-                    <DetailLines lines={[preview.coin.hint]} />
+                    <CoinHintLine hint={preview.coin.hint} />
                   </li>
                 </ul>
               </div>
