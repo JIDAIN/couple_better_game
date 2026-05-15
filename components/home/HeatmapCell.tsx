@@ -38,7 +38,7 @@ export function HeatmapCell({
     >
       {icon ? (
         <span
-          className="pointer-events-none absolute -right-0.5 -top-0.5 origin-top-right scale-[0.36] leading-none sm:scale-[0.42]"
+          className="pointer-events-none absolute -right-0.5 -top-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/78 text-[9px] leading-none shadow-[0_1px_3px_rgba(120,80,60,0.14)]"
           aria-hidden
         >
           {icon}

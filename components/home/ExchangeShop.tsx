@@ -356,7 +356,7 @@ export function ExchangeShop() {
           key={category.id}
           className={`ui-card-soft ui-card-compact transition ${cardClass}`}
         >
-          <div className="flex min-w-0 items-start gap-2">
+          <div className="flex min-w-0 items-center gap-3">
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${iconClass}`}
               aria-hidden
@@ -367,24 +367,24 @@ export function ExchangeShop() {
               <p className="truncate text-[12px] font-bold leading-4 ui-text-main sm:text-[13px]">
                 {category.title}
               </p>
-              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft">
+              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft sm:text-[11px]">
                 {category.description}
               </p>
-              <div className="mt-1.5 flex flex-col items-end gap-1.5 sm:items-stretch">
-                <span
-                  className={`ui-badge shrink-0 py-0.5 text-[10px] tabular-nums ${priceClass}`}
-                >
-                  {categoryPriceLabel(category)}
-                </span>
-                <button
-                  type="button"
-                  disabled={!affordable}
-                  onClick={() => openRecord(category.id)}
-                  className={`shrink-0 px-2.5 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-full ${buttonClass}`}
-                >
-                  {affordable ? "兑换" : "差一点"}
-                </button>
-              </div>
+            </div>
+            <div className="flex w-[4.75rem] shrink-0 flex-col items-end gap-1.5 sm:items-stretch">
+              <span
+                className={`ui-badge shrink-0 py-0.5 text-[10px] tabular-nums ${priceClass}`}
+              >
+                {categoryPriceLabel(category)}
+              </span>
+              <button
+                type="button"
+                disabled={!affordable}
+                onClick={() => openRecord(category.id)}
+                className={`shrink-0 px-2.5 py-1 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-full ${buttonClass}`}
+              >
+                {affordable ? "兑换" : "差一点"}
+              </button>
             </div>
           </div>
         </article>
