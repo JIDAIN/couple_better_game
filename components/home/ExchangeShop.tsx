@@ -375,38 +375,35 @@ export function ExchangeShop() {
           key={category.id}
           className={`ui-card-soft ui-card-compact transition ${cardClass}`}
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5">
+            <div className="flex min-w-0 items-center gap-2">
               <span
                 className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${iconClass}`}
                 aria-hidden
               >
                 {category.icon}
               </span>
-              <div className="min-w-0">
-                <p className="truncate text-[12px] font-bold leading-4 ui-text-main sm:text-[13px]">
-                  {category.title}
-                </p>
-                <p className="mt-0.5 line-clamp-1 text-[10px] font-medium leading-3 ui-text-soft sm:text-[11px]">
-                  {displayCategoryDescription(category)}
-                </p>
-              </div>
+              <p className="truncate text-[12px] font-bold leading-4 ui-text-main sm:text-[13px]">
+                {category.title}
+              </p>
             </div>
-            <div className="flex w-[4rem] shrink-0 flex-col items-center gap-1.5">
-              <span
-                className={`ui-badge ui-price-pill shrink-0 text-[10px] tabular-nums ${priceClass}`}
-              >
-                {categoryPriceLabel(category)}
-              </span>
-              <button
-                type="button"
-                disabled={!affordable}
-                onClick={() => openRecord(category.id)}
-                className={`ui-action-pill shrink-0 text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${buttonClass}`}
-              >
-                {affordable ? "兑换" : "差一点"}
-              </button>
-            </div>
+            <span
+              className={`ui-badge ui-price-pill shrink-0 self-center text-[10px] tabular-nums ${priceClass}`}
+            >
+              {categoryPriceLabel(category)}
+            </span>
+
+            <p className="min-w-0 truncate text-[10px] font-medium leading-3 ui-text-soft sm:text-[11px]">
+              {displayCategoryDescription(category)}
+            </p>
+            <button
+              type="button"
+              disabled={!affordable}
+              onClick={() => openRecord(category.id)}
+              className={`ui-action-pill shrink-0 self-center text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${buttonClass}`}
+            >
+              {affordable ? "兑换" : "差一点"}
+            </button>
           </div>
         </article>
       );
@@ -435,7 +432,7 @@ export function ExchangeShop() {
 
     return (
       <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
           {renderSection("💎 宝石兑换", gemCategories)}
           {renderSection("🪙 金币兑换", coinCategories)}
         </div>
@@ -1046,7 +1043,7 @@ export function ExchangeShop() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`ui-sheet relative flex h-[78dvh] w-full max-w-lg flex-col overflow-hidden px-4 pt-3 transition-all duration-300 ease-out will-change-transform ${
+            className={`ui-sheet relative flex h-[78dvh] w-full max-w-md flex-col overflow-hidden px-4 pt-3 transition-all duration-300 ease-out will-change-transform ${
               sheetEnter
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-full opacity-90 sm:translate-y-2 sm:scale-95"
