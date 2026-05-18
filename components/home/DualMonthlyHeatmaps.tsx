@@ -92,7 +92,7 @@ export function DualMonthlyHeatmaps() {
 
   return (
     <section
-      className="ui-card-hero ui-card-main relative overflow-hidden sm:p-5"
+      className="ui-card-hero ui-card-main relative w-full overflow-hidden sm:p-5 md:w-[min(56rem,calc(100vw-2.5rem))] md:self-center"
       aria-label="当月成就"
     >
       <div
@@ -148,7 +148,7 @@ export function DualMonthlyHeatmaps() {
         </div>
       </div>
 
-      <div className="relative mt-4 space-y-3.5">
+      <div className="relative mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
         <PlayerHeatmap
           title="🐟 的成长热力图"
           subtitle="小鱼也在努力闪闪发光"
