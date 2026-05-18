@@ -109,28 +109,34 @@ export function sumCoinExchangeSpend(records: ExchangeRecord[]) {
   );
 }
 
+function exchangeRecordIsoDate(record: ExchangeRecord) {
+  const source = record.occurredAt || record.date;
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(source);
+  return match?.[1] ?? "";
+}
+
 export function computeGemWallet(
   records: DailyRecord[],
   exchangeRecords: ExchangeRecord[],
 ) {
-  const events = [
-    ...records.map((record) => ({
-      at: `${record.createdAt || record.recordDate}#gain`,
-      delta: recordGems(record),
-    })),
-    ...exchangeRecords
-      .filter((record) => record.resourceKind === "gem")
-      .map((record) => ({
-        at: `${record.occurredAt || record.createdAt || record.date}#spend`,
-        delta: -record.price,
-      })),
-  ].sort((a, b) => a.at.localeCompare(b.at));
+  const gainsByDate = new Map<string, number>();
+  for (const record of records) {
+    const date = recordIsoDate(record);
+    gainsByDate.set(date, (gainsByDate.get(date) ?? 0) + recordGems(record));
+  }
 
-  return events.reduce((balance, event) => {
-    if (event.delta >= 0) {
-      return Math.min(GEM_CAP, balance + event.delta);
-    }
-    return Math.max(0, balance + event.delta);
+  const spendsByDate = new Map<string, number>();
+  for (const record of exchangeRecords) {
+    if (record.resourceKind !== "gem") continue;
+    const date = exchangeRecordIsoDate(record);
+    if (!date) continue;
+    spendsByDate.set(date, (spendsByDate.get(date) ?? 0) + record.price);
+  }
+
+  const dates = [...new Set([...gainsByDate.keys(), ...spendsByDate.keys()])].sort();
+  return dates.reduce((balance, date) => {
+    const afterGain = Math.min(GEM_CAP, balance + (gainsByDate.get(date) ?? 0));
+    return Math.max(0, afterGain - (spendsByDate.get(date) ?? 0));
   }, 0);
 }
 

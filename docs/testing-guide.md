@@ -55,3 +55,11 @@ npm run build
 3. 再确认 store 或 snapshot 是否正确写回
 
 这样更接近真实业务，也更能保护当前的本地 MVP。  
+# 当前实现同步说明（2026-05）
+
+测试清单已包含：
+
+- `settlement-rules.test.ts`：结算规则、运动宝石、情侣 bonus、热力图等级。
+- `home-stat-service.test.ts`：钱包回算、宝石封顶、兑换消费、周统计。
+- `data-import-export.test.ts`：完整备份 JSON、导入兼容和 CSV 导出。
+- `heatmap-grid.test.ts`：热力图跨月完整周和日期标签。

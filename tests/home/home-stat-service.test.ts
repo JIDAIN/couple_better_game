@@ -7,7 +7,6 @@ import {
   recalculateCoinsWithCurrentRules,
   sumRecordGemsInCoinWeek,
 } from "../../lib/home/home-stat-service";
-import { todayIsoDate } from "../../lib/home/date-utils";
 import { buildHeatmapDay, DEFAULT_COIN_RULES, DEFAULT_VISUAL_RULES } from "../../lib/home/settlement-rules";
 import type {
   DailyRecord,
@@ -54,6 +53,26 @@ function makeRecord(
       deficit: catDeficit,
       minutes: 0,
     }),
+  };
+}
+
+function makeGemExchange(
+  id: string,
+  occurredAt: string | undefined,
+  price: number,
+  date = occurredAt?.replace("T", " ") ?? "2026-05-01 12:00",
+): ExchangeRecord {
+  return {
+    id,
+    date,
+    createdAt: `${date.slice(0, 10)}T12:00:00.000Z`,
+    occurredAt: occurredAt ?? "",
+    time: "12:00",
+    category: "零食",
+    remark: "",
+    resourceKind: "gem",
+    price,
+    icon: "🍪",
   };
 }
 
@@ -115,6 +134,30 @@ describe("home stat service", () => {
     expect(computeGemWallet(records, exchangeRecords)).toBe(33);
   });
 
+  it("replays gem wallet by business date and caps gains before later spends", () => {
+    const records = [
+      makeRecord("2026-05-15", 0, 0, 51, 0),
+    ];
+    const exchangeRecords = [
+      makeGemExchange("exchange-1", "2026-05-16T12:00", 15),
+    ];
+
+    expect(computeGemWallet(records, exchangeRecords)).toBe(35);
+  });
+
+  it("uses recordDate for gains and spends after gains on the same day", () => {
+    const lateCreatedRecord = {
+      ...makeRecord("2026-05-15", 0, 0, 51, 0),
+      createdAt: "2026-05-20T12:00:00.000Z",
+    };
+    const exchangeRecords = [
+      makeGemExchange("same-day", "2026-05-15T08:00", 15),
+      makeGemExchange("legacy-date", undefined, 5, "2026-05-16 09:00"),
+    ];
+
+    expect(computeGemWallet([lateCreatedRecord], exchangeRecords)).toBe(30);
+  });
+
   it("sums gems only within the current coin week", () => {
     const records = [
       makeRecord("2026-05-08", 0, 0, 20, 0),
@@ -122,7 +165,7 @@ describe("home stat service", () => {
       makeRecord("2026-05-15", 0, 0, 7, 0),
     ];
 
-    expect(sumRecordGemsInCoinWeek(records, todayIsoDate(), DEFAULT_COIN_RULES)).toBe(12);
+    expect(sumRecordGemsInCoinWeek(records, "2026-05-14", DEFAULT_COIN_RULES)).toBe(12);
   });
 
   it("counts successful check-ins within the current coin week", () => {
@@ -135,7 +178,7 @@ describe("home stat service", () => {
     expect(
       countSuccessfulCheckInsInWeek(
         records,
-        todayIsoDate(),
+        "2026-05-14",
         DEFAULT_COIN_RULES,
         DEFAULT_VISUAL_RULES,
       ),
@@ -145,15 +188,15 @@ describe("home stat service", () => {
   it("recalculates wallet and weekly totals without changing the rule result", () => {
     const state = baseState({
       dailyRecords: [
-        makeRecord("2026-05-09", 200, 100, 5, 5),
-        makeRecord("2026-05-10", 200, 100, 5, 5),
+        makeRecord("2026-05-16", 200, 100, 5, 5),
+        makeRecord("2026-05-17", 200, 100, 5, 5),
       ],
       exchangeRecords: [
         {
           id: "exchange-1",
-          date: "2026-05-09 13:00",
-          createdAt: "2026-05-09T13:00:00.000Z",
-          occurredAt: "2026-05-09T13:00",
+          date: "2026-05-16 13:00",
+          createdAt: "2026-05-16T13:00:00.000Z",
+          occurredAt: "2026-05-16T13:00",
           time: "13:00",
           category: "零食",
           remark: "",

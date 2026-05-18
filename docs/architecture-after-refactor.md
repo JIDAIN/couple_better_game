@@ -202,3 +202,6 @@ seed 历史数据集中地，保存内置的 5 月历史记录导入数据。
 - 没有云同步
 
 当前边界的目标很明确：先把业务规则、数据恢复和存储抽象成可替换层，后续再把 `AppDataStore` 替换成远程实现。  
+# 当前实现同步说明（2026-05）
+
+当前重构后架构包含导入导出服务：`lib/home/export-service.ts`、`lib/home/import-service.ts`，以及首页入口 `components/home/DataManagement.tsx`。热力图动态网格生成位于 `components/home/mockHeatmapData.ts`。

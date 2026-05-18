@@ -32,10 +32,6 @@ function resolveVisibleStartDate(savedDate: string, monthDate: Date) {
   return /^\d{4}-\d{2}-\d{2}$/.test(savedDate) ? savedDate : fallback;
 }
 
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export function DualMonthlyHeatmaps() {
   const {
     dailyRecords,
@@ -47,7 +43,6 @@ export function DualMonthlyHeatmaps() {
 
   const monthLabel = currentMonthLabel(viewMonthDate);
   const monthEndDate = lastDateOfMonth(viewMonthDate);
-  const viewMonthKey = monthKey(viewMonthDate);
 
   const fishHeatByDate = useMemo(
     () =>
@@ -67,9 +62,6 @@ export function DualMonthlyHeatmaps() {
   );
 
   const visibleStartDate = resolveVisibleStartDate(heatmapStartDate, viewMonthDate);
-  const hasMonthRecords = dailyRecords.some(
-    (record) => record.recordDate.startsWith(viewMonthKey),
-  );
 
   const fishGrid = useMemo(
     () =>
@@ -121,7 +113,7 @@ export function DualMonthlyHeatmaps() {
               className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
               aria-label="查看上个月"
             >
-              ‹
+              ←
             </button>
             <h2 className="text-[1rem] font-bold tracking-tight ui-text-main sm:text-[1.08rem]">
               {monthLabel} · 成长地图
@@ -132,11 +124,11 @@ export function DualMonthlyHeatmaps() {
               className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
               aria-label="查看下个月"
             >
-              ›
+              →
             </button>
           </div>
           <p className="mt-2 text-[13px] font-semibold ui-text-primary sm:text-[14px]">
-            本周已坚持 {weeklySuccessDays} 天 🌷
+            本周已坚持 {weeklySuccessDays} 天 🌟
           </p>
         </div>
       </div>
@@ -162,14 +154,12 @@ export function DualMonthlyHeatmaps() {
           subtitle="小鱼也在努力闪闪发光"
           playerShort="🐟"
           grid={fishGrid}
-          showWeekLabels={hasMonthRecords}
         />
         <PlayerHeatmap
           title="🐱 的成长热力图"
           subtitle="小猫的脚步轻轻，但很坚定"
           playerShort="🐱"
           grid={catGrid}
-          showWeekLabels={hasMonthRecords}
         />
       </div>
 

@@ -1033,3 +1033,6 @@ coupleSpaceId + partnerKey 唯一
 > 钱包余额可以保存快照，但资源变化应由 WalletLedger 追踪。
 > 兑换记录必须保存当时的奖励快照，不能依赖当前奖励分类。
 >
+# 当前实现同步说明（2026-05）
+
+当前仍未接入数据库。若未来入库，`exchange_records` 必须保存兑换当时的 `category`、`icon`、`resourceKind`、`price`、`remark` 快照；宝石钱包余额应能通过 `daily_records + exchange_records` 按业务日期回放重算。

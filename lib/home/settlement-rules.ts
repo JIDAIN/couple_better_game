@@ -56,6 +56,12 @@ export function parseNonNegativeInt(raw: string, fallback = 0): number {
   return Math.floor(n);
 }
 
+export function parseInteger(raw: string, fallback = 0): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.trunc(n);
+}
+
 export function hasDeficit(input: SideLogInput) {
   return input.deficit > 0;
 }
@@ -78,11 +84,12 @@ export function gemsFromExercise(
   minutes: number,
   personHasDeficit: boolean,
 ): number {
+  if (!personHasDeficit) return 0;
+
   if (person === "fish") {
     return minutes >= 30 ? 1 : 0;
   }
 
-  if (!personHasDeficit) return 0;
   if (minutes >= 60) return 2;
   if (minutes >= 30) return 1;
   return 0;
@@ -291,7 +298,12 @@ export function computeCoupleBonus(
   fish: SideLogInput,
   cat: SideLogInput,
 ): CoupleBonusResult {
-  if (fish.minutes < 30 || cat.minutes < 30) {
+  if (
+    !hasDeficit(fish) ||
+    !hasDeficit(cat) ||
+    fish.minutes < 30 ||
+    cat.minutes < 30
+  ) {
     return { gems: 0, reasons: [] };
   }
 

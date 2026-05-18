@@ -5,6 +5,7 @@ import { useHomeResources } from "./HomeResourcesProvider";
 import { getCampaignDayCount } from "./mockHeatmapData";
 
 import { CoupleGrowthPanel } from "./CoupleGrowthPanel";
+import { DataManagement } from "./DataManagement";
 import { DualMonthlyHeatmaps } from "./DualMonthlyHeatmaps";
 import { EncouragementQuote } from "./EncouragementQuote";
 import { ExchangeShop } from "./ExchangeShop";
@@ -83,9 +84,10 @@ export function HomeScreen() {
 
           <RecordTodayButton buttonVariant="today" />
 
-          <div className="grid w-full grid-cols-2 gap-2 pt-1">
+          <div className="grid w-full grid-cols-3 gap-2 pt-1">
             <GrowthLog />
             <ExchangeShop />
+            <DataManagement />
           </div>
         </div>
       </div>

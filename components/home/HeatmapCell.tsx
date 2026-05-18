@@ -17,10 +17,12 @@ export function HeatmapCell({
   level,
   exercise,
   title,
+  muted = false,
 }: {
   level: HeatLevel;
   exercise: ExerciseTag;
   title: string;
+  muted?: boolean;
 }) {
   const icon = exerciseIcon[exercise];
 
@@ -32,6 +34,7 @@ export function HeatmapCell({
         "hover:z-10 hover:scale-110",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1",
         levelClass[level],
+        muted ? "opacity-45 saturate-[0.75]" : "",
       ].join(" ")}
       role="img"
       aria-label={title}

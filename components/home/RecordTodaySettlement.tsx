@@ -8,6 +8,7 @@ import {
   gemBreakdownForPerson,
   getCurrentIsoDate,
   isInCoinWeek,
+  parseInteger,
   parseNonNegativeInt,
   parseOptionalWeight,
   type SideLogInput,
@@ -237,7 +238,7 @@ export function RecordTodaySettlement({
   const fishInput: SideLogInput = useMemo(
     () => ({
       weightKg: parseOptionalWeight(fishW),
-      deficit: parseNonNegativeInt(fishD),
+      deficit: parseInteger(fishD),
       minutes: parseNonNegativeInt(fishM),
     }),
     [fishD, fishM, fishW],
@@ -245,7 +246,7 @@ export function RecordTodaySettlement({
   const catInput: SideLogInput = useMemo(
     () => ({
       weightKg: parseOptionalWeight(catW),
-      deficit: parseNonNegativeInt(catD),
+      deficit: parseInteger(catD),
       minutes: parseNonNegativeInt(catM),
     }),
     [catD, catM, catW],
@@ -320,9 +321,11 @@ export function RecordTodaySettlement({
   const hasAnyEffort = useMemo(
     () =>
       fishInput.deficit > 0 ||
+      fishInput.deficit < 0 ||
       fishInput.minutes > 0 ||
       fishInput.weightKg != null ||
       catInput.deficit > 0 ||
+      catInput.deficit < 0 ||
       catInput.minutes > 0 ||
       catInput.weightKg != null,
     [catInput, fishInput],

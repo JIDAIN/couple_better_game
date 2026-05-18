@@ -15,3 +15,6 @@
 | 热力图颜色等级：0 = 未完成；1-279 kcal = 一般；280-519 kcal = 较好；>=520 kcal = 超棒 | `DualMonthlyHeatmaps` 月度热力图；`HeatmapLegend` 图例 | 沿用现有等级，集中在 `heatLevelFromDeficit()` | 当日输入经 `buildHeatmapDay()` 写入 heatmap overrides | 若想严格区分鱼鱼 / 猫猫阈值，可后续调整色阶 |
 | 运动热力图角标：0 = 无；1-39min = 有运动；>=40min = 高强度 | `DualMonthlyHeatmaps` 月度热力图；`HeatmapLegend` 图例 | 沿用现有等级，集中在 `exerciseTagFromMinutes()` | 当日输入经 `buildHeatmapDay()` 写入 heatmap overrides | 可后续按 30 / 60min 新规则同步角标阈值 |
 | 兑换余额检查 | `ExchangeShop` 兑换按钮可用性、确认兑换扣减 | 已检查，仍只读取共享宝石 / 金币余额；本次未修改默认分类、价格、消费流程 | `HomeResourcesProvider.gemStock`、`coinStock` | 不实现双方同意 / 否决机制 |
+# 当前实现同步说明（2026-05）
+
+当前规则已确认：鱼鱼运动宝石必须在鱼鱼存在热量缺口时触发；情侣运动 bonus 必须双方都有热量缺口时触发。宝石钱包按业务日期账本回放，每天先加成长宝石并封顶 50，再扣当天兑换消费。

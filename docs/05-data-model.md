@@ -971,3 +971,12 @@ AppDataSnapshot 作为导入导出的整体快照
 UI 状态不应持久化；
 未来后端应以 daily_records 和 exchange_records 为核心表。
 ```
+# 当前实现同步说明（2026-05）
+
+以下数据模型以当前程序为准：
+
+- 完整备份 JSON 使用 `schemaVersion: 1`，顶层包含 `exportedAt`、`wallet`、`dailyRecords`、`exchangeRecords`、`exchangeCategories`、`heatmapStartDate`、`coinRules`、`visualRules`。
+- `exchangeRecords` 必须保存历史快照字段：`category`、`icon`、`resourceKind`、`price`、`remark`。历史展示不依赖当前商品模板。
+- 旧兑换记录导入时，如果缺快照字段，会用默认值或通过 `categoryId` 从 `exchangeCategories` 尝试补齐一次。
+- 宝石钱包余额是派生值，应由 `dailyRecords + exchangeRecords` 按业务日期回放重算：每天先加成长宝石并封顶 50，再扣当天兑换消费。
+- 热力图展示层的 `HeatmapCellData` 包含 `date`、`day`、`month`、`isCurrentMonth`、`heat`。月视图会生成完整周，所以首尾行可能包含上个月或下个月日期。

@@ -937,3 +937,8 @@ visualRules
 未来接入后端时，应优先持久化这些数据。
 钱包、周统计、连续天数、热力图结果可以保存快照，但必须允许重新计算。
 弹窗、toast、输入草稿、当前 tab、动画状态不应进入数据库。
+# 当前实现同步说明（2026-05）
+
+当前可导出 / 可备份数据包括：`wallet`、`dailyRecords`、`exchangeRecords`、`exchangeCategories`、`heatmapStartDate`、`coinRules`、`visualRules`。完整备份 JSON 使用 `schemaVersion: 1`，导入方式为覆盖导入。
+
+`wallet` 是可导出的快照，但宝石余额应能从 `dailyRecords + exchangeRecords` 按业务日期回放重算。`exchangeRecords` 是历史事实数据，必须保留兑换当时的 `category`、`icon`、`resourceKind`、`price`、`remark` 快照。

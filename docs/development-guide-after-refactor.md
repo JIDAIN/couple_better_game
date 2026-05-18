@@ -108,3 +108,6 @@
 4. 最后跑 `npm run test`、`npm run lint`、`npm run build`
 
 这样做会慢一点，但回头修 bug 会轻松很多。  
+# 当前实现同步说明（2026-05）
+
+新增数据迁移相关功能时应优先扩展 `lib/home/export-service.ts` 和 `lib/home/import-service.ts`，不要在 UI 组件中拼装备份结构。修改热力图日期逻辑时应同步更新 `components/home/mockHeatmapData.ts` 和 `tests/home/heatmap-grid.test.ts`。

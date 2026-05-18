@@ -37,17 +37,13 @@ export function PlayerHeatmap({
   subtitle,
   playerShort,
   grid,
-  showWeekLabels = true,
 }: {
   title: string;
   subtitle: string;
   playerShort: string;
   grid: MonthGrid;
-  showWeekLabels?: boolean;
 }) {
-  const gridColumns = showWeekLabels
-    ? "2.9rem repeat(7, minmax(0, 1fr))"
-    : "repeat(7, minmax(0, 1fr))";
+  const gridColumns = "repeat(7, minmax(0, 1fr))";
 
   return (
     <div className="ui-card-soft ui-card-item sm:p-4">
@@ -68,9 +64,6 @@ export function PlayerHeatmap({
           className="grid items-center gap-x-1 sm:gap-x-1.5"
           style={{ gridTemplateColumns: gridColumns }}
         >
-          {showWeekLabels ? (
-            <div className="text-[10px] font-semibold ui-text-soft"> </div>
-          ) : null}
           {weekdayLabels.map((label) => (
             <div
               key={`weekday-${label}`}
@@ -87,11 +80,6 @@ export function PlayerHeatmap({
             className="grid items-center gap-x-1 sm:gap-x-1.5"
             style={{ gridTemplateColumns: gridColumns }}
           >
-            {showWeekLabels ? (
-              <div className="pr-1 text-[10px] font-semibold ui-text-soft sm:text-[11px]">
-                第 {weekIndex + 1} 周
-              </div>
-            ) : null}
             {week.map((cell, dayIndex) => {
               const heat = cell?.heat;
               const level = heat?.level ?? "none";
@@ -101,6 +89,7 @@ export function PlayerHeatmap({
                   key={`${weekIndex}-${dayIndex}`}
                   level={level}
                   exercise={exercise}
+                  muted={cell ? !cell.isCurrentMonth : false}
                   title={buildCellTitle({
                     playerShort,
                     dateLabel: dayLabel(cell),

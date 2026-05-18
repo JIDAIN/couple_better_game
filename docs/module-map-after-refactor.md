@@ -42,3 +42,12 @@
 3. 最后如果需要，再考虑 reducer / event bus 之类的结构
 
 当前最重要的原则仍然是：**UI 只消费 Context，不直接接触核心业务逻辑。**  
+# 当前实现同步说明（2026-05）
+
+新增或更新的关键模块：
+
+- `lib/home/export-service.ts`：完整备份 JSON 和每周复盘 CSV 导出。
+- `lib/home/import-service.ts`：完整备份 JSON 覆盖导入和旧兑换记录兼容。
+- `components/home/DataManagement.tsx`：首页数据管理入口。
+- `components/home/mockHeatmapData.ts`：动态生成完整周月度热力图网格，支持跨月日期。
+- `tests/home/heatmap-grid.test.ts`：保护跨月热力图网格行为。

@@ -36,7 +36,7 @@ export function normalizeHistoricalSideInput(
   if (!input) return null;
   return {
     weightKg: input.weightKg,
-    deficit: Math.max(0, Math.floor(input.deficit)),
+    deficit: Math.trunc(input.deficit),
     minutes: Math.max(0, Math.floor(input.minutes)),
   };
 }

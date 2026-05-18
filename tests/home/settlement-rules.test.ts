@@ -12,6 +12,7 @@ import {
   getCoinWeekRange,
   heatLevelFromDeficit,
   isInCoinWeek,
+  parseInteger,
   parseNonNegativeInt,
   parseOptionalWeight,
   type PreviousDailyRecord,
@@ -50,6 +51,13 @@ describe("input parsers", () => {
     expect(parseNonNegativeInt("-1", 7)).toBe(7);
     expect(parseNonNegativeInt("abc", 7)).toBe(7);
   });
+
+  it("parses signed integer deficits", () => {
+    expect(parseInteger("12")).toBe(12);
+    expect(parseInteger("12.9")).toBe(12);
+    expect(parseInteger("-48.6")).toBe(-48);
+    expect(parseInteger("abc", 7)).toBe(7);
+  });
 });
 
 describe("gem settlement rules", () => {
@@ -71,8 +79,9 @@ describe("gem settlement rules", () => {
 
   it("settles exercise gems by person and deficit precondition", () => {
     expect(gemsFromExercise("fish", 29, false)).toBe(0);
-    expect(gemsFromExercise("fish", 30, false)).toBe(1);
-    expect(gemsFromExercise("fish", 60, false)).toBe(1);
+    expect(gemsFromExercise("fish", 30, false)).toBe(0);
+    expect(gemsFromExercise("fish", 30, true)).toBe(1);
+    expect(gemsFromExercise("fish", 60, false)).toBe(0);
 
     expect(gemsFromExercise("cat", 29, true)).toBe(0);
     expect(gemsFromExercise("cat", 30, true)).toBe(1);
@@ -126,15 +135,23 @@ describe("gem settlement rules", () => {
     });
   });
 
-  it("settles couple bonus when both exercised at least 30 minutes", () => {
-    expect(computeCoupleBonus(side(0, 30), side(0, 30))).toMatchObject({
+  it("settles couple bonus when both have deficits and exercised at least 30 minutes", () => {
+    expect(computeCoupleBonus(side(1, 30), side(1, 30))).toMatchObject({
       gems: 2,
     });
-    expect(computeCoupleBonus(side(0, 30), side(0, 29))).toEqual({
+    expect(computeCoupleBonus(side(1, 30), side(1, 29))).toEqual({
       gems: 0,
       reasons: [],
     });
-    expect(computeCoupleBonus(side(0, 30), side(0, 30)).reasons.length).toBe(1);
+    expect(computeCoupleBonus(side(0, 30), side(1, 30))).toEqual({
+      gems: 0,
+      reasons: [],
+    });
+    expect(computeCoupleBonus(side(1, 30), side(0, 30))).toEqual({
+      gems: 0,
+      reasons: [],
+    });
+    expect(computeCoupleBonus(side(1, 30), side(1, 30)).reasons.length).toBe(1);
   });
 });
 

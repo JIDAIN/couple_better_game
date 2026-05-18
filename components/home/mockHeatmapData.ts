@@ -3,6 +3,8 @@ import type { HeatmapDay } from "./types";
 export type HeatmapCellData = {
   date: string;
   day: number;
+  month: number;
+  isCurrentMonth: boolean;
   heat: HeatmapDay;
 } | null;
 
@@ -98,12 +100,12 @@ export function getCampaignDayCount(startDate: string, today = new Date()) {
 export function getCampaignDayText(startDate: string, today = new Date()) {
   const count = getCampaignDayCount(startDate, today);
   if (count == null || !startDate) {
-    return "设置作战开始日后，就可以记录我们的第几天啦 ✨";
+    return "设置作战开始日后，就可以记录我们的第几天啦";
   }
   if (count <= 0) {
-    return "变美变瘦大作战即将开启 ✨";
+    return "变美变瘦大作战即将开始";
   }
-  return `变美变瘦大作战已经开启第 ${count} 天啦 ✨`;
+  return `变美变瘦大作战已经开启第 ${count} 天啦`;
 }
 
 export function buildMonthGridByStartDate({
@@ -132,14 +134,11 @@ export function buildMonthGridByStartDate({
     for (let offset = 0; offset < 7; offset += 1) {
       const date = addDays(weekStart, offset);
       const iso = formatDateKey(date);
-      const inTargetMonth = monthKey(date) === targetMonth;
-      if (!inTargetMonth) {
-        week.push(null);
-        continue;
-      }
       week.push({
         date: iso,
         day: date.getDate(),
+        month: date.getMonth() + 1,
+        isCurrentMonth: monthKey(date) === targetMonth,
         heat: heatByDate[iso] ?? emptyHeat,
       });
     }
@@ -159,5 +158,6 @@ export function buildMonthGrid(args: {
 
 export function dayLabel(cell: HeatmapCellData): string | null {
   if (!cell) return null;
+  if (!cell.isCurrentMonth) return `${cell.month}/${cell.day}日`;
   return `${cell.day}日`;
 }

@@ -1165,3 +1165,8 @@ Store 负责数据来源
 
 这个架构的目标是：
 **让 UI 可以持续调整，让业务规则可以独立测试，让数据来源未来可以从 localStorage 平滑迁移到后端。**
+# 当前实现同步说明（2026-05）
+
+当前前端本地架构新增数据管理服务：`export-service` 负责完整备份 JSON 和每周复盘 CSV 导出，`import-service` 负责完整备份 JSON 校验和覆盖导入。首页通过 `DataManagement` 暴露入口。
+
+热力图网格由 `components/home/mockHeatmapData.ts` 动态生成，按周六到周五渲染完整周，跨月日期读取真实 `dailyRecords.recordDate` 数据。

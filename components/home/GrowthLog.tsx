@@ -7,6 +7,7 @@ import {
   computeCoupleBonus,
   gemBreakdownForPerson,
   isInCoinWeek,
+  parseInteger,
   parseNonNegativeInt,
   parseOptionalWeight,
   type SideLogInput,
@@ -395,7 +396,7 @@ export function GrowthLog() {
   const fishInput: SideLogInput = useMemo(
     () => ({
       weightKg: parseOptionalWeight(fishW),
-      deficit: parseNonNegativeInt(fishD),
+      deficit: parseInteger(fishD),
       minutes: parseNonNegativeInt(fishM),
     }),
     [fishD, fishM, fishW],
@@ -403,7 +404,7 @@ export function GrowthLog() {
   const catInput: SideLogInput = useMemo(
     () => ({
       weightKg: parseOptionalWeight(catW),
-      deficit: parseNonNegativeInt(catD),
+      deficit: parseInteger(catD),
       minutes: parseNonNegativeInt(catM),
     }),
     [catD, catM, catW],

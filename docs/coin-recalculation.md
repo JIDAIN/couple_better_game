@@ -104,3 +104,6 @@
 
 - `tests/home/home-stat-service.test.ts` 中验证了 `2026-05-11` 和一个 `9` 宝石的 `2026-05-13` 都是 `0` 金币。
 - 同一测试文件也验证了阈值金币只会落在真实跨过门槛的日期。
+# 当前实现同步说明（2026-05）
+
+宝石钱包重算规则：按业务日期顺序回放 `dailyRecords + exchangeRecords`。同一天先加成长获得宝石并执行 `min(50, balance + gain)`，再扣当天兑换消费 `max(0, balance - spend)`。消费日期使用 `occurredAt`，旧数据兼容 `date`。

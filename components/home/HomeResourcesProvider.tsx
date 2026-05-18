@@ -20,7 +20,12 @@ import {
   upsertExchangeCategoryInList,
 } from "@/lib/home/exchange-service";
 import { createLocalStorageAppDataStore } from "@/lib/home/local-storage-app-data-store";
+import {
+  exportWeeklyReviewCsv,
+  serializeHomeBackup,
+} from "@/lib/home/export-service";
 import { computeGemWallet } from "@/lib/home/home-stat-service";
+import { importHomeBackupJson } from "@/lib/home/import-service";
 import {
   applyTodayRecordToState,
   deleteDailyRecordFromState,
@@ -153,6 +158,9 @@ type HomeResourcesContextValue = {
   updateHeatmapStartDate: (date: string) => void;
   upsertExchangeCategory: (category: ExchangeCategory) => void;
   deleteExchangeCategory: (categoryId: string) => void;
+  exportBackupJson: () => string;
+  exportWeeklyReviewCsv: () => string;
+  importBackupJson: (raw: string) => { ok: boolean; reason?: string };
 };
 
 const HomeResourcesContext = createContext<HomeResourcesContextValue | null>(
@@ -268,13 +276,18 @@ export function HomeResourcesProvider({
         });
 
         updated = true;
+        const nextExchangeRecords = orderExchangeRecords(
+          state.exchangeRecords.map((record) =>
+            record.id === recordId ? nextRecord : record,
+          ),
+        );
         return {
           ...state,
-          exchangeRecords: orderExchangeRecords(
-            state.exchangeRecords.map((record) =>
-              record.id === recordId ? nextRecord : record,
-            ),
-          ),
+          wallet: {
+            ...state.wallet,
+            gems: computeGemWallet(state.dailyRecords, nextExchangeRecords),
+          },
+          exchangeRecords: nextExchangeRecords,
         };
       });
       return updated;
@@ -456,6 +469,28 @@ export function HomeResourcesProvider({
     [commitHomeState],
   );
 
+  const exportBackupJson = useCallback(
+    () => serializeHomeBackup(stateRef.current),
+    [],
+  );
+
+  const exportWeeklyReviewCsvAction = useCallback(
+    () => exportWeeklyReviewCsv(stateRef.current),
+    [],
+  );
+
+  const importBackupJson = useCallback(
+    (raw: string) => {
+      const result = importHomeBackupJson(raw);
+      if (!result.ok) return result;
+      stateRef.current = result.state;
+      setHomeState(result.state);
+      writeHomeResourcesState(dataStore, result.state);
+      return { ok: true };
+    },
+    [dataStore],
+  );
+
   const value = useMemo(
     () => ({
       gemStock: homeState.wallet.gems,
@@ -491,6 +526,9 @@ export function HomeResourcesProvider({
       updateHeatmapStartDate,
       upsertExchangeCategory,
       deleteExchangeCategory,
+      exportBackupJson,
+      exportWeeklyReviewCsv: exportWeeklyReviewCsvAction,
+      importBackupJson,
     }),
     [
       homeState,
@@ -508,6 +546,9 @@ export function HomeResourcesProvider({
       updateHeatmapStartDate,
       upsertExchangeCategory,
       deleteExchangeCategory,
+      exportBackupJson,
+      exportWeeklyReviewCsvAction,
+      importBackupJson,
     ],
   );
 
