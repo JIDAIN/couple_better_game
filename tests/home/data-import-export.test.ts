@@ -109,6 +109,45 @@ describe("data import/export", () => {
     });
   });
 
+  it("normalizes exchange record snapshots before exporting backup json", () => {
+    const state = makeState({
+      exchangeCategories: [
+        {
+          id: "changed",
+          title: "不应依赖的新分类",
+          icon: "✨",
+          description: "",
+          resourceKind: "coin",
+          price: 99,
+        },
+      ],
+      exchangeRecords: [
+        {
+          id: "legacy-export",
+          date: "",
+          createdAt: "",
+          occurredAt: "",
+          time: "",
+        } as ExchangeRecord,
+      ],
+    });
+
+    const backup = buildHomeBackup(state, "2026-05-18T00:00:00.000Z");
+
+    expect(backup.schemaVersion).toBe(1);
+    expect(backup.exchangeRecords[0]).toMatchObject({
+      id: "legacy-export",
+      category: "未知兑换",
+      icon: "🎁",
+      resourceKind: "gem",
+      price: 0,
+      remark: "",
+      createdAt: "1970-01-01T00:00:00.000Z",
+      occurredAt: "1970-01-01T08:00",
+    });
+    expect(backup.exchangeRecords[0].date).toContain("08:00");
+  });
+
   it("imports a complete backup and keeps exchange record snapshots", () => {
     const backup = {
       schemaVersion: 1,

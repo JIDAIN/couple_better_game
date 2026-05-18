@@ -1,6 +1,12 @@
 import { getCoinWeekRange } from "./settlement-rules";
 import { recordGems, recordIsoDate } from "./daily-record-utils";
-import type { DailyRecord, HomeResourcesState } from "./types";
+import { normalizeExchangeRecord } from "./exchange-service";
+import type {
+  DailyRecord,
+  ExchangeRecord,
+  HomeResourcesState,
+  ResourceKind,
+} from "./types";
 
 export const BACKUP_SCHEMA_VERSION = 1;
 
@@ -16,6 +22,49 @@ export type HomeBackupJson = {
   visualRules: HomeResourcesState["visualRules"];
 };
 
+function stringOr(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function numberOr(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function resourceKindOr(value: unknown, fallback: ResourceKind): ResourceKind {
+  return value === "coin" || value === "gem" ? value : fallback;
+}
+
+function normalizeExportExchangeRecord(
+  record: Partial<ExchangeRecord>,
+  index: number,
+): ExchangeRecord {
+  const createdAt = stringOr(
+    record.createdAt,
+    stringOr(record.occurredAt, "1970-01-01T00:00:00.000Z"),
+  );
+
+  return normalizeExchangeRecord({
+    id: stringOr(record.id, `exchange-export-${index}`),
+    date: stringOr(record.date),
+    createdAt,
+    occurredAt: stringOr(record.occurredAt, createdAt),
+    time: stringOr(record.time),
+    category: stringOr(record.category, "未知兑换"),
+    icon: stringOr(record.icon, "🎁"),
+    resourceKind: resourceKindOr(record.resourceKind, "gem"),
+    price: numberOr(record.price),
+    remark: stringOr(record.remark),
+  });
+}
+
+function normalizeExportExchangeRecords(
+  records: HomeResourcesState["exchangeRecords"],
+) {
+  return records.map((record, index) =>
+    normalizeExportExchangeRecord(record, index),
+  );
+}
+
 export function buildHomeBackup(
   state: HomeResourcesState,
   exportedAt = new Date().toISOString(),
@@ -25,7 +74,7 @@ export function buildHomeBackup(
     exportedAt,
     wallet: state.wallet,
     dailyRecords: state.dailyRecords,
-    exchangeRecords: state.exchangeRecords,
+    exchangeRecords: normalizeExportExchangeRecords(state.exchangeRecords),
     exchangeCategories: state.exchangeCategories,
     heatmapStartDate: state.heatmapStartDate,
     coinRules: state.coinRules,
