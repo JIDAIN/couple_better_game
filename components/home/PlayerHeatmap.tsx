@@ -1,58 +1,62 @@
+import type { ReactNode } from "react";
 import type { MonthGrid } from "./mockHeatmapData";
 import { dayLabel } from "./mockHeatmapData";
 import { HeatmapCell } from "./HeatmapCell";
 import type { HeatLevel } from "./types";
+import { AppCard } from "../ui";
 
 const weekdayLabels = ["六", "日", "一", "二", "三", "四", "五"] as const;
 
 const levelHint: Record<HeatLevel, string> = {
-  none: "未完成",
-  ok: "一般完成",
-  good: "完成较好",
-  perfect: "超棒的一天",
+  empty: "未记录",
+  "over-light": "未达标",
+  "over-mid": "未达标",
+  "over-strong": "未达标",
+  "over-heavy": "未达标",
+  none: "未达标",
+  ok: "一般",
+  good: "较好",
+  perfect: "超棒",
 };
 
 function buildCellTitle({
-  playerShort,
+  playerLabel,
   dateLabel,
   weekday,
   level,
   hasRun,
 }: {
-  playerShort: string;
+  playerLabel: string;
   dateLabel: string | null;
   weekday: string;
   level: HeatLevel;
   hasRun: boolean;
 }) {
-  const run = hasRun ? "有运动" : "未记录运动";
+  const run = level === "empty" ? "未记录" : hasRun ? "有运动" : "未记录运动";
   const head = dateLabel
-    ? `${playerShort} · ${dateLabel} · 周${weekday}`
-    : `${playerShort} · 周${weekday}`;
+    ? `${playerLabel} · ${dateLabel} · 周${weekday}`
+    : `${playerLabel} · 周${weekday}`;
   return `${head} · 热量缺口${levelHint[level]} · ${run}`;
 }
 
 export function PlayerHeatmap({
   title,
-  subtitle,
   playerShort,
+  playerLabel,
   grid,
 }: {
-  title: string;
-  subtitle: string;
-  playerShort: string;
+  title: ReactNode;
+  playerShort: ReactNode;
+  playerLabel: string;
   grid: MonthGrid;
 }) {
   const gridColumns = "repeat(7, minmax(0, 1fr))";
 
   return (
-    <div className="ui-card-soft ui-card-item min-w-0 sm:p-4">
+    <AppCard variant="item" className="min-w-0 sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-[13px] font-bold tracking-wide ui-text-main">
-            {title}
-          </h3>
-          <p className="text-[11px] font-medium ui-text-muted">{subtitle}</p>
+          <p className="heatmap-card-title">{title}</p>
         </div>
         <span className="text-base opacity-90" aria-hidden>
           {playerShort}
@@ -82,7 +86,7 @@ export function PlayerHeatmap({
           >
             {week.map((cell, dayIndex) => {
               const heat = cell?.heat;
-              const level = heat?.level ?? "none";
+              const level = heat?.level ?? "empty";
               const exercise = heat?.exercise ?? "none";
               return (
                 <HeatmapCell
@@ -91,7 +95,7 @@ export function PlayerHeatmap({
                   exercise={exercise}
                   muted={cell ? !cell.isCurrentMonth : false}
                   title={buildCellTitle({
-                    playerShort,
+                    playerLabel,
                     dateLabel: dayLabel(cell),
                     weekday: weekdayLabels[dayIndex],
                     level,
@@ -103,6 +107,6 @@ export function PlayerHeatmap({
           </div>
         ))}
       </div>
-    </div>
+    </AppCard>
   );
 }

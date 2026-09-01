@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildMonthGridByStartDate, dayLabel } from "../../components/home/mockHeatmapData";
+import {
+  buildMonthGridByStartDate,
+  dayLabel,
+} from "../../components/home/mockHeatmapData";
 import type { HeatmapDay } from "../../components/home/types";
 
 const activeHeat: HeatmapDay = {
@@ -33,7 +36,7 @@ describe("heatmap month grid", () => {
     expect(dayLabel(april30)).toBe("4/30日");
   });
 
-  it("keeps current-month labels compact", () => {
+  it("keeps current-month labels compact and separates missing records", () => {
     const grid = buildMonthGridByStartDate({
       monthDate: new Date(2026, 4, 1),
       startDate: "2026-04-25",
@@ -41,5 +44,6 @@ describe("heatmap month grid", () => {
     });
 
     expect(dayLabel(grid[0][6])).toBe("1日");
+    expect(grid[0][6]?.heat.level).toBe("empty");
   });
 });

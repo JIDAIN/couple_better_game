@@ -70,7 +70,7 @@ function makeGemExchange(
     time: "12:00",
     category: "零食",
     remark: "",
-    resourceKind: "gem",
+    resourceKind: "coin",
     price,
     icon: "🍪",
   };
@@ -125,7 +125,7 @@ describe("home stat service", () => {
         time: "13:00",
         category: "零食",
         remark: "",
-        resourceKind: "gem",
+        resourceKind: "coin",
         price: 7,
         icon: "🍿",
       },
@@ -209,8 +209,9 @@ describe("home stat service", () => {
 
     const next = recalculateCoinsWithCurrentRules(state);
 
-    expect(next.wallet.gems).toBe(17);
-    expect(next.weekGemTotal).toBe(20);
+    expect(next.wallet.gems).toBe(0);
+    expect(next.wallet.coins).toBe(20);
+    expect(next.weekGemTotal).toBe(0);
     expect(next.weekCoinTotal).toBe(0);
   });
 

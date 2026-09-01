@@ -23,8 +23,9 @@ import { createLocalStorageAppDataStore } from "@/lib/home/local-storage-app-dat
 import {
   exportWeeklyReviewCsv,
   serializeHomeBackup,
+  serializeHomeSyncData,
 } from "@/lib/home/export-service";
-import { computeGemWallet } from "@/lib/home/home-stat-service";
+import { computeCoinWallet } from "@/lib/home/home-stat-service";
 import { importHomeBackupJson } from "@/lib/home/import-service";
 import {
   applyTodayRecordToState,
@@ -39,6 +40,13 @@ import {
   readHomeResourcesState,
   writeHomeResourcesState,
 } from "@/lib/home/home-state-service";
+import {
+  guardRemoteReload,
+  retryExhaustedMessage,
+  shouldRetrySync,
+  shouldRunPendingAutoSync,
+  type SyncErrorCode,
+} from "@/lib/home/sync-state-service";
 import type {
   DailyRecord,
   ExchangeCategory,
@@ -49,6 +57,18 @@ import type {
   Wallet,
 } from "@/lib/home/types";
 import { type CoinRulesConfig, type SettlementVisualRules } from "./settlement-rules";
+
+const SYNC_META_STORAGE_KEY = "couple-better-game-sync-meta";
+const SYNC_DIRTY_KEY = "couple-better-game-sync-dirty";
+const PRE_SYNC_BACKUP_KEY = "couple-better-game:home-resources:pre-sync-backup";
+const SYNC_PASSWORD_KEY = "couple-better-sync-password";
+
+type SyncStatus =
+  | "已是最新"
+  | "有未同步修改"
+  | "正在加载"
+  | "正在同步"
+  | "同步失败";
 
 export { GEM_CAP } from "./settlement-rules";
 export type {
@@ -158,7 +178,24 @@ type HomeResourcesContextValue = {
   updateHeatmapStartDate: (date: string) => void;
   upsertExchangeCategory: (category: ExchangeCategory) => void;
   deleteExchangeCategory: (categoryId: string) => void;
+  syncStatus: SyncStatus;
+  syncErrorReason: string | null;
+  syncErrorCode: SyncErrorCode | null;
+  lastSyncedAt: string | null;
+  reloadFromGitHub: (options?: {
+    force?: boolean;
+    silent?: boolean;
+    allowDirtyOverwrite?: boolean;
+  }) => Promise<{
+    ok: boolean;
+    reason?: string;
+    errorCode?: SyncErrorCode;
+  }>;
+  syncToGitHub: (
+    password: string,
+  ) => Promise<{ ok: boolean; reason?: string; errorCode?: SyncErrorCode }>;
   exportBackupJson: () => string;
+  exportGitHubSyncJson: () => string;
   exportWeeklyReviewCsv: () => string;
   importBackupJson: (raw: string) => { ok: boolean; reason?: string };
 };
@@ -181,6 +218,83 @@ type ProviderProps = {
   initialCoins?: number;
 };
 
+function readSyncMeta() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SYNC_META_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { lastSyncedAt?: unknown };
+    return typeof parsed.lastSyncedAt === "string" ? parsed.lastSyncedAt : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSyncMeta(lastSyncedAt: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(
+    SYNC_META_STORAGE_KEY,
+    JSON.stringify({ lastSyncedAt }),
+  );
+}
+
+function readSyncDirty(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(SYNC_DIRTY_KEY) === "1";
+}
+
+function writeSyncDirty(dirty: boolean) {
+  if (typeof window === "undefined") return;
+  if (dirty) {
+    window.localStorage.setItem(SYNC_DIRTY_KEY, "1");
+  } else {
+    window.localStorage.removeItem(SYNC_DIRTY_KEY);
+  }
+}
+
+function readSyncPassword(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(SYNC_PASSWORD_KEY) ?? "";
+}
+
+function clearSyncPassword() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SYNC_PASSWORD_KEY);
+}
+
+function writePreSyncBackup(state: HomeResourcesState) {
+  if (typeof window === "undefined") return;
+  try {
+    const backup = serializeHomeBackup(state);
+    window.localStorage.setItem(PRE_SYNC_BACKUP_KEY, backup);
+  } catch {
+    // 备份失败不阻塞
+  }
+}
+
+function clearPreSyncBackup() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(PRE_SYNC_BACKUP_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+const MAX_SYNC_RETRY = 3;
+
+function timestamp(value: string | null | undefined) {
+  if (!value) return null;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
+}
+
+function remoteUpdatedAtFromData(data: unknown) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const updatedAt = (data as { updatedAt?: unknown }).updatedAt;
+  return typeof updatedAt === "string" ? updatedAt : null;
+}
+
 export function HomeResourcesProvider({
   children,
   initialGems = 0,
@@ -190,29 +304,223 @@ export function HomeResourcesProvider({
   const [homeState, setHomeState] = useState<HomeResourcesState>(() =>
     createDefaultHomeResourcesState(initialGems, initialCoins),
   );
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("正在加载");
+  const [syncErrorReason, setSyncErrorReason] = useState<string | null>(null);
+  const [syncErrorCode, setSyncErrorCode] = useState<SyncErrorCode | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const stateRef = useRef(homeState);
+  const lastSyncedAtRef = useRef<string | null>(null);
+  const hadLocalDataRef = useRef(false);
+  const hasUnsyncedChangesRef = useRef(false);
+  const syncInFlightRef = useRef(false);
+  const pendingAutoSyncRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const syncErrorCodeRef = useRef<SyncErrorCode | null>(null);
+  const syncErrorReasonRef = useRef<string | null>(null);
+
+  const [dirtyVersion, setDirtyVersion] = useState(0);
+  const dirtyVersionRef = useRef(0);
+
+  const [retryVersion, setRetryVersion] = useState(0);
+  const retryVersionRef = useRef(0);
+
+  const bumpDirtyVersion = useCallback(() => {
+    retryCountRef.current = 0;
+    retryVersionRef.current = 0;
+    setRetryVersion(0);
+    dirtyVersionRef.current += 1;
+    setDirtyVersion(dirtyVersionRef.current);
+  }, []);
+
+  const clearDirtyVersion = useCallback(() => {
+    retryCountRef.current = 0;
+    retryVersionRef.current = 0;
+    setRetryVersion(0);
+    dirtyVersionRef.current = 0;
+    setDirtyVersion(0);
+  }, []);
+
+  const updateLastSyncedAt = useCallback((value: string) => {
+    lastSyncedAtRef.current = value;
+    setLastSyncedAt(value);
+    writeSyncMeta(value);
+  }, []);
+
+  const clearSyncError = useCallback(() => {
+    syncErrorCodeRef.current = null;
+    syncErrorReasonRef.current = null;
+    setSyncErrorCode(null);
+    setSyncErrorReason(null);
+  }, []);
+
+  const setSyncError = useCallback(
+    (reason: string, errorCode: SyncErrorCode = "UNKNOWN") => {
+      syncErrorCodeRef.current = errorCode;
+      syncErrorReasonRef.current = reason;
+      setSyncErrorCode(errorCode);
+      setSyncErrorReason(reason);
+    },
+    [],
+  );
+
+  const markUnsyncedChanges = useCallback(() => {
+    hasUnsyncedChangesRef.current = true;
+    writeSyncDirty(true);
+    clearSyncError();
+    setSyncStatus("有未同步修改");
+    bumpDirtyVersion();
+  }, [bumpDirtyVersion, clearSyncError]);
+
+  const commitHomeState = useCallback(
+    (
+      updater: (current: HomeResourcesState) => HomeResourcesState,
+      options?: { markDirty?: boolean },
+    ) => {
+      const current = stateRef.current;
+      const next = updater(current);
+      if (next === current) return;
+      stateRef.current = next;
+      setHomeState(next);
+      writeHomeResourcesState(dataStore, next);
+      if (options?.markDirty !== false) {
+        markUnsyncedChanges();
+      }
+    },
+    [dataStore, markUnsyncedChanges],
+  );
+
+  const applyRemoteData = useCallback(
+    (raw: unknown, remoteUpdatedAt: string) => {
+      const result = importHomeBackupJson(JSON.stringify(raw));
+      if (!result.ok) return result;
+      stateRef.current = result.state;
+      setHomeState(result.state);
+      writeHomeResourcesState(dataStore, result.state);
+      hasUnsyncedChangesRef.current = false;
+      writeSyncDirty(false);
+      clearDirtyVersion();
+      clearSyncError();
+      updateLastSyncedAt(remoteUpdatedAt);
+      setSyncStatus("已是最新");
+      return { ok: true };
+    },
+    [dataStore, updateLastSyncedAt, clearDirtyVersion, clearSyncError],
+  );
+
+  const reloadFromGitHub = useCallback(
+    async (options?: {
+      force?: boolean;
+      silent?: boolean;
+      allowDirtyOverwrite?: boolean;
+    }) => {
+      const guard = guardRemoteReload({
+        hasLocalData: hadLocalDataRef.current,
+        hasUnsyncedChanges: hasUnsyncedChangesRef.current,
+        hasLastSyncedAt: lastSyncedAtRef.current != null,
+        allowDirtyOverwrite: options?.allowDirtyOverwrite ?? false,
+      });
+      if (!guard.ok) {
+        hasUnsyncedChangesRef.current = true;
+        writeSyncDirty(true);
+        setSyncError(guard.reason, guard.errorCode);
+        setSyncStatus("有未同步修改");
+        return guard;
+      }
+
+      setSyncStatus("正在加载");
+      try {
+        const response = await fetch(`/data/couple-data.json?t=${Date.now()}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("读取 GitHub 数据失败");
+        const data: unknown = await response.json();
+        const remoteUpdatedAt = remoteUpdatedAtFromData(data);
+        if (!remoteUpdatedAt) throw new Error("GitHub 数据缺少 updatedAt");
+        const remoteTime = timestamp(remoteUpdatedAt);
+        const localTime = timestamp(lastSyncedAtRef.current);
+        const forceReload = options?.force ?? false;
+        const shouldApply =
+          forceReload || localTime == null || (remoteTime ?? 0) > localTime;
+
+        if (!shouldApply) {
+          setSyncStatus(
+            hasUnsyncedChangesRef.current ? "有未同步修改" : "已是最新",
+          );
+          return { ok: true };
+        }
+
+        const result = applyRemoteData(data, remoteUpdatedAt);
+        if (!result.ok) {
+          throw new Error(
+            "reason" in result
+              ? result.reason ?? "GitHub 数据格式不正确"
+              : "GitHub 数据格式不正确",
+          );
+        }
+        return { ok: true };
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : "从 GitHub 重新加载失败";
+        setSyncError(reason);
+        setSyncStatus("同步失败");
+        return { ok: false, reason, errorCode: "UNKNOWN" as const };
+      }
+    },
+    [applyRemoteData, setSyncError],
+  );
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
+      const savedLastSyncedAt = readSyncMeta();
+      lastSyncedAtRef.current = savedLastSyncedAt;
+      setLastSyncedAt(savedLastSyncedAt);
+      let hadLocalData = false;
+      try {
+        hadLocalData = !!dataStore.load();
+      } catch {
+        hadLocalData = false;
+      }
+      hadLocalDataRef.current = hadLocalData;
       const next = readHomeResourcesState(dataStore, {
         initialGems,
         initialCoins,
       });
       stateRef.current = next;
       setHomeState(next);
+
+      const persistedDirty = readSyncDirty();
+      if (persistedDirty && hadLocalData) {
+        hasUnsyncedChangesRef.current = true;
+        clearSyncError();
+        setSyncStatus("有未同步修改");
+        bumpDirtyVersion();
+        return;
+      }
+
+      if (hadLocalData && !savedLastSyncedAt) {
+        hasUnsyncedChangesRef.current = true;
+        writeSyncDirty(true);
+        setSyncError(
+          "本地已有数据但缺少上次同步记录，为避免覆盖，请先同步本地数据",
+          "LOCAL_DATA_NEEDS_SYNC",
+        );
+        setSyncStatus("有未同步修改");
+        bumpDirtyVersion();
+        return;
+      }
+
+      void reloadFromGitHub({ force: !hadLocalData, silent: true });
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [dataStore, initialGems, initialCoins]);
-
-  const commitHomeState = useCallback(
-    (updater: (current: HomeResourcesState) => HomeResourcesState) => {
-      const next = updater(stateRef.current);
-      stateRef.current = next;
-      setHomeState(next);
-      writeHomeResourcesState(dataStore, next);
-    },
-    [dataStore],
-  );
+  }, [
+    dataStore,
+    initialGems,
+    initialCoins,
+    reloadFromGitHub,
+    bumpDirtyVersion,
+    clearSyncError,
+    setSyncError,
+  ]);
 
   const tryRedeem = useCallback(
     (cost: { gems?: number; coins?: number }) => {
@@ -250,8 +558,11 @@ export function HomeResourcesProvider({
       commitHomeState((state) => ({
         ...state,
         wallet: {
-          gems: computeGemWallet(state.dailyRecords, [record, ...state.exchangeRecords]),
-          coins: state.wallet.coins - coins,
+          gems: state.wallet.gems - gems,
+          coins: computeCoinWallet(state.dailyRecords, [
+            record,
+            ...state.exchangeRecords,
+          ]),
         },
         exchangeRecords: orderExchangeRecords([record, ...state.exchangeRecords]),
       }));
@@ -285,7 +596,7 @@ export function HomeResourcesProvider({
           ...state,
           wallet: {
             ...state.wallet,
-            gems: computeGemWallet(state.dailyRecords, nextExchangeRecords),
+            coins: computeCoinWallet(state.dailyRecords, nextExchangeRecords),
           },
           exchangeRecords: nextExchangeRecords,
         };
@@ -304,20 +615,18 @@ export function HomeResourcesProvider({
         );
         if (!existing) return state;
         deleted = true;
-        const refundCoins =
-          existing.resourceKind === "coin" ? existing.price : 0;
+        const refundGems =
+          existing.resourceKind === "gem" ? existing.price : 0;
+        const nextExchangeRecords = state.exchangeRecords.filter(
+          (item) => item.id !== recordId,
+        );
         return {
           ...state,
           wallet: {
-            gems: computeGemWallet(
-              state.dailyRecords,
-              state.exchangeRecords.filter((item) => item.id !== recordId),
-            ),
-            coins: state.wallet.coins + refundCoins,
+            gems: state.wallet.gems + refundGems,
+            coins: computeCoinWallet(state.dailyRecords, nextExchangeRecords),
           },
-          exchangeRecords: state.exchangeRecords.filter(
-            (record) => record.id !== recordId,
-          ),
+          exchangeRecords: nextExchangeRecords,
         };
       });
       return deleted;
@@ -474,6 +783,198 @@ export function HomeResourcesProvider({
     [],
   );
 
+  const exportGitHubSyncJson = useCallback(
+    () => serializeHomeSyncData(stateRef.current),
+    [],
+  );
+
+  const syncToGitHub = useCallback(
+    async (
+      password: string,
+    ): Promise<{ ok: boolean; reason?: string; errorCode?: SyncErrorCode }> => {
+      const trimmed = password.trim();
+      if (!trimmed) {
+        const reason = "需要先保存同步密码，之后才能自动同步";
+        setSyncError(reason, "MISSING_PASSWORD");
+        setSyncStatus("有未同步修改");
+        return { ok: false, reason, errorCode: "MISSING_PASSWORD" };
+      }
+
+      if (syncInFlightRef.current) {
+        pendingAutoSyncRef.current = true;
+        return { ok: false, reason: "正在同步中", errorCode: "IN_FLIGHT" };
+      }
+      syncInFlightRef.current = true;
+
+      const syncingVersion = dirtyVersionRef.current;
+
+      writePreSyncBackup(stateRef.current);
+
+      clearSyncError();
+      setSyncStatus("正在同步");
+      try {
+        const response = await fetch("/api/save-data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            password: trimmed,
+            data: JSON.parse(serializeHomeSyncData(stateRef.current)),
+          }),
+        });
+        const result = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          error?: string;
+          errorCode?: SyncErrorCode;
+          updatedAt?: string;
+        } | null;
+        if (!response.ok || !result?.ok) {
+          const reason = result?.error ?? "同步到 GitHub 失败";
+          const errorCode = result?.errorCode ?? "UNKNOWN";
+          throw Object.assign(new Error(reason), { errorCode });
+        }
+
+        const syncedAt = result.updatedAt ?? new Date().toISOString();
+
+        if (dirtyVersionRef.current === syncingVersion) {
+          hasUnsyncedChangesRef.current = false;
+          writeSyncDirty(false);
+          clearDirtyVersion();
+          clearSyncError();
+          clearPreSyncBackup();
+          updateLastSyncedAt(syncedAt);
+          setSyncStatus("已是最新");
+        } else {
+          hasUnsyncedChangesRef.current = true;
+          writeSyncDirty(true);
+          setSyncStatus("有未同步修改");
+          bumpDirtyVersion();
+        }
+
+        return { ok: true };
+      } catch (error) {
+        const reason =
+          error instanceof Error ? error.message : "同步到 GitHub 失败";
+        const errorCode =
+          error instanceof Error &&
+          "errorCode" in error &&
+          typeof error.errorCode === "string"
+            ? (error.errorCode as SyncErrorCode)
+            : "UNKNOWN";
+        if (errorCode === "WRONG_PASSWORD") {
+          clearSyncPassword();
+        }
+        setSyncError(reason, errorCode);
+        setSyncStatus("同步失败");
+        retryVersionRef.current += 1;
+        setRetryVersion(retryVersionRef.current);
+        return { ok: false, reason, errorCode };
+      } finally {
+        syncInFlightRef.current = false;
+        if (
+          shouldRunPendingAutoSync({
+            pendingAutoSync: pendingAutoSyncRef.current,
+            hasUnsyncedChanges: hasUnsyncedChangesRef.current,
+            syncInFlight: syncInFlightRef.current,
+            errorCode: syncErrorCodeRef.current,
+          })
+        ) {
+          pendingAutoSyncRef.current = false;
+          bumpDirtyVersion();
+        } else {
+          pendingAutoSyncRef.current = false;
+        }
+      }
+    },
+    [
+      updateLastSyncedAt,
+      clearDirtyVersion,
+      bumpDirtyVersion,
+      clearSyncError,
+      setSyncError,
+    ],
+  );
+
+  useEffect(() => {
+    if (dirtyVersion === 0) return;
+
+    const password = readSyncPassword();
+    if (!password) {
+      const reason = "需要先在数据管理中勾选“记住本设备”并成功同步一次";
+      const timer = window.setTimeout(() => {
+        setSyncError(reason, "MISSING_PASSWORD");
+        setSyncStatus("有未同步修改");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => {
+      if (!hasUnsyncedChangesRef.current) return;
+      if (syncInFlightRef.current) {
+        pendingAutoSyncRef.current = true;
+        return;
+      }
+      void syncToGitHub(password);
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [dirtyVersion, syncToGitHub, setSyncError]);
+
+  useEffect(() => {
+    if (retryVersion === 0) return;
+    if (
+      !shouldRetrySync({
+        hasUnsyncedChanges: hasUnsyncedChangesRef.current,
+        retryCount: retryCountRef.current,
+        maxRetry: MAX_SYNC_RETRY,
+        errorCode: syncErrorCodeRef.current,
+      })
+    ) {
+      if (
+        hasUnsyncedChangesRef.current &&
+        retryCountRef.current >= MAX_SYNC_RETRY
+      ) {
+        setSyncError(
+          retryExhaustedMessage(syncErrorReasonRef.current),
+          "RETRY_EXHAUSTED",
+        );
+        setSyncStatus("同步失败");
+      }
+      return;
+    }
+
+    const password = readSyncPassword();
+    if (!password) {
+      const timer = window.setTimeout(() => {
+        setSyncError("需要先保存同步密码，之后才能自动重试", "MISSING_PASSWORD");
+        setSyncStatus("有未同步修改");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => {
+      if (!hasUnsyncedChangesRef.current) return;
+      if (syncInFlightRef.current) {
+        pendingAutoSyncRef.current = true;
+        return;
+      }
+      if (
+        !shouldRetrySync({
+          hasUnsyncedChanges: hasUnsyncedChangesRef.current,
+          retryCount: retryCountRef.current,
+          maxRetry: MAX_SYNC_RETRY,
+          errorCode: syncErrorCodeRef.current,
+        })
+      ) {
+        return;
+      }
+
+      retryCountRef.current += 1;
+      void syncToGitHub(password);
+    }, 30_000);
+
+    return () => window.clearTimeout(timer);
+  }, [retryVersion, syncToGitHub, setSyncError]);
+
   const exportWeeklyReviewCsvAction = useCallback(
     () => exportWeeklyReviewCsv(stateRef.current),
     [],
@@ -486,9 +987,10 @@ export function HomeResourcesProvider({
       stateRef.current = result.state;
       setHomeState(result.state);
       writeHomeResourcesState(dataStore, result.state);
+      markUnsyncedChanges();
       return { ok: true };
     },
-    [dataStore],
+    [dataStore, markUnsyncedChanges],
   );
 
   const value = useMemo(
@@ -526,7 +1028,14 @@ export function HomeResourcesProvider({
       updateHeatmapStartDate,
       upsertExchangeCategory,
       deleteExchangeCategory,
+      syncStatus,
+      syncErrorReason,
+      syncErrorCode,
+      lastSyncedAt,
+      reloadFromGitHub,
+      syncToGitHub,
       exportBackupJson,
+      exportGitHubSyncJson,
       exportWeeklyReviewCsv: exportWeeklyReviewCsvAction,
       importBackupJson,
     }),
@@ -546,7 +1055,14 @@ export function HomeResourcesProvider({
       updateHeatmapStartDate,
       upsertExchangeCategory,
       deleteExchangeCategory,
+      syncStatus,
+      syncErrorReason,
+      syncErrorCode,
+      lastSyncedAt,
+      reloadFromGitHub,
+      syncToGitHub,
       exportBackupJson,
+      exportGitHubSyncJson,
       exportWeeklyReviewCsvAction,
       importBackupJson,
     ],

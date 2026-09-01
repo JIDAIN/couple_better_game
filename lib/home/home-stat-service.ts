@@ -109,13 +109,21 @@ export function sumCoinExchangeSpend(records: ExchangeRecord[]) {
   );
 }
 
+export function sumGemExchangeSpend(records: ExchangeRecord[]) {
+  return records.reduce(
+    (total, record) =>
+      record.resourceKind === "gem" ? total + record.price : total,
+    0,
+  );
+}
+
 function exchangeRecordIsoDate(record: ExchangeRecord) {
   const source = record.occurredAt || record.date;
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(source);
   return match?.[1] ?? "";
 }
 
-export function computeGemWallet(
+export function computeCoinWallet(
   records: DailyRecord[],
   exchangeRecords: ExchangeRecord[],
 ) {
@@ -127,7 +135,7 @@ export function computeGemWallet(
 
   const spendsByDate = new Map<string, number>();
   for (const record of exchangeRecords) {
-    if (record.resourceKind !== "gem") continue;
+    if (record.resourceKind !== "coin") continue;
     const date = exchangeRecordIsoDate(record);
     if (!date) continue;
     spendsByDate.set(date, (spendsByDate.get(date) ?? 0) + record.price);
@@ -139,6 +147,8 @@ export function computeGemWallet(
     return Math.max(0, afterGain - (spendsByDate.get(date) ?? 0));
   }, 0);
 }
+
+export const computeGemWallet = computeCoinWallet;
 
 export function todayRecordFrom(records: DailyRecord[]) {
   return findRecordByIso(records, todayIsoDate());
@@ -197,24 +207,24 @@ export function recalculateCoinsWithCurrentRules(
   const nextRecords = orderDailyRecords(recalculatedRecords);
   const todayRecord = todayRecordFrom(nextRecords);
   const yesterdayRecord = yesterdayRecordFrom(nextRecords);
-  const earnedCoins = sumRecordCoins(nextRecords);
-  const spentCoins = sumCoinExchangeSpend(state.exchangeRecords);
+  const earnedGems = sumRecordCoins(nextRecords);
+  const spentGems = sumGemExchangeSpend(state.exchangeRecords);
 
   return {
     ...state,
     wallet: {
-      gems: computeGemWallet(nextRecords, state.exchangeRecords),
-      coins: Math.max(0, earnedCoins - spentCoins),
+      gems: Math.max(0, earnedGems - spentGems),
+      coins: computeCoinWallet(nextRecords, state.exchangeRecords),
     },
     todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
     todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
     todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
-    weekGemTotal: sumRecordGemsInCoinWeek(
+    weekGemTotal: sumRecordCoinsInCoinWeek(
       nextRecords,
       todayIsoDate(),
       state.coinRules,
     ),
-    weekCoinTotal: sumRecordCoinsInCoinWeek(
+    weekCoinTotal: sumRecordGemsInCoinWeek(
       nextRecords,
       todayIsoDate(),
       state.coinRules,
@@ -317,26 +327,26 @@ export function importMayHistoryRecords(
   }
 
   const nextRecords = orderDailyRecords([...importedRecords, ...baseRecords]);
-  const oldCoinTotal = sumRecordCoins(oldImportRecords);
-  const newCoinTotal = sumRecordCoins(importedRecords);
+  const oldGemTotal = sumRecordCoins(oldImportRecords);
+  const newGemTotal = sumRecordCoins(importedRecords);
   const todayRecord = todayRecordFrom(nextRecords);
   const yesterdayRecord = yesterdayRecordFrom(nextRecords);
 
   return {
     ...state,
     wallet: {
-      gems: computeGemWallet(nextRecords, state.exchangeRecords),
-      coins: Math.max(0, state.wallet.coins - oldCoinTotal + newCoinTotal),
+      gems: Math.max(0, state.wallet.gems - oldGemTotal + newGemTotal),
+      coins: computeCoinWallet(nextRecords, state.exchangeRecords),
     },
     todayFishGems: todayRecord?.fish.gems ?? state.todayFishGems,
     todayCatGems: todayRecord?.cat.gems ?? state.todayCatGems,
     todayBonusGems: todayRecord?.bonus ?? state.todayBonusGems,
-    weekGemTotal: sumRecordGemsInCoinWeek(
+    weekGemTotal: sumRecordCoinsInCoinWeek(
       nextRecords,
       todayIsoDate(),
       state.coinRules,
     ),
-    weekCoinTotal: sumRecordCoinsInCoinWeek(
+    weekCoinTotal: sumRecordGemsInCoinWeek(
       nextRecords,
       todayIsoDate(),
       state.coinRules,

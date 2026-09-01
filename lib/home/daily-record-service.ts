@@ -2,6 +2,7 @@ import { formatRecordDateFromIso, parseIsoDate, previousIsoDate, todayIsoDate } 
 import {
   buildHeatmapOverrides,
   findRecordByIso,
+  hasMeaningfulDailyInput,
   normalizeHistoricalSideInput,
   orderDailyRecords,
   recordGems,
@@ -15,7 +16,7 @@ import {
   gemsForPerson,
 } from "./settlement-rules";
 import {
-  computeGemWallet,
+  computeCoinWallet,
   countSuccessfulCheckInsInWeek,
   countSuccessfulCheckInsTotal,
   recalculateCoinsWithCurrentRules,
@@ -177,23 +178,23 @@ export function applyTodayRecordToState(
   ]);
   const todayRecord = todayRecordFrom(nextRecords);
   const yesterdayRecord = yesterdayRecordFrom(nextRecords);
-  const coinDelta = payload.coinDelta - (existing?.coins ?? 0);
+  const gemDelta = payload.coinDelta - (existing?.coins ?? 0);
 
   return {
     ...state,
     wallet: {
-      gems: computeGemWallet(nextRecords, state.exchangeRecords),
-      coins: Math.max(0, state.wallet.coins + coinDelta),
+      gems: Math.max(0, state.wallet.gems + gemDelta),
+      coins: computeCoinWallet(nextRecords, state.exchangeRecords),
     },
     todayFishGems: todayRecord?.fish.gems ?? payload.fishGems,
     todayCatGems: todayRecord?.cat.gems ?? payload.catGems,
     todayBonusGems: todayRecord?.bonus ?? payload.bonusGems,
-    weekGemTotal: sumRecordGemsInCoinWeek(
+    weekGemTotal: sumRecordCoinsInCoinWeek(
       nextRecords,
       record.recordDate,
       state.coinRules,
     ),
-    weekCoinTotal: sumRecordCoinsInCoinWeek(
+    weekCoinTotal: sumRecordGemsInCoinWeek(
       nextRecords,
       record.recordDate,
       state.coinRules,
@@ -246,11 +247,29 @@ export function upsertDailyRecordInState(
 
   const deduped = dedupeRecordsByRecordDate(state.dailyRecords);
   const existing = findRecordByIso(deduped, recordDate);
+
+  const normalizedFish = normalizeHistoricalSideInput(fishInput) ?? zeroSide();
+  const normalizedCat = normalizeHistoricalSideInput(catInput) ?? zeroSide();
+
+  if (!hasMeaningfulDailyInput(normalizedFish, normalizedCat)) {
+    if (existing) {
+      const nextRecords = deduped.filter((item) => item.id !== existing.id);
+      return {
+        result: { ok: true, updatedExisting: false },
+        state: rebuildDailyRecordDerivedState(state, nextRecords),
+      };
+    }
+    return {
+      result: { ok: true, updatedExisting: false },
+      state,
+    };
+  }
+
   const record = buildDailyRecordForDate(
     { ...state, dailyRecords: deduped },
     recordDate,
-    normalizeHistoricalSideInput(fishInput) ?? zeroSide(),
-    normalizeHistoricalSideInput(catInput) ?? zeroSide(),
+    normalizedFish,
+    normalizedCat,
     existing,
   );
   if (!record) {

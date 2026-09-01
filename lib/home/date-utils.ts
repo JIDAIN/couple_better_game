@@ -8,6 +8,10 @@ export function todayIsoDate() {
   return getCurrentIsoDate();
 }
 
+export function yesterdayIsoDate() {
+  return previousIsoDate(todayIsoDate())!;
+}
+
 export function isoDateFromMayDay(day: number) {
   return `2026-05-${pad2(day)}`;
 }

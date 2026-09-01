@@ -1,5 +1,14 @@
 /** 单日热量缺口完成程度（热力图底色） */
-export type HeatLevel = "none" | "ok" | "good" | "perfect";
+export type HeatLevel =
+  | "empty"
+  | "over-light"
+  | "over-mid"
+  | "over-strong"
+  | "over-heavy"
+  | "none"
+  | "ok"
+  | "good"
+  | "perfect";
 
 /** 运动角标 */
 export type ExerciseTag = "none" | "run" | "intense";
@@ -161,6 +170,7 @@ export type HomeResourcesState = UserRuntimeData & AppConfigData;
 
 export type AppDataSnapshot = {
   version: 1;
+  currencySemanticsVersion?: number;
   runtime: Partial<UserRuntimeData>;
   config: Partial<AppConfigData>;
 };

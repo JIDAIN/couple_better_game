@@ -3,6 +3,7 @@ import {
   snapshotFromHomeResourcesState,
   type AppDataStore,
 } from "./app-data-store";
+import { migrateSnapshotCurrencySemantics } from "./currency-semantics";
 import { normalizeExchangeCategories, normalizeExchangeRecord } from "./exchange-service";
 import { normalizeDailyRecord, orderDailyRecords, recordIsoDate } from "./daily-record-utils";
 import {
@@ -138,7 +139,9 @@ export function readHomeResourcesState(
       return next;
     }
 
-    const parsed = homeStatePatchFromSnapshot(snapshot);
+    const parsed = homeStatePatchFromSnapshot(
+      migrateSnapshotCurrencySemantics(snapshot),
+    );
     const restored: HomeResourcesState = {
       wallet: {
         gems: safeNumber(parsed.wallet?.gems, fallback.wallet.gems),

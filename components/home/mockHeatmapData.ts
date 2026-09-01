@@ -13,7 +13,7 @@ export type WeekColumn = HeatmapCellData[];
 export type MonthGrid = WeekColumn[];
 
 const emptyHeat: HeatmapDay = {
-  level: "none",
+  level: "empty",
   exercise: "none",
 };
 
@@ -67,17 +67,21 @@ function firstDayOfMonth(target: Date) {
 }
 
 function lastDayOfMonth(target: Date) {
-  return startOfLocalDay(new Date(target.getFullYear(), target.getMonth() + 1, 0));
+  return startOfLocalDay(
+    new Date(target.getFullYear(), target.getMonth() + 1, 0),
+  );
 }
 
 export function getWeekdayIndexForSatStart(date: Date | string) {
-  const target = typeof date === "string" ? parseDateKey(date) : startOfLocalDay(date);
+  const target =
+    typeof date === "string" ? parseDateKey(date) : startOfLocalDay(date);
   const safeDate = target ?? startOfLocalDay(new Date());
   return (safeDate.getDay() + 1) % 7;
 }
 
 export function getSatStartWeekStart(date: Date | string) {
-  const target = typeof date === "string" ? parseDateKey(date) : startOfLocalDay(date);
+  const target =
+    typeof date === "string" ? parseDateKey(date) : startOfLocalDay(date);
   const safeDate = target ?? startOfLocalDay(new Date());
   return addDays(safeDate, -getWeekdayIndexForSatStart(safeDate));
 }

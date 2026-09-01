@@ -1,5 +1,6 @@
 import { getCoinWeekRange } from "./settlement-rules";
 import { recordGems, recordIsoDate } from "./daily-record-utils";
+import { CURRENT_CURRENCY_SEMANTICS_VERSION } from "./currency-semantics";
 import { normalizeExchangeRecord } from "./exchange-service";
 import type {
   DailyRecord,
@@ -12,6 +13,7 @@ export const BACKUP_SCHEMA_VERSION = 1;
 
 export type HomeBackupJson = {
   schemaVersion: 1;
+  currencySemanticsVersion: number;
   exportedAt: string;
   wallet: HomeResourcesState["wallet"];
   dailyRecords: HomeResourcesState["dailyRecords"];
@@ -20,6 +22,10 @@ export type HomeBackupJson = {
   heatmapStartDate: HomeResourcesState["heatmapStartDate"];
   coinRules: HomeResourcesState["coinRules"];
   visualRules: HomeResourcesState["visualRules"];
+};
+
+export type HomeSyncJson = Omit<HomeBackupJson, "exportedAt"> & {
+  updatedAt: string;
 };
 
 function stringOr(value: unknown, fallback = "") {
@@ -51,7 +57,7 @@ function normalizeExportExchangeRecord(
     time: stringOr(record.time),
     category: stringOr(record.category, "未知兑换"),
     icon: stringOr(record.icon, "🎁"),
-    resourceKind: resourceKindOr(record.resourceKind, "gem"),
+    resourceKind: resourceKindOr(record.resourceKind, "coin"),
     price: numberOr(record.price),
     remark: stringOr(record.remark),
   });
@@ -71,6 +77,7 @@ export function buildHomeBackup(
 ): HomeBackupJson {
   return {
     schemaVersion: BACKUP_SCHEMA_VERSION,
+    currencySemanticsVersion: CURRENT_CURRENCY_SEMANTICS_VERSION,
     exportedAt,
     wallet: state.wallet,
     dailyRecords: state.dailyRecords,
@@ -87,6 +94,28 @@ export function serializeHomeBackup(
   exportedAt?: string,
 ) {
   return JSON.stringify(buildHomeBackup(state, exportedAt), null, 2);
+}
+
+export function buildHomeSyncData(
+  state: HomeResourcesState,
+  updatedAt = new Date().toISOString(),
+): HomeSyncJson {
+  const { exportedAt: _exportedAt, ...backup } = buildHomeBackup(
+    state,
+    updatedAt,
+  );
+  void _exportedAt;
+  return {
+    ...backup,
+    updatedAt,
+  };
+}
+
+export function serializeHomeSyncData(
+  state: HomeResourcesState,
+  updatedAt?: string,
+) {
+  return JSON.stringify(buildHomeSyncData(state, updatedAt), null, 2);
 }
 
 function csvCell(value: string | number) {
@@ -134,13 +163,13 @@ export function exportWeeklyReviewCsv(state: HomeResourcesState) {
     "日期",
     "鱼鱼缺口kcal",
     "鱼鱼运动min",
-    "鱼鱼宝石",
+    "鱼鱼金币",
     "猫猫缺口kcal",
     "猫猫运动min",
-    "猫猫宝石",
-    "情侣bonus",
-    "当日总宝石",
-    "金币变化",
+    "猫猫金币",
+    "同行金币",
+    "当日总金币",
+    "宝石变化",
   ];
   const rows = [...state.dailyRecords]
     .sort((a, b) => recordIsoDate(a).localeCompare(recordIsoDate(b)))

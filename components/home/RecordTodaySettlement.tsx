@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider";
 import {
   computeCoinPreview,
@@ -13,6 +13,10 @@ import {
   parseOptionalWeight,
   type SideLogInput,
 } from "./settlement-rules";
+import { yesterdayIsoDate } from "@/lib/home/date-utils";
+import { Title } from "animal-island-ui";
+import { AppButton, AppCard, AppCurrencyChip, AppGameIcon, AppInput, AppModal, AppRoleAvatar, AppToast } from "../ui";
+import type { RoleKind } from "../ui";
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
@@ -61,11 +65,13 @@ function formatBreakdownLines(lines: string[]) {
   const labels: Record<string, string> = {
     缺口宝石: "缺口",
     运动宝石: "运动",
+    缺口金币: "缺口",
+    运动金币: "运动",
     恢复日奖励: "恢复",
   };
   const formatted = lines
     .map((line) => {
-      const match = /^(缺口宝石|运动宝石|恢复日奖励) \+(\d+)$/.exec(line);
+      const match = /^(缺口宝石|运动宝石|缺口金币|运动金币|恢复日奖励) \+(\d+)$/.exec(line);
       if (!match) return line;
       const value = Number(match[2]);
       if (value <= 0) return null;
@@ -76,22 +82,19 @@ function formatBreakdownLines(lines: string[]) {
 }
 
 function formatCoinHint(hint: string) {
-  if (hint === "本日暂未触发金币规则") return "还没点亮";
+  if (hint === "本日暂未触发金币规则" || hint === "本日暂未触发宝石规则") return "还没点亮";
   return hint
     .split(" · ")
     .map((part) =>
       part
         .replace(/本周新增宝石达到 30：\+1/g, "本周达标")
         .replace(/本周新增宝石达到 50：再 \+1/g, "本周进阶")
+        .replace(/本周新增金币达到 30：\+1/g, "本周达标")
+        .replace(/本周新增金币达到 50：再 \+1/g, "本周进阶")
         .replace(/双人连续 \d+ 天达到一般打卡：\+1/g, "连续坚持")
         .replace(/本周一起运动达到 2 次：\+1/g, "一起运动"),
     )
     .join(" · ");
-}
-
-function coinAmountLabel(value: number) {
-  if (value > 0) return `🪙 +${value}`;
-  return "🪙 0";
 }
 
 function CoinHintLine({ hint }: { hint: string }) {
@@ -122,22 +125,23 @@ function CompactField({
   return (
     <label className="compact-field">
       <span className="compact-field-label">{label}</span>
-      <div className="compact-field-input">
-        <input
+      <div className="app-compact-control">
+        <AppInput
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
+          inputSize="small"
           placeholder="0"
+          suffix={unit}
+          className="record-compact-input"
         />
-        {unit ? <span>{unit}</span> : null}
       </div>
     </label>
   );
 }
 
 function PartnerColumn({
-  emoji,
-  title,
+  role,
   weight,
   setWeight,
   deficit,
@@ -145,8 +149,7 @@ function PartnerColumn({
   minutes,
   setMinutes,
 }: {
-  emoji: string;
-  title: string;
+  role: RoleKind;
   weight: string;
   setWeight: (value: string) => void;
   deficit: string;
@@ -154,13 +157,14 @@ function PartnerColumn({
   minutes: string;
   setMinutes: (value: string) => void;
 }) {
+  const title = role === "fish" ? "鱼鱼" : "猫猫";
   return (
-    <div className="growth-partner-form ui-soft-panel ui-card-item flex min-w-0 flex-col">
+    <AppCard variant="panel" className="growth-partner-form flex min-w-0 flex-col">
       <p className="text-[11px] font-bold ui-text-main">
-        <span aria-hidden>{emoji}</span> {title}
+        <AppRoleAvatar role={role} size={16} /> {title}
       </p>
       <CompactField
-        label="今日体重"
+        label="体重"
         value={weight}
         onChange={setWeight}
         inputMode="decimal"
@@ -180,7 +184,7 @@ function PartnerColumn({
         inputMode="numeric"
         unit="kcal"
       />
-    </div>
+    </AppCard>
   );
 }
 
@@ -193,16 +197,16 @@ type RecordTodaySettlementProps = {
 export function RecordTodaySettlement({
   buttonVariant = "full",
 }: RecordTodaySettlementProps) {
-  const { coinRules, dailyRecords, upsertDailyRecord, visualRules } =
+  const { coinRules, dailyRecords, deleteDailyRecord, upsertDailyRecord, visualRules } =
     useHomeResources();
   const [open, setOpen] = useState(false);
-  const [entered, setEntered] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const titleId = useId();
+  const openInFlightRef = useRef(false);
 
-  // Must not freeze at mount: long sessions and cross-midnight need a fresh "today".
+  // Must not freeze at mount: long sessions and cross-midnight need a fresh value.
   const todayDate = getCurrentIsoDate();
-  const [recordDate, setRecordDate] = useState(todayDate);
+  const yesterdayDate = yesterdayIsoDate();
+  const [recordDate, setRecordDate] = useState(yesterdayDate);
   const [fishW, setFishW] = useState("");
   const [fishD, setFishD] = useState("0");
   const [fishM, setFishM] = useState("0");
@@ -227,13 +231,18 @@ export function RecordTodaySettlement({
   }, []);
 
   const openSheet = useCallback(() => {
-    const date = todayDate;
+    if (open || openInFlightRef.current) return;
+    openInFlightRef.current = true;
+    const date = yesterdayDate;
     const record =
       dailyRecords.find((item) => recordIsoDate(item) === date) ?? null;
     setRecordDate(date);
     hydrateInputs(record);
     setOpen(true);
-  }, [dailyRecords, hydrateInputs, todayDate]);
+    window.setTimeout(() => {
+      openInFlightRef.current = false;
+    }, 250);
+  }, [dailyRecords, hydrateInputs, open, yesterdayDate]);
 
   const fishInput: SideLogInput = useMemo(
     () => ({
@@ -332,38 +341,6 @@ export function RecordTodaySettlement({
   );
 
   useEffect(() => {
-    if (!open) {
-      let cancelled = false;
-      const id = requestAnimationFrame(() => {
-        if (!cancelled) setEntered(false);
-      });
-      return () => {
-        cancelled = true;
-        cancelAnimationFrame(id);
-      };
-    }
-    let cancelled = false;
-    const outerId = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) setEntered(true);
-      });
-    });
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(outerId);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
-  useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
@@ -379,7 +356,19 @@ export function RecordTodaySettlement({
   }, [toast]);
 
   const onConfirm = useCallback(() => {
-    if (!hasAnyEffort || recordDay == null) return;
+    if (recordDay == null) return;
+
+    if (!hasAnyEffort) {
+      if (existingRecord) {
+        deleteDailyRecord(recordDate);
+        setOpen(false);
+        setToast("这一天的记录已清空");
+      } else {
+        setOpen(false);
+      }
+      return;
+    }
+
     const result = upsertDailyRecord(recordDate, fishInput, catInput);
     if (!result.ok) {
       setToast(
@@ -389,79 +378,86 @@ export function RecordTodaySettlement({
     }
     setOpen(false);
     setToast(
-      recordDate === todayDate
-        ? "今天已经存好啦，明天继续并肩"
-        : result.updatedExisting
-          ? "这一天已经更新完成"
-          : "这一天已经补录完成",
+      recordDate === yesterdayDate
+        ? "昨天已经存好啦，今天继续并肩"
+        : recordDate === todayDate
+          ? "今天已经存好啦，明天继续并肩"
+          : result.updatedExisting
+            ? "这一天已经更新完成"
+            : "这一天已经补录完成",
     );
   }, [
     catInput,
+    existingRecord,
     fishInput,
     hasAnyEffort,
+    deleteDailyRecord,
     recordDate,
     recordDay,
     todayDate,
+    yesterdayDate,
     upsertDailyRecord,
   ]);
 
-  const buttonLabel = buttonVariant === "history" ? "补录记录" : "记录今天";
+  const buttonLabel = buttonVariant === "history" ? "补录记录" : "记录昨日";
+  const buttonClassName =
+    buttonVariant === "history"
+      ? "is-nav inline-flex w-full whitespace-nowrap text-sm"
+      : buttonVariant === "today"
+        ? "is-primary record-nav-action w-full px-3 py-2 text-xs font-semibold"
+        : "is-primary relative w-full overflow-hidden px-5 py-3 text-sm font-semibold will-change-transform sm:py-3.5";
 
   return (
     <>
       <div className="space-y-2 pt-1">
-        <button
+        <AppButton
           type="button"
           onClick={openSheet}
-          className={
-            buttonVariant === "history"
-              ? "ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
-              : "ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-semibold text-white will-change-transform sm:py-4"
-          }
+          className={buttonClassName}
         >
           <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
-            {buttonVariant === "history" ? <span aria-hidden>📝</span> : null}
+            {buttonVariant === "history" ? <AppGameIcon name="notebook" size={16} /> : null}
             {buttonLabel}
           </span>
-        </button>
+        </AppButton>
       </div>
 
-      {open ? (
-        <div className="fixed inset-0 z-[55] flex items-end justify-center p-3 sm:items-center">
-          <button
-            type="button"
-            aria-label="关闭"
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
-              entered ? "opacity-100" : "opacity-0"
-            }`}
-            onClick={() => setOpen(false)}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            className={`ui-sheet growth-record-day-sheet relative flex max-h-[min(92dvh,640px)] w-full max-w-lg flex-col overflow-hidden transition-all duration-300 ease-out ${
-              entered
-                ? "translate-y-0 opacity-100 sm:scale-100"
-                : "translate-y-6 opacity-0 sm:translate-y-0 sm:scale-95"
-            }`}
-          >
-            <div className="ui-modal-header shrink-0">
+      <AppModal
+        open={open}
+        onClose={() => setOpen(false)}
+        maskClosable
+        width="min(92vw, 30rem)"
+        title={
+          <div className="app-dialog-header shrink-0">
               <p className="text-[10px] font-bold tracking-[0.2em] ui-text-primary">
-                {recordDate === todayDate ? "今日收工啦" : "补录这一天"}
+                {recordDate === yesterdayDate
+                  ? "昨日收工啦"
+                  : recordDate === todayDate
+                    ? "今日收工啦"
+                    : "补录这一天"}
               </p>
-              <h2 id={titleId} className="mt-1 text-lg font-bold ui-text-main">
-                {recordDate === todayDate ? "今天的小记录" : "保存这一天"}
-              </h2>
+              <Title size="small" color="app-yellow" className="mt-1">
+                {recordDate === yesterdayDate
+                  ? "昨天的小记录"
+                  : recordDate === todayDate
+                    ? "今天的小记录"
+                    : "保存这一天"}
+              </Title>
               <p className="mt-1 text-xs font-medium ui-text-muted">
-                把今天轻轻存起来
+                {recordDate === yesterdayDate
+                  ? "把昨天轻轻存起来"
+                : recordDate === todayDate
+                  ? "把今天轻轻存起来"
+                  : "把这一天轻轻存起来"}
               </p>
             </div>
-
-            <div className="ui-modal-body">
+        }
+        footer={null}
+      >
+            <div className="app-modal-scroll-body app-modal-scroll-body--record">
               <label className="mb-3 block">
                 <span className="ui-field-label">记录日期</span>
-                <input
+                <AppInput
                   type="date"
                   value={recordDate}
                   max={todayDate}
@@ -474,14 +470,13 @@ export function RecordTodaySettlement({
                     setRecordDate(nextDate);
                     hydrateInputs(nextRecord);
                   }}
-                  className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
+                  className="app-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                 />
               </label>
 
               <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
                 <PartnerColumn
-                  emoji="🐟"
-                  title="鱼鱼"
+                  role="fish"
                   weight={fishW}
                   setWeight={setFishW}
                   deficit={fishD}
@@ -490,8 +485,7 @@ export function RecordTodaySettlement({
                   setMinutes={setFishM}
                 />
                 <PartnerColumn
-                  emoji="🐱"
-                  title="猫猫"
+                  role="cat"
                   weight={catW}
                   setWeight={setCatW}
                   deficit={catD}
@@ -501,90 +495,85 @@ export function RecordTodaySettlement({
                 />
               </div>
 
-              <div className="ui-soft-panel ui-card-item mt-3">
+              <AppCard variant="panel" className="mt-3">
                 <p className="text-center text-[11px] font-bold ui-text-reward">
                   这一天的小奖励
                 </p>
                 <ul className="mt-2 grid min-w-0 grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
                   <li className="growth-detail-extra-card">
                     <span className="flex items-center justify-between gap-2">
-                      <span aria-hidden>🐟</span>
-                      <span className="tabular-nums ui-text-primary">
-                        💎 +{preview.fg}
-                      </span>
+                      <AppRoleAvatar role="fish" size={14} />
+                      <AppCurrencyChip currency="coin" value={preview.fg} size="sm" />
                     </span>
                     <DetailLines lines={preview.fishBreakdown.lines} />
                   </li>
                   <li className="growth-detail-extra-card">
                     <span className="flex items-center justify-between gap-2">
-                      <span aria-hidden>🐱</span>
-                      <span className="tabular-nums ui-text-primary">
-                        💎 +{preview.cg}
-                      </span>
+                      <AppRoleAvatar role="cat" size={14} />
+                      <AppCurrencyChip currency="coin" value={preview.cg} size="sm" />
                     </span>
                     <DetailLines lines={preview.catBreakdown.lines} />
                   </li>
                   <li className="growth-detail-extra-card">
                     <div className="growth-detail-extra-row">
-                      <span className="growth-detail-extra-title">🔥 一起加成</span>
-                      {preview.couple.gems > 0 ? (
-                        <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
-                          💎 +{preview.couple.gems}
-                        </span>
-                      ) : (
-                        <span className="growth-detail-extra-value growth-detail-extra-value--muted">
-                          未点亮
-                        </span>
-                      )}
+                      <span className="growth-detail-extra-title">
+                        <AppRoleAvatar role="fish" size={14} /><AppRoleAvatar role="cat" size={14} />
+                      </span>
+                      <AppCurrencyChip currency="coin" value={preview.couple.gems} size="sm" />
                     </div>
                     <p className="growth-detail-extra-hint">
-                      {preview.couple.gems > 0 ? "一起点亮" : "满 30 分钟时点亮"}
+                      {preview.couple.gems > 0 ? "一起点亮" : "一起运动 30min 点亮"}
                     </p>
                   </li>
                   <li className="growth-detail-extra-card">
                     <div className="growth-detail-extra-row">
-                      <span className="growth-detail-extra-title">🪙 金币</span>
-                      <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
-                        {coinAmountLabel(preview.coin.delta)}
+                      <span className="growth-detail-extra-title">
+                        <AppGameIcon name="gem" size={14} /> 宝石
                       </span>
+                      <AppCurrencyChip currency="gem" value={preview.coin.delta} size="sm" />
                     </div>
                     <CoinHintLine hint={preview.coin.hint} />
                   </li>
                 </ul>
-              </div>
+              </AppCard>
 
-              <div className="ui-modal-footer">
-                <button
+              <div className="app-dialog-footer app-dialog-footer--inline">
+                <AppButton
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
+                  className="is-secondary flex-1 py-3 text-sm font-semibold"
                 >
                   下次再记
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="button"
                   disabled={
-                    !hasAnyEffort || recordDay == null || recordDate > todayDate
+                    (!hasAnyEffort && !existingRecord) || recordDay == null || recordDate > todayDate
                   }
                   onClick={onConfirm}
-                  className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="is-primary flex-[1.35] py-3 text-sm font-semibold transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {recordDate === todayDate ? "存好今天" : "保存这一天"}
-                </button>
+                  {!hasAnyEffort && existingRecord
+                    ? "清空记录"
+                    : recordDate === yesterdayDate
+                      ? "存好昨天"
+                      : recordDate === todayDate
+                        ? "存好今天"
+                        : "保存这一天"}
+                </AppButton>
               </div>
             </div>
-          </div>
-        </div>
-      ) : null}
+      </AppModal>
 
       {toast ? (
-        <div
+        <AppToast
           role="status"
-          className="ui-dialog pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
+          className="pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
         >
           {toast}
-        </div>
+        </AppToast>
       ) : null}
     </>
   );
 }
+

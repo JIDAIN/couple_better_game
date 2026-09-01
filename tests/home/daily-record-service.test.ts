@@ -98,13 +98,13 @@ describe("daily record service", () => {
     const next = applyTodayRecordToState(makeState(), payload);
 
     expect(next.dailyRecords).toHaveLength(1);
-    expect(next.wallet.gems).toBe(7);
-    expect(next.wallet.coins).toBe(4);
+    expect(next.wallet.gems).toBe(4);
+    expect(next.wallet.coins).toBe(7);
     expect(next.todayFishGems).toBe(3);
     expect(next.todayCatGems).toBe(2);
     expect(next.todayBonusGems).toBe(2);
-    expect(next.fishHeatmapOverrides[14]).toEqual(payload.fishHeat);
-    expect(next.catHeatmapOverrides[14]).toEqual(payload.catHeat);
+    expect(next.dailyRecords[0].fishHeat).toEqual(payload.fishHeat);
+    expect(next.dailyRecords[0].catHeat).toEqual(payload.catHeat);
   });
 
   it("rejects invalid and future historical records", () => {
@@ -213,7 +213,7 @@ describe("daily record service", () => {
 
     expect(deleted.deleted).toBe(true);
     expect(deleted.state.dailyRecords).toHaveLength(0);
-    expect(deleted.state.wallet.gems).toBe(0);
+    expect(deleted.state.wallet.coins).toBe(0);
   });
 
   it("deletes historical records and recomputes summary state", () => {
@@ -228,7 +228,7 @@ describe("daily record service", () => {
 
     expect(deleted.deleted).toBe(true);
     expect(deleted.state.dailyRecords).toHaveLength(0);
-    expect(deleted.state.wallet.gems).toBe(0);
+    expect(deleted.state.wallet.coins).toBe(0);
     expect(deleted.state.weekGemTotal).toBe(0);
   });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHomeBackup,
+  buildHomeSyncData,
   exportWeeklyReviewCsv,
   serializeHomeBackup,
 } from "../../lib/home/export-service";
@@ -95,6 +96,7 @@ describe("data import/export", () => {
 
     expect(backup).toMatchObject({
       schemaVersion: 1,
+      currencySemanticsVersion: 2,
       exportedAt: "2026-05-18T00:00:00.000Z",
       wallet: state.wallet,
       dailyRecords: state.dailyRecords,
@@ -106,6 +108,7 @@ describe("data import/export", () => {
     });
     expect(JSON.parse(serializeHomeBackup(state))).toMatchObject({
       schemaVersion: 1,
+      currencySemanticsVersion: 2,
     });
   });
 
@@ -139,13 +142,43 @@ describe("data import/export", () => {
       id: "legacy-export",
       category: "未知兑换",
       icon: "🎁",
-      resourceKind: "gem",
+      resourceKind: "coin",
       price: 0,
       remark: "",
       createdAt: "1970-01-01T00:00:00.000Z",
       occurredAt: "1970-01-01T08:00",
     });
     expect(backup.exchangeRecords[0].date).toContain("08:00");
+  });
+
+  it("exports github sync json with updatedAt and exchange snapshots", () => {
+    const state = makeState({
+      exchangeRecords: [
+        {
+          id: "legacy-sync",
+          date: "",
+          createdAt: "",
+          occurredAt: "",
+          time: "",
+        } as ExchangeRecord,
+      ],
+    });
+
+    const data = buildHomeSyncData(state, "2026-05-18T10:00:00.000Z");
+
+    expect(data).toMatchObject({
+      schemaVersion: 1,
+      currencySemanticsVersion: 2,
+      updatedAt: "2026-05-18T10:00:00.000Z",
+    });
+    expect("exportedAt" in data).toBe(false);
+    expect(data.exchangeRecords[0]).toMatchObject({
+      category: "未知兑换",
+      icon: "🎁",
+      resourceKind: "coin",
+      price: 0,
+      remark: "",
+    });
   });
 
   it("imports a complete backup and keeps exchange record snapshots", () => {
@@ -187,11 +220,12 @@ describe("data import/export", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.state.wallet.gems).toBe(35);
+    expect(result.state.wallet.coins).toBe(35);
+    expect(result.state.wallet.gems).toBe(2);
     expect(result.state.exchangeRecords[0]).toMatchObject({
       category: "旧零食",
       icon: "🍪",
-      resourceKind: "gem",
+      resourceKind: "coin",
       price: 15,
       remark: "当时的备注",
     });
@@ -233,7 +267,7 @@ describe("data import/export", () => {
     expect(result.state.exchangeRecords[0]).toMatchObject({
       category: "小零食",
       icon: "🍪",
-      resourceKind: "gem",
+      resourceKind: "coin",
       price: 6,
     });
   });
@@ -251,7 +285,7 @@ describe("data import/export", () => {
 
     expect(csv.charCodeAt(0)).toBe(0xfeff);
     expect(csv).toContain(
-      "周次,日期,鱼鱼缺口kcal,鱼鱼运动min,鱼鱼宝石,猫猫缺口kcal,猫猫运动min,猫猫宝石,情侣bonus,当日总宝石,金币变化",
+      "周次,日期,鱼鱼缺口kcal,鱼鱼运动min,鱼鱼金币,猫猫缺口kcal,猫猫运动min,猫猫金币,同行金币,当日总金币,宝石变化",
     );
     expect(csv).toContain("第1周,2026-05-15,200,30,2,100,30,1,2,5,0");
     expect(csv).toContain("第2周,2026-05-16,300,40,3,100,20,1,0,4,1");

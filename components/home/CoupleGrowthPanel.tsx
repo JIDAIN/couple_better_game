@@ -1,11 +1,13 @@
 "use client";
 
 import { GEM_CAP, useHomeResources } from "./HomeResourcesProvider";
+import { Title } from "animal-island-ui";
+import { AppCard, AppGameIcon, AppProgressBar } from "../ui";
 
 function resourceIcon(tone: "gem" | "coin" | "heart") {
-  if (tone === "gem") return "💎";
-  if (tone === "coin") return "🪙";
-  return "🔥";
+  if (tone === "gem") return <AppGameIcon name="gem" size={16} />;
+  if (tone === "coin") return <AppGameIcon name="coin" size={16} />;
+  return <AppGameIcon name="fire" size={16} />;
 }
 
 function StatBubble({
@@ -19,60 +21,21 @@ function StatBubble({
 }) {
   const toneRing =
     tone === "gem"
-      ? "ui-tinted-primary"
+      ? "app-token-gem"
       : tone === "coin"
-        ? "ui-tinted-reward"
-        : "ui-tinted-growth";
-  const icon = resourceIcon(tone);
+        ? "app-token-coin"
+        : "app-token-growth";
 
   return (
-    <div className={`ui-card-soft ui-card-item relative overflow-hidden ${toneRing}`}>
+    <AppCard variant="item" className={`relative overflow-hidden ${toneRing}`}>
       <p className="text-[11px] font-semibold tracking-wide ui-text-muted">
         {label}
       </p>
       <p className="mt-0.5 flex items-baseline gap-1 text-[1.1rem] font-bold tabular-nums ui-text-main">
-        <span aria-hidden className="text-[0.95rem]">
-          {icon}
-        </span>
+        {resourceIcon(tone)}
         <span suppressHydrationWarning>{value}</span>
       </p>
-    </div>
-  );
-}
-
-function GemTreasureBar({
-  current,
-  max,
-}: {
-  current: number;
-  max: number;
-}) {
-  const pct = Math.min(100, Math.round((current / max) * 100));
-
-  return (
-    <div className="ui-card-soft ui-card-item ui-sparkle-card relative overflow-hidden">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] font-bold ui-text-main">💎 宝石小宝箱</span>
-        <span suppressHydrationWarning className="text-[11px] font-semibold tabular-nums ui-text-muted">
-          {current} / {max}
-        </span>
-      </div>
-      <div
-        className="ui-progress-track mt-2 h-2.5 overflow-hidden rounded-full"
-        role="progressbar"
-        aria-valuenow={current}
-        aria-valuemin={0}
-        aria-valuemax={max}
-      >
-        <div
-          className="ui-progress-fill h-full rounded-full transition-[width] duration-700 ease-out"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p className="mt-1.5 text-[10px] font-medium ui-text-muted">
-        装满以后会有小惊喜
-      </p>
-    </div>
+    </AppCard>
   );
 }
 
@@ -87,37 +50,33 @@ export function CoupleGrowthPanel() {
   } = useHomeResources();
 
   return (
-    <section
-      className="ui-card ui-card-main animate-card-breathe sm:p-5"
+    <AppCard
+      variant="main"
+      className="animate-card-breathe sm:p-5"
       aria-label="情侣成长资源"
     >
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[13px] font-bold tracking-wide ui-text-main">
+        <Title size="small" color="app-yellow">
           今日小收获
-        </h2>
-        <span className="text-lg" aria-hidden>
-          📒
-        </span>
+        </Title>
+        <AppGameIcon name="notebook" size={28} />
       </div>
-      <p className="mt-0.5 text-[10px] font-medium ui-text-muted">
-        我们攒下的闪光
-      </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <StatBubble label="昨日宝石" value={yesterdayGemTotal} tone="gem" />
-        <StatBubble label="本周宝石" value={weekGemTotal} tone="gem" />
+        <StatBubble label="昨日金币" value={yesterdayGemTotal} tone="coin" />
+        <StatBubble label="本周金币" value={weekCoinTotal} tone="coin" />
       </div>
 
       <div className="mt-2">
-        <GemTreasureBar current={gemStock} max={GEM_CAP} />
+        <AppProgressBar value={coinStock} max={GEM_CAP} />
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <StatBubble label="本周金币" value={weekCoinTotal} tone="coin" />
-        <StatBubble label="金币存钱罐" value={coinStock} tone="coin" />
+        <StatBubble label="本周宝石" value={weekGemTotal} tone="gem" />
+        <StatBubble label="宝石存钱罐" value={gemStock} tone="gem" />
       </div>
 
-      <div className="ui-card-soft ui-card-item ui-tinted-primary mt-3">
+      <AppCard variant="item" className="app-token-gem mt-3">
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="text-[10px] font-semibold tracking-wide ui-text-primary">
@@ -128,11 +87,9 @@ export function CoupleGrowthPanel() {
               <span className="ml-1 text-sm font-semibold ui-text-muted">天</span>
             </p>
           </div>
-          <span className="text-2xl" aria-hidden>
-            🔥
-          </span>
+          <AppGameIcon name="fire" size={28} />
         </div>
-      </div>
-    </section>
+      </AppCard>
+    </AppCard>
   );
 }

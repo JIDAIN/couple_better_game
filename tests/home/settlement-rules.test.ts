@@ -156,7 +156,15 @@ describe("gem settlement rules", () => {
 });
 
 describe("heatmap visual rules", () => {
+  it("keeps negative deficits visually unfilled", () => {
+    expect(heatLevelFromDeficit("fish", -700)).toBe("none");
+    expect(heatLevelFromDeficit("fish", -100)).toBe("none");
+    expect(heatLevelFromDeficit("cat", -700)).toBe("none");
+    expect(heatLevelFromDeficit("cat", -100)).toBe("none");
+  });
+
   it("maps fish heat levels with fish thresholds", () => {
+    expect(heatLevelFromDeficit("fish", 0)).toBe("none");
     expect(heatLevelFromDeficit("fish", 199)).toBe("none");
     expect(heatLevelFromDeficit("fish", 200)).toBe("ok");
     expect(heatLevelFromDeficit("fish", 300)).toBe("good");
@@ -164,6 +172,7 @@ describe("heatmap visual rules", () => {
   });
 
   it("maps cat heat levels with cat thresholds", () => {
+    expect(heatLevelFromDeficit("cat", 0)).toBe("none");
     expect(heatLevelFromDeficit("cat", 99)).toBe("none");
     expect(heatLevelFromDeficit("cat", 100)).toBe("ok");
     expect(heatLevelFromDeficit("cat", 200)).toBe("good");

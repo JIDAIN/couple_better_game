@@ -1,4 +1,5 @@
 import { normalizeDailyRecord, orderDailyRecords, recordIsoDate } from "./daily-record-utils";
+import { migrateBackupCurrencySemantics } from "./currency-semantics";
 import { normalizeExchangeRecord } from "./exchange-service";
 import {
   recalculateCoinsWithCurrentRules,
@@ -103,7 +104,7 @@ function normalizeDailyRecords(value: unknown) {
 
 function normalizeCategory(value: unknown): ExchangeCategory | null {
   if (!isObject(value)) return null;
-  const resourceKind = resourceKindOr(value.resourceKind, "gem");
+  const resourceKind = resourceKindOr(value.resourceKind, "coin");
   return {
     id: stringOr(value.id, `category-import-${Date.now()}`),
     title: stringOr(value.title, "未命名奖励"),
@@ -137,7 +138,7 @@ function normalizeImportedExchangeRecord(
   const icon = stringOr(value.icon, fallback?.icon ?? "🎁");
   const resourceKind = resourceKindOr(
     value.resourceKind,
-    fallback?.resourceKind ?? "gem",
+    fallback?.resourceKind ?? "coin",
   );
   const price = numberOr(value.price, fallback?.price ?? 0);
 
@@ -184,6 +185,8 @@ export function importHomeBackupJson(raw: string): ImportResult {
     return { ok: false, reason: "只支持 schemaVersion: 1 的完整备份" };
   }
 
+  const migrated = migrateBackupCurrencySemantics(parsed);
+
   const requiredKeys = [
     "wallet",
     "dailyRecords",
@@ -193,28 +196,28 @@ export function importHomeBackupJson(raw: string): ImportResult {
     "coinRules",
     "visualRules",
   ];
-  if (!requiredKeys.every((key) => key in parsed)) {
+  if (!requiredKeys.every((key) => key in migrated)) {
     return { ok: false, reason: "备份字段不完整" };
   }
 
-  const exchangeCategories = normalizeCategories(parsed.exchangeCategories);
-  const dailyRecords = normalizeDailyRecords(parsed.dailyRecords);
+  const exchangeCategories = normalizeCategories(migrated.exchangeCategories);
+  const dailyRecords = normalizeDailyRecords(migrated.dailyRecords);
   if (!exchangeCategories || !dailyRecords) {
     return { ok: false, reason: "备份数据结构不正确" };
   }
 
   const exchangeRecords = normalizeExchangeRecords(
-    parsed.exchangeRecords,
+    migrated.exchangeRecords,
     exchangeCategories,
   );
   if (!exchangeRecords) {
     return { ok: false, reason: "兑换记录结构不正确" };
   }
 
-  const wallet = isObject(parsed.wallet)
+  const wallet = isObject(migrated.wallet)
     ? {
-        gems: numberOr(parsed.wallet.gems),
-        coins: numberOr(parsed.wallet.coins),
+        gems: numberOr(migrated.wallet.gems),
+        coins: numberOr(migrated.wallet.coins),
       }
     : { gems: 0, coins: 0 };
 
@@ -234,9 +237,9 @@ export function importHomeBackupJson(raw: string): ImportResult {
     dailyRecords,
     exchangeRecords,
     exchangeCategories,
-    heatmapStartDate: stringOr(parsed.heatmapStartDate),
-    coinRules: normalizeCoinRules(parsed.coinRules),
-    visualRules: normalizeVisualRules(parsed.visualRules),
+    heatmapStartDate: stringOr(migrated.heatmapStartDate),
+    coinRules: normalizeCoinRules(migrated.coinRules),
+    visualRules: normalizeVisualRules(migrated.visualRules),
   };
 
   return { ok: true, state: recalculateCoinsWithCurrentRules(base) };

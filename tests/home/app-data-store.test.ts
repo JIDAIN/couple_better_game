@@ -77,6 +77,7 @@ describe("app data snapshot helpers", () => {
     const snapshot = snapshotFromHomeResourcesState(state());
 
     expect(snapshot.version).toBe(1);
+    expect(snapshot.currencySemanticsVersion).toBe(2);
     expect(snapshot.runtime.wallet).toEqual({ gems: 8, coins: 2 });
     expect(snapshot.runtime.dailyRecords).toHaveLength(1);
     expect(snapshot.config.heatmapStartDate).toBe("2026-05-06");
@@ -109,6 +110,7 @@ describe("app data snapshot helpers", () => {
     const snapshot = snapshotFromLegacyHomeState(legacy);
 
     expect(snapshot.version).toBe(1);
+    expect(snapshot.currencySemanticsVersion).toBeUndefined();
     expect(snapshot.runtime.wallet).toEqual(legacy.wallet);
     expect(snapshot.runtime.exchangeRecords).toEqual(legacy.exchangeRecords);
     expect(snapshot.config.visualRules).toEqual(legacy.visualRules);

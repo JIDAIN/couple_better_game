@@ -1,6 +1,8 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Tabs, Title } from "animal-island-ui";
+import { AppButton, AppCard, AppCurrencyChip, AppGameIcon, AppInput, AppModal, AppTextarea, AppToast } from "../ui";
 import {
   GEM_CAP,
   useHomeResources,
@@ -32,7 +34,7 @@ const EMPTY_CATEGORY_FORM: CategoryFormState = {
   title: "",
   icon: "",
   description: "",
-  resourceKind: "gem",
+  resourceKind: "coin",
   price: "",
 };
 
@@ -64,20 +66,22 @@ function resourceLabel(kind: ResourceKind) {
   return kind === "gem" ? "宝石" : "金币";
 }
 
-function resourceIcon(kind: ResourceKind) {
-  return kind === "gem" ? "💎" : "🪙";
-}
-
-function categoryTone(kind: ResourceKind) {
-  return kind === "gem" ? "ui-chip-primary" : "ui-chip-reward";
-}
-
-function categoryPriceLabel(category: ExchangeCategory) {
-  return `${resourceIcon(category.resourceKind)} ${category.price}`;
-}
-
-function recordPriceLabel(price: number, kind: ResourceKind) {
-  return `${resourceIcon(kind)} ${price}`;
+function ShopBalanceChip({
+  icon,
+  label,
+  value,
+}: {
+  icon: "gem" | "coin";
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <span className="shop-balance-chip">
+      <AppGameIcon name={icon} size={14} />
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </span>
+  );
 }
 
 function formatExchangeDisplayDate(value: string) {
@@ -98,13 +102,14 @@ function ExchangeRecordCard({
           {formatExchangeDisplayDate(record.date)}
         </span>
 
-        <button
+        <AppButton
           type="button"
           onClick={() => onEdit(record.id)}
-          className="ui-action-pill ui-button-secondary exchange-edit-button"
+          size="small"
+          className="exchange-edit-button"
         >
           编辑
-        </button>
+        </AppButton>
       </div>
 
       <div className="exchange-record-line">
@@ -113,35 +118,16 @@ function ExchangeRecordCard({
           {record.remark ? ` · ${record.remark}` : ""}
         </span>
 
-        <span
-          className={`ui-price-pill exchange-record-price ${getCategoryChipClass(
-            record.resourceKind,
-          )}`}
-        >
-          {recordPriceLabel(record.price, record.resourceKind)}
-        </span>
+        <AppCurrencyChip
+          currency={record.resourceKind}
+          value={record.price}
+          showSign={false}
+          size="sm"
+          className="exchange-record-price"
+        />
       </div>
     </article>
   );
-}
-
-function displayCategoryDescription(category: ExchangeCategory) {
-  switch (category.id) {
-    case "snack":
-      return "轻轻奖励一下";
-    case "drink":
-      return "小甜甜奖励";
-    case "double-drink":
-      return "双人份快乐";
-    case "dinner":
-      return "热乎一顿";
-    case "deluxe-dinner":
-      return "周末小奖励";
-    case "family":
-      return "温柔奖励";
-    default:
-      return category.description;
-  }
 }
 
 function formFromCategory(category?: ExchangeCategory | null): CategoryFormState {
@@ -155,11 +141,12 @@ function formFromCategory(category?: ExchangeCategory | null): CategoryFormState
   };
 }
 
-function getCategoryChipClass(kind: ResourceKind) {
-  return kind === "gem" ? "ui-chip-primary" : "ui-chip-reward";
-}
-
-export function ExchangeShop() {
+export function ExchangeShop({
+  variant = "sheet",
+}: {
+  variant?: "sheet" | "inline";
+}) {
+  const inline = variant === "inline";
   const {
     gemStock,
     coinStock,
@@ -172,11 +159,9 @@ export function ExchangeShop() {
     deleteExchangeCategory,
   } = useHomeResources();
   const [open, setOpen] = useState(false);
-  const [sheetEnter, setSheetEnter] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [mode, setMode] = useState<"browse" | "manage">("browse");
   const [overlay, setOverlay] = useState<OverlayState>(null);
-  const [overlayEnter, setOverlayEnter] = useState(false);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(
     EMPTY_CATEGORY_FORM,
   );
@@ -184,8 +169,6 @@ export function ExchangeShop() {
     EMPTY_RECORD_FORM,
   );
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
-  const titleId = useId();
-  const overlayTitleId = useId();
   const prevOverflow = useRef<string | null>(null);
 
   const selectedCategory =
@@ -198,7 +181,6 @@ export function ExchangeShop() {
       : null;
 
   const closeOverlay = useCallback(() => {
-    setOverlayEnter(false);
     setOverlay(null);
     setRecordForm(EMPTY_RECORD_FORM);
     setEditingRecordId(null);
@@ -207,7 +189,6 @@ export function ExchangeShop() {
 
   const openOverlay = useCallback((next: OverlayState) => {
     setOverlay(next);
-    setOverlayEnter(false);
     if (next?.kind === "category") {
       const source =
         next.categoryId == null
@@ -226,14 +207,12 @@ export function ExchangeShop() {
   const closeShop = useCallback(() => {
     closeOverlay();
     setMode("browse");
-    setSheetEnter(false);
     setOpen(false);
   }, [closeOverlay]);
 
   const openShop = useCallback(() => {
     closeOverlay();
     setMode("browse");
-    setSheetEnter(false);
     setOpen(true);
   }, [closeOverlay]);
 
@@ -286,25 +265,17 @@ export function ExchangeShop() {
   }, [toast]);
 
   useEffect(() => {
-    if (!open) return;
-    const id = requestAnimationFrame(() =>
-      requestAnimationFrame(() => setSheetEnter(true)),
-    );
-    return () => cancelAnimationFrame(id);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     const prev = document.body.style.overflow;
     prevOverflow.current = prev;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prevOverflow.current ?? "";
     };
-  }, [open]);
+  }, [open, inline]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || inline) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (overlay) {
@@ -319,15 +290,23 @@ export function ExchangeShop() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, overlay, mode, closeOverlay, closeCategoryMode, closeShop]);
+  }, [open, overlay, mode, closeOverlay, closeCategoryMode, closeShop, inline]);
 
   useEffect(() => {
-    if (!overlay) return;
-    const id = requestAnimationFrame(() =>
-      requestAnimationFrame(() => setOverlayEnter(true)),
-    );
-    return () => cancelAnimationFrame(id);
-  }, [overlay]);
+    if (!inline) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (overlay) {
+        closeOverlay();
+        return;
+      }
+      if (mode === "manage") {
+        closeCategoryMode();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inline, overlay, mode, closeOverlay, closeCategoryMode]);
 
   const saveCategory = useCallback(() => {
     const parsedPrice = Number.parseInt(categoryForm.price, 10);
@@ -402,99 +381,110 @@ export function ExchangeShop() {
   );
 
   const renderBrowseList = () => {
-    const gemCategories = categories.filter(
-      (category) => category.resourceKind === "gem",
-    );
     const coinCategories = categories.filter(
       (category) => category.resourceKind === "coin",
+    );
+    const gemCategories = categories.filter(
+      (category) => category.resourceKind === "gem",
     );
 
     const renderCategoryCard = (category: ExchangeCategory) => {
       const affordable = canAfford(category);
-      const isGem = category.resourceKind === "gem";
-      const cardClass = isGem ? "ui-tinted-primary" : "ui-tinted-reward";
-      const iconClass = isGem ? "ui-chip-primary" : "ui-chip-reward";
-      const priceClass = isGem ? "ui-chip-primary" : "ui-chip-reward";
-      const buttonClass = "ui-button-secondary";
       return (
-        <article
+        <AppCard
+          variant="item"
           key={category.id}
-          className={`ui-card-soft ui-card-compact transition ${cardClass}`}
+          className="shop-shelf-item"
         >
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5">
-            <div className="flex min-w-0 items-center gap-2">
+          <div className="shop-shelf-row">
+            <div className="shop-shelf-main">
               <span
-                className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${iconClass}`}
+                className="flex h-8 w-8 shrink-0 items-center justify-center text-base"
                 aria-hidden
               >
                 {category.icon}
               </span>
-              <p className="truncate text-[12px] font-bold leading-4 ui-text-main sm:text-[13px]">
-                {category.title}
-              </p>
+              <div className="min-w-0">
+                <p className="shop-shelf-title ui-text-main">
+                  {category.title}
+                </p>
+              </div>
             </div>
-            <span
-              className={`ui-badge ui-price-pill shrink-0 self-center text-[10px] tabular-nums ${priceClass}`}
-            >
-              {categoryPriceLabel(category)}
-            </span>
 
-            <p className="min-w-0 truncate text-[10px] font-medium leading-3 ui-text-soft sm:text-[11px]">
-              {displayCategoryDescription(category)}
-            </p>
-            <button
-              type="button"
-              disabled={!affordable}
-              onClick={() => openRecord(category.id)}
-              className={`ui-action-pill shrink-0 self-center text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${buttonClass}`}
-            >
-              {affordable ? "兑换" : "差一点"}
-            </button>
+            <div className="shop-shelf-action">
+              <AppCurrencyChip currency={category.resourceKind} value={category.price} size="sm" showSign={false} />
+              <AppButton
+                type="button"
+                disabled={!affordable}
+                onClick={() => openRecord(category.id)}
+                size="small"
+                className="shrink-0 self-center text-[10px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                {affordable ? "兑换" : "差一点"}
+              </AppButton>
+            </div>
           </div>
-        </article>
+        </AppCard>
       );
     };
 
-    const renderSection = (title: string, items: ExchangeCategory[]) => (
-      <section className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3 px-1">
+    const renderSection = (title: React.ReactNode, kind: ResourceKind, items: ExchangeCategory[]) => (
+      <AppCard variant="panel" className="shop-shelf-section">
+        <div className="shop-shelf-header">
           <p
             className={`text-sm font-bold tracking-wide ${
-              title.includes("宝石") ? "ui-text-primary" : "ui-text-reward"
+              kind === "gem" ? "ui-text-primary" : "ui-text-reward"
             }`}
           >
             {title}
           </p>
         </div>
         {items.length > 0 ? (
-          <div className="space-y-1.5">{items.map(renderCategoryCard)}</div>
+          <div className="shop-shelf-list">{items.map(renderCategoryCard)}</div>
         ) : (
-          <div className="ui-soft-panel ui-card-item py-5 text-center text-[11px] font-semibold ui-text-soft">
-            {title.includes("宝石") ? "还没有宝石商品" : "还没有金币商品"}
-          </div>
+          <AppCard variant="item" className="shop-shelf-empty text-center text-[11px] font-semibold ui-text-soft">
+            {kind === "gem" ? "还没有宝石商品" : "还没有金币商品"}
+          </AppCard>
         )}
-      </section>
+      </AppCard>
     );
 
     return (
-      <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          {renderSection("💎 宝石兑换", gemCategories)}
-          {renderSection("🪙 金币兑换", coinCategories)}
-        </div>
+      <div
+        className={
+          inline
+            ? "shop-list-scroll mt-2.5 space-y-2"
+            : "shop-list-scroll mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        }
+      >
+        <Tabs
+          items={[
+            {
+              key: "coin",
+              label: "金币兑换",
+              children: renderSection(<><AppGameIcon name="coin" size={16} /> 金币兑换</>, "coin", coinCategories),
+            },
+            {
+              key: "gem",
+              label: "宝石兑换",
+              children: renderSection(<><AppGameIcon name="gem" size={16} /> 宝石兑换</>, "gem", gemCategories),
+            },
+          ]}
+          defaultActiveKey="coin"
+        />
 
-        <section className="mt-2.5 space-y-1.5">
+        <AppCard variant="panel" className="shop-shelf-section mt-2.5">
           <div className="flex items-center justify-between gap-3">
             <p className="px-1 text-[11px] font-semibold tracking-wide ui-text-muted">
               已兑换记录
             </p>
-            <button
+            <AppButton
               type="button"
               onClick={openHistory}
-              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold"
+              className="px-3 py-1.5 text-[11px] font-semibold"
             >
               查看记录
-            </button>
+            </AppButton>
           </div>
           {exchangeRecords.length > 0 ? (
             <div className="space-y-1.5">
@@ -507,80 +497,75 @@ export function ExchangeShop() {
               ))}
             </div>
           ) : (
-            <div className="ui-soft-panel ui-card-compact text-[11px] font-medium ui-text-soft">
+            <AppCard variant="item" className="shop-shelf-empty text-[11px] font-medium ui-text-soft">
               还没有兑换记录，攒到喜欢的奖励再来换吧。
-            </div>
+            </AppCard>
           )}
-        </section>
+        </AppCard>
       </div>
     );
   };
 
   const renderManageList = () => {
-    const gemCategories = categories.filter(
-      (category) => category.resourceKind === "gem",
-    );
     const coinCategories = categories.filter(
       (category) => category.resourceKind === "coin",
     );
-
-    const renderCategoryCard = (category: ExchangeCategory) => (
-      <article
-        key={category.id}
-        className="ui-card-soft ui-card-compact"
-      >
-        <div className="flex items-center gap-2.5">
-          <span
-            className={`flex h-8 w-8 shrink-0 items-center justify-center text-base ${categoryTone(
-              category.resourceKind,
-            )}`}
-            aria-hidden
-          >
-            {category.icon}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold ui-text-main">
-              {category.title}
-            </p>
-            <p className="mt-0.5 line-clamp-1 text-[10px] font-medium ui-text-soft">
-              {category.description}
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              <span
-                className={`ui-badge py-0.5 text-[10px] ${getCategoryChipClass(
-                  category.resourceKind,
-                )}`}
-              >
-                {resourceLabel(category.resourceKind)}
-              </span>
-              <span className="ui-badge ui-chip-plain py-0.5 text-[10px]">
-                {categoryPriceLabel(category)}
-              </span>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => openCategoryForm(category.id)}
-              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold"
-            >
-              编辑
-            </button>
-            <button
-              type="button"
-              onClick={() => deleteCategory(category.id)}
-              className="ui-button-secondary px-3 py-1.5 text-[11px] font-semibold opacity-80"
-            >
-              删除
-            </button>
-          </div>
-        </div>
-      </article>
+    const gemCategories = categories.filter(
+      (category) => category.resourceKind === "gem",
     );
 
-    const renderSection = (title: string, items: ExchangeCategory[]) => (
-      <section className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3 px-1">
+    const renderCategoryCard = (category: ExchangeCategory) => (
+      <AppCard
+        variant="item"
+        key={category.id}
+        className="shop-shelf-item"
+      >
+        <div className="shop-shelf-row">
+          <div className="shop-shelf-main">
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center text-base"
+              aria-hidden
+            >
+              {category.icon}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-semibold ui-text-main">
+                {category.title}
+              </p>
+              <p className="mt-0.5 line-clamp-1 text-[10px] font-medium ui-text-soft">
+                {category.description}
+              </p>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                <AppButton type="button" size="small" disabled className="py-0.5 text-[10px]">
+                  {resourceLabel(category.resourceKind)}
+                </AppButton>
+                <AppCurrencyChip currency={category.resourceKind} value={category.price} size="sm" showSign={false} />
+              </div>
+            </div>
+          </div>
+          <div className="shop-shelf-action">
+            <AppButton
+              type="button"
+              onClick={() => openCategoryForm(category.id)}
+              className="px-3 py-1.5 text-[11px] font-semibold"
+            >
+              编辑
+            </AppButton>
+            <AppButton
+              type="button"
+              onClick={() => deleteCategory(category.id)}
+              className="px-3 py-1.5 text-[11px] font-semibold opacity-80"
+            >
+              删除
+            </AppButton>
+          </div>
+        </div>
+      </AppCard>
+    );
+
+    const renderSection = (title: React.ReactNode, items: ExchangeCategory[]) => (
+      <AppCard variant="panel" className="shop-shelf-section">
+        <div className="shop-shelf-header">
           <p className="text-[11px] font-semibold tracking-wide ui-text-muted">
             {title}
           </p>
@@ -588,30 +573,36 @@ export function ExchangeShop() {
             {items.length} 项
           </span>
         </div>
-        <div className="space-y-1.5">
+        <div className="shop-shelf-list">
           {items.map(renderCategoryCard)}
         </div>
-      </section>
+      </AppCard>
     );
 
     return (
-      <div className="mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain pb-1">
+      <div
+        className={
+          inline
+            ? "shop-list-scroll mt-2.5 space-y-2"
+            : "shop-list-scroll mt-2.5 min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        }
+      >
         <div className="flex items-center justify-between gap-3">
           <p className="px-1 text-[11px] font-semibold tracking-wide ui-text-muted">
             奖励模板
           </p>
-          <button
+          <AppButton
             type="button"
             onClick={() => openCategoryForm(null)}
-            className="ui-button-secondary px-3 py-1.5 text-xs font-semibold"
+            className="px-3 py-1.5 text-xs font-semibold"
           >
             新增类别
-          </button>
+          </AppButton>
         </div>
 
         <div className="mt-2 space-y-3">
-          {renderSection("宝石类", gemCategories)}
           {renderSection("金币类", coinCategories)}
+          {renderSection("宝石类", gemCategories)}
         </div>
       </div>
     );
@@ -621,67 +612,51 @@ export function ExchangeShop() {
 
     if (overlay.kind === "history") {
       return (
-        <div className="fixed inset-0 z-10 flex items-center justify-center p-3 sm:p-4">
-          <button
-            type="button"
-            aria-label="关闭已兑换记录"
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
-              overlayEnter ? "opacity-100" : "opacity-0"
-            }`}
-            onClick={closeOverlay}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={overlayTitleId}
-            className={`ui-sheet ui-record-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out ${
-              overlayEnter
-                ? "translate-y-0 opacity-100"
-                : "translate-y-3 opacity-0"
-            }`}
-          >
-            <div className="record-sheet-header">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3
-                    id={overlayTitleId}
-                    className="text-base font-semibold tracking-tight ui-text-main"
-                  >
-                    兑换记录
-                  </h3>
-                  <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
-                    最近的小奖励都在这里
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeOverlay}
-                  className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
-                >
-                  返回
-                </button>
+        <AppModal
+          open
+          onClose={closeOverlay}
+          maskClosable
+          width="min(92vw, 28rem)"
+          title={
+            <div className="app-dialog-header">
+              <Title size="small" color="app-yellow">
+                兑换记录
+              </Title>
+              <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
+                最近的小奖励都在这里
+              </p>
+            </div>
+          }
+          footer={
+            <div className="app-dialog-footer">
+              <AppButton
+                type="button"
+                onClick={closeOverlay}
+                className="is-secondary flex-1 py-3 text-sm font-semibold"
+              >
+                返回
+              </AppButton>
+            </div>
+          }
+        >
+          <div className="app-modal-scroll-body app-modal-scroll-body--records">
+            {exchangeRecords.length > 0 ? (
+              <div className="record-list">
+                {exchangeRecords.map((record) => (
+                  <ExchangeRecordCard
+                    key={record.id}
+                    record={record}
+                    onEdit={openEditRecord}
+                  />
+                ))}
               </div>
-            </div>
-
-            <div className="record-sheet-body">
-              {exchangeRecords.length > 0 ? (
-                <div className="record-list">
-                  {exchangeRecords.map((record) => (
-                    <ExchangeRecordCard
-                      key={record.id}
-                      record={record}
-                      onEdit={openEditRecord}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
-                  还没有兑换记录，攒到喜欢的小奖励再来换吧。
-                </div>
-              )}
-            </div>
+            ) : (
+              <div className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
+                还没有兑换记录，攒到喜欢的小奖励再来换吧。
+              </div>
+            )}
           </div>
-        </div>
+        </AppModal>
       );
     }
 
@@ -700,99 +675,29 @@ export function ExchangeShop() {
       }
 
       return (
-        <div className="absolute inset-0 z-10 flex items-end justify-center p-2.5 sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label={isEditing ? "关闭记录编辑" : "关闭记录兑换"}
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
-              overlayEnter ? "opacity-100" : "opacity-0"
-            }`}
-            onClick={closeOverlay}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={overlayTitleId}
-            className={`ui-dialog ui-dialog-content relative w-full max-w-md transition-all duration-300 ease-out ${
-              overlayEnter
-                ? "translate-y-0 opacity-100"
-                : "translate-y-4 opacity-0"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3 pb-3">
+        <AppModal
+          open
+          onClose={closeOverlay}
+          maskClosable
+          width="min(92vw, 26rem)"
+          title={
+            <div className="app-dialog-header">
               <div>
                 <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
                   {isEditing ? "编辑兑换记录" : "记录兑换"}
                 </p>
-                <h3
-                  id={overlayTitleId}
-                  className="mt-0.5 text-base font-semibold tracking-tight ui-text-main"
-                >
+                <Title size="small" color="app-yellow" className="mt-0.5">
                   {displayIcon} {displayTitle}
-                </h3>
+                </Title>
               </div>
-              <button
-                type="button"
-                onClick={closeOverlay}
-                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
-              >
-                取消
-              </button>
             </div>
-
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              <span
-                className={`ui-badge py-1 text-[11px] ${getCategoryChipClass(
-                  displayResource,
-                )}`}
-              >
-                {resourceLabel(displayResource)}
-              </span>
-              <span
-                className={`ui-badge ui-price-pill ui-chip-plain text-[11px] tabular-nums ${getCategoryChipClass(displayResource)}`}
-              >
-                {recordPriceLabel(displayPrice, displayResource)}
-              </span>
-            </div>
-
-            <label className="mt-3 block">
-              <span className="ui-field-label">
-                时间
-              </span>
-              <input
-                type="datetime-local"
-                value={recordForm.occurredAt}
-                onChange={(e) =>
-                  setRecordForm((current) => ({
-                    ...current,
-                    occurredAt: e.target.value,
-                  }))
-                }
-                className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
-              />
-            </label>
-
-            <label className="mt-3 block">
-              <span className="ui-field-label">
-                备注
-              </span>
-              <input
-                value={recordForm.remark}
-                onChange={(e) =>
-                  setRecordForm((current) => ({
-                    ...current,
-                    remark: e.target.value,
-                  }))
-                }
-                className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
-                placeholder="例如：下午茶 / 小奖励 / 周末加餐"
-              />
-            </label>
-
-            <div className="mt-4 flex gap-2">
+          }
+          footer={
+            <div className="app-dialog-footer">
               {isEditing ? (
-                <button
+                <AppButton
                   type="button"
+                  variant="ghost"
                   onClick={() => {
                     if (!record) return;
                     const ok = deleteExchangeRecord(record.id);
@@ -801,80 +706,122 @@ export function ExchangeShop() {
                       closeOverlay();
                     }
                   }}
-                  className="ui-button-secondary flex-1 py-2.5 text-sm font-semibold text-[#b44f6f]"
+                  className="flex-1 py-2.5 text-sm font-semibold"
                 >
                   删除
-                </button>
+                </AppButton>
               ) : null}
-              <button
+              <AppButton
                 type="button"
                 onClick={closeOverlay}
-                className="ui-button-secondary flex-1 py-2.5 text-sm font-semibold"
+                className="is-secondary flex-1 py-2.5 text-sm font-semibold"
               >
                 取消
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 type="button"
                 onClick={saveExchangeRecord}
                 disabled={!canSubmit}
-                className="ui-button-primary flex-[1.3] py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                className="is-primary flex-[1.3] py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isEditing ? "保存修改" : "确认兑换"}
-              </button>
+              </AppButton>
             </div>
+          }
+        >
+          <div className="app-modal-scroll-body app-modal-scroll-body--form-compact">
+            <div className="flex flex-wrap gap-1.5">
+              <AppButton type="button" size="small" disabled className="py-1 text-[11px]">
+                {resourceLabel(displayResource)}
+              </AppButton>
+              <AppCurrencyChip currency={displayResource} value={displayPrice} size="sm" showSign={false} />
+            </div>
+
+            <label className="mt-2.5 block">
+              <span className="ui-field-label">
+                时间
+              </span>
+              <AppInput
+                type="datetime-local"
+                value={recordForm.occurredAt}
+                onChange={(e) =>
+                  setRecordForm((current) => ({
+                    ...current,
+                    occurredAt: e.target.value,
+                  }))
+                }
+                className="app-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
+              />
+            </label>
+
+            <label className="mt-2.5 block">
+              <span className="ui-field-label">
+                备注
+              </span>
+              <AppInput
+                value={recordForm.remark}
+                onChange={(e) =>
+                  setRecordForm((current) => ({
+                    ...current,
+                    remark: e.target.value,
+                  }))
+                }
+                className="app-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
+                placeholder="例如：下午茶 / 小奖励 / 周末加餐"
+              />
+            </label>
           </div>
-        </div>
+        </AppModal>
       );
-    }    if (overlay.kind === "category") {
+    }
+
+    if (overlay.kind === "category") {
       const isEdit = overlay.categoryId != null;
 
       return (
-        <div className="absolute inset-0 z-10 flex items-end justify-center p-2.5 sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="关闭类别表单"
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
-              overlayEnter ? "opacity-100" : "opacity-0"
-            }`}
-            onClick={closeOverlay}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={overlayTitleId}
-            className={`ui-dialog ui-dialog-content relative w-full max-w-md transition-all duration-300 ease-out ${
-              overlayEnter
-                ? "translate-y-0 opacity-100"
-                : "translate-y-4 opacity-0"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-3 pb-3">
+        <AppModal
+          open
+          onClose={closeOverlay}
+          maskClosable
+          width="min(92vw, 27rem)"
+          title={
+            <div className="app-dialog-header">
               <div>
                 <p className="text-[11px] font-semibold tracking-wide ui-text-soft">
                   {isEdit ? "编辑类别" : "新增类别"}
                 </p>
-                <h3
-                  id={overlayTitleId}
-                  className="mt-0.5 text-base font-semibold tracking-tight ui-text-main"
-                >
+                <Title size="small" color="app-yellow" className="mt-0.5">
                   {isEdit ? "修改一个小奖励模板" : "添加一个新的小奖励模板"}
-                </h3>
+                </Title>
               </div>
-              <button
+            </div>
+          }
+          footer={
+            <div className="app-dialog-footer">
+              <AppButton
                 type="button"
                 onClick={closeOverlay}
-                className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
+                className="is-secondary flex-1 py-2.5 text-sm font-semibold"
               >
-                返回
-              </button>
+                取消
+              </AppButton>
+              <AppButton
+                type="button"
+                onClick={saveCategory}
+                className="is-primary flex-[1.3] py-2.5 text-sm font-semibold"
+              >
+                保存类别
+              </AppButton>
             </div>
-
-            <div className="mt-3 space-y-3">
+          }
+        >
+          <div className="app-modal-scroll-body app-modal-scroll-body--form-compact">
+            <div className="space-y-2.5">
               <label className="block">
                 <span className="ui-field-label">
                   类别名称
                 </span>
-                <input
+                <AppInput
                   value={categoryForm.title}
                   onChange={(e) =>
                     setCategoryForm((current) => ({
@@ -882,7 +829,7 @@ export function ExchangeShop() {
                       title: e.target.value,
                     }))
                   }
-                  className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
+                  className="app-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                   placeholder="例如：小零食"
                 />
               </label>
@@ -892,7 +839,7 @@ export function ExchangeShop() {
                   <span className="ui-field-label">
                     图标
                   </span>
-                  <input
+                  <AppInput
                     value={categoryForm.icon}
                     onChange={(e) =>
                       setCategoryForm((current) => ({
@@ -900,7 +847,7 @@ export function ExchangeShop() {
                         icon: e.target.value,
                       }))
                     }
-                    className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
+                    className="app-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                     placeholder="🍦"
                   />
                 </label>
@@ -910,23 +857,7 @@ export function ExchangeShop() {
                     消耗资源
                   </span>
                   <div className="mt-1 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCategoryForm((current) => ({
-                          ...current,
-                          resourceKind: "gem",
-                        }))
-                      }
-                      className={`ui-tab flex-1 text-sm transition ${
-                        categoryForm.resourceKind === "gem"
-                          ? "ui-tab-active"
-                          : "ui-tab-idle"
-                      }`}
-                    >
-                      宝石
-                    </button>
-                    <button
+                    <AppButton
                       type="button"
                       onClick={() =>
                         setCategoryForm((current) => ({
@@ -941,7 +872,23 @@ export function ExchangeShop() {
                       }`}
                     >
                       金币
-                    </button>
+                    </AppButton>
+                    <AppButton
+                      type="button"
+                      onClick={() =>
+                        setCategoryForm((current) => ({
+                          ...current,
+                          resourceKind: "gem",
+                        }))
+                      }
+                      className={`ui-tab flex-1 text-sm transition ${
+                        categoryForm.resourceKind === "gem"
+                          ? "ui-tab-active"
+                          : "ui-tab-idle"
+                      }`}
+                    >
+                      宝石
+                    </AppButton>
                   </div>
                 </label>
               </div>
@@ -950,8 +897,8 @@ export function ExchangeShop() {
                 <span className="ui-field-label">
                   消耗数量
                 </span>
-                <div className="ui-input-shell mt-1 flex items-center gap-2 px-3 py-2.5">
-                  <input
+                <div className="mt-1">
+                  <AppInput
                     value={categoryForm.price}
                     onChange={(e) =>
                       setCategoryForm((current) => ({
@@ -960,12 +907,10 @@ export function ExchangeShop() {
                       }))
                     }
                     inputMode="numeric"
-                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold ui-text-main outline-none"
+                    className="w-full text-sm font-semibold"
                     placeholder="5"
+                    suffix={resourceLabel(categoryForm.resourceKind)}
                   />
-                  <span className="shrink-0 text-[11px] font-medium ui-text-soft">
-                    {resourceLabel(categoryForm.resourceKind)}
-                  </span>
                 </div>
               </label>
 
@@ -973,7 +918,7 @@ export function ExchangeShop() {
                 <span className="ui-field-label">
                   描述
                 </span>
-                <textarea
+                <AppTextarea
                   value={categoryForm.description}
                   onChange={(e) =>
                     setCategoryForm((current) => ({
@@ -982,142 +927,126 @@ export function ExchangeShop() {
                     }))
                   }
                   rows={3}
-                  className="ui-input mt-1 w-full resize-none px-3 py-2.5 text-sm font-medium outline-none"
+                  className="app-input mt-1 w-full resize-none px-3 py-2.5 text-sm font-medium outline-none"
                   placeholder="简单写一句这个奖励为什么可爱"
                 />
               </label>
             </div>
-
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={closeOverlay}
-                className="ui-button-secondary flex-1 py-2.5 text-sm font-semibold"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={saveCategory}
-                className="ui-button-primary flex-[1.3] py-2.5 text-sm font-semibold text-white"
-              >
-                保存类别
-              </button>
-            </div>
           </div>
-        </div>
+        </AppModal>
       );
     }
 
     return null;
   };
 
+  const shopHeader = (
+    <AppCard variant="panel" className="shop-signboard relative overflow-hidden">
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {!inline ? (
+              <Title
+                size="small"
+                color="app-yellow"
+                className="mt-0.5"
+              >
+                <span aria-hidden><AppGameIcon name="shop" size={18} /></span> 兑换商店
+              </Title>
+          ) : null}
+          <div className="shop-balance-row">
+            <ShopBalanceChip icon="coin" label="金币" value={`${coinStock}/${GEM_CAP}`} />
+            <ShopBalanceChip icon="gem" label="宝石" value={gemStock} />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {mode === "browse" ? (
+            <AppButton
+              type="button"
+              onClick={() => setMode("manage")}
+              className="px-3 py-1 text-xs font-semibold"
+            >
+              管理类别
+            </AppButton>
+          ) : (
+            <AppButton
+              type="button"
+              onClick={closeCategoryMode}
+              className="px-3 py-1 text-xs font-semibold"
+            >
+              返回
+            </AppButton>
+          )}
+          {inline ? null : (
+            <AppButton
+              type="button"
+              onClick={closeShop}
+              className="px-3 py-1 text-xs font-semibold"
+            >
+              收起
+            </AppButton>
+          )}
+        </div>
+      </div>
+    </AppCard>
+  );
+
+  const shopBody = (
+    <>{mode === "browse" ? renderBrowseList() : renderManageList()}</>
+  );
+
+  if (inline) {
+    return (
+      <div className="flex min-h-0 flex-col gap-3">
+        {shopHeader}
+        {shopBody}
+        {renderOverlay()}
+        {toast ? (
+          <AppToast
+            role="status"
+            className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,22rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold leading-relaxed ui-text-main"
+          >
+            {toast}
+          </AppToast>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="w-full">
-        <button
+        <AppButton
           type="button"
           onClick={openShop}
-          className="ui-nav-button inline-flex w-full whitespace-nowrap text-[12px] sm:text-sm"
+          className="is-nav inline-flex w-full whitespace-nowrap text-[12px] sm:text-sm"
         >
-          <span aria-hidden>🎁</span>
+          <AppGameIcon name="gift" size={16} />
           <span>兑换商店</span>
-        </button>
+        </AppButton>
       </div>
 
-      {open ? (
-        <div className="fixed inset-0 z-[55] flex items-end justify-center p-2.5 sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="关闭兑换"
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
-              sheetEnter ? "opacity-100" : "opacity-0"
-            }`}
-            onClick={closeShop}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            className={`ui-sheet relative flex h-[78dvh] w-full max-w-md flex-col overflow-hidden px-4 pt-3 transition-all duration-300 ease-out will-change-transform ${
-              sheetEnter
-                ? "translate-y-0 opacity-100 sm:scale-100"
-                : "translate-y-full opacity-90 sm:translate-y-2 sm:scale-95"
-            } pb-[max(1.25rem,env(safe-area-inset-bottom))]`}
-          >
-            <div className="ui-sheet-handle mx-auto mb-3 h-1 w-10 rounded-full" aria-hidden />
-
-            <div className="ui-soft-panel ui-card-compact relative overflow-hidden">
-              <div
-                aria-hidden
-                className="ui-ambient-white pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full blur-xl"
-              />
-              <div className="relative flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2
-                    id={titleId}
-                    className="mt-0.5 text-base font-extrabold ui-text-main"
-                  >
-                    🎁 兑换商店
-                  </h2>
-                  <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
-                    把每天的认真，换成小小奖励
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {mode === "browse" ? (
-                    <button
-                      type="button"
-                      onClick={() => setMode("manage")}
-                      className="ui-button-secondary px-3 py-1 text-xs font-semibold"
-                    >
-                      管理类别
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={closeCategoryMode}
-                      className="ui-button-secondary px-3 py-1 text-xs font-semibold"
-                    >
-                      返回
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={closeShop}
-                    className="ui-button-secondary px-3 py-1 text-xs font-semibold"
-                  >
-                    收起
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                <span className="ui-badge ui-chip-primary py-1 text-[11px]">
-                  <span aria-hidden>💎</span>
-                  {gemStock}/{GEM_CAP}
-                </span>
-                <span className="ui-badge ui-chip-reward py-1 text-[11px]">
-                  <span aria-hidden>🪙</span>
-                  {coinStock}
-                </span>
-              </div>
-            </div>
-
-            {mode === "browse" ? renderBrowseList() : renderManageList()}
-
-            {renderOverlay()}
-          </div>
+      <AppModal
+        open={open}
+        onClose={closeShop}
+        maskClosable
+        width="min(92vw, 30rem)"
+        footer={null}
+      >
+        <div className="app-modal-scroll-body app-modal-scroll-body--shop">
+          {shopHeader}
+          {shopBody}
         </div>
-      ) : null}
+      </AppModal>
+
+      {renderOverlay()}
 
       {toast ? (
-        <div
+        <AppToast
           role="status"
-          className="ui-dialog pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,22rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold leading-relaxed ui-text-main"
+          className="pointer-events-none fixed bottom-[max(5.5rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,22rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold leading-relaxed ui-text-main"
         >
           {toast}
-        </div>
+        </AppToast>
       ) : null}
     </>
   );

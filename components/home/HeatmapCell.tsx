@@ -1,16 +1,16 @@
 import type { ExerciseTag, HeatLevel } from "./types";
+import { AppHeatmapMarker } from "../ui";
 
 const levelClass: Record<HeatLevel, string> = {
-  none: "heat-cell-empty",
+  empty: "heat-cell-empty",
+  "over-light": "heat-cell-miss",
+  "over-mid": "heat-cell-miss",
+  "over-strong": "heat-cell-miss",
+  "over-heavy": "heat-cell-miss",
+  none: "heat-cell-miss",
   ok: "heat-cell-normal",
   good: "heat-cell-good",
   perfect: "heat-cell-great",
-};
-
-const exerciseIcon: Record<ExerciseTag, string> = {
-  none: "",
-  run: "🏃",
-  intense: "🔥",
 };
 
 export function HeatmapCell({
@@ -24,7 +24,7 @@ export function HeatmapCell({
   title: string;
   muted?: boolean;
 }) {
-  const icon = exerciseIcon[exercise];
+  const hasExercise = exercise !== "none";
 
   return (
     <div
@@ -39,12 +39,12 @@ export function HeatmapCell({
       role="img"
       aria-label={title}
     >
-      {icon ? (
+      {hasExercise ? (
         <span
           className="pointer-events-none absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white/75 text-[9px] leading-none shadow-[0_1px_3px_rgb(120_80_60_/_0.14)]"
           aria-hidden
         >
-          {icon}
+          <AppHeatmapMarker intensity={exercise as "run" | "intense"} size={9} />
         </span>
       ) : null}
       <span className="sr-only">{title}</span>

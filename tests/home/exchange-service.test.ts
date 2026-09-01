@@ -153,7 +153,7 @@ describe("exchange service", () => {
     ]);
   });
 
-  it("lets gem exchanges reduce wallet balance and coin exchanges reduce coin spend", () => {
+  it("lets coin exchanges reduce the daily coin wallet", () => {
     const records: ExchangeRecord[] = [
       {
         id: "daily-1",
@@ -204,6 +204,6 @@ describe("exchange service", () => {
     ];
 
     expect(sumCoinExchangeSpend(exchangeRecords)).toBe(3);
-    expect(computeGemWallet(records, exchangeRecords)).toBe(2);
+    expect(computeGemWallet(records, exchangeRecords)).toBe(3);
   });
 });

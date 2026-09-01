@@ -23,6 +23,10 @@
 # misc
 .DS_Store
 *.pem
+.codex-screens/
+.codex/
+.claude/
+docs/.ui-migration-checkpoints/
 
 # debug
 npm-debug.log*

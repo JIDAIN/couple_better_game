@@ -9,6 +9,7 @@ import type {
 } from "./types";
 
 export const GEM_CAP = 50;
+export const COIN_CAP = GEM_CAP;
 
 export type {
   CoinRulesConfig,
@@ -135,8 +136,8 @@ export function gemBreakdownForPerson(
   const exercise = gemsFromExercise(person, input.minutes, personHasDeficit);
   const recovery = computeRecoveryBonus(person, input, yesterdayRecord);
   const lines = [
-    `缺口宝石 +${deficit}`,
-    `运动宝石 +${exercise}`,
+    `缺口金币 +${deficit}`,
+    `运动金币 +${exercise}`,
     `恢复日奖励 +${recovery}`,
   ];
 
@@ -176,7 +177,7 @@ export function heatLevelFromDeficit(
   rules: SettlementVisualRules = DEFAULT_VISUAL_RULES,
 ): HeatLevel {
   const thresholds = rules.heatmap[person];
-  if (deficit <= thresholds.noneMax) return "none";
+  if (deficit < thresholds.okMin) return "none";
   if (deficit >= thresholds.perfectMin) return "perfect";
   if (deficit >= thresholds.goodMin) return "good";
   if (deficit >= thresholds.okMin) return "ok";
@@ -387,12 +388,12 @@ export function computeCoinPreview({
 
   if (currentWeekGemTotal < 30 && nextWeekGemTotal >= 30) {
     delta += 1;
-    bits.push("本周新增宝石达到 30：+1");
+    bits.push("本周新增金币达到 30：+1");
   }
 
   if (currentWeekGemTotal < 50 && nextWeekGemTotal >= 50) {
     delta += 1;
-    bits.push("本周新增宝石达到 50：再 +1");
+    bits.push("本周新增金币达到 50：再 +1");
   }
 
   const todayBothReachedOk =
@@ -426,7 +427,7 @@ export function computeCoinPreview({
   }
 
   if (delta === 0) {
-    return { delta: 0, hint: "本日暂未触发金币规则" };
+    return { delta: 0, hint: "本日暂未触发宝石规则" };
   }
 
   return { delta, hint: bits.join(" · ") };

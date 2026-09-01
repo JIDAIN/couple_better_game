@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider";
 import {
   computeCoinPreview,
@@ -12,6 +12,10 @@ import {
   parseOptionalWeight,
   type SideLogInput,
 } from "./settlement-rules";
+import { hasMeaningfulGrowthActivity } from "@/lib/home/daily-record-utils";
+import { Title } from "animal-island-ui";
+import { AppButton, AppCard, AppCurrencyChip, AppGameIcon, AppInput, AppModal, AppRoleAvatar, AppToast } from "../ui";
+import type { RoleKind } from "../ui";
 
 type GrowthLogEntry = DailyRecord;
 type DetailMode = "detail" | "edit";
@@ -68,11 +72,13 @@ function formatBreakdownLines(lines: string[]) {
   const labels: Record<string, string> = {
     缺口宝石: "缺口",
     运动宝石: "运动",
+    缺口金币: "缺口",
+    运动金币: "运动",
     恢复日奖励: "恢复",
   };
   const formatted = lines
     .map((line) => {
-      const match = /^(缺口宝石|运动宝石|恢复日奖励) \+(\d+)$/.exec(line);
+      const match = /^(缺口宝石|运动宝石|缺口金币|运动金币|恢复日奖励) \+(\d+)$/.exec(line);
       if (!match) return line;
       const value = Number(match[2]);
       if (value <= 0) return null;
@@ -88,26 +94,19 @@ function personGemNoteFromLines(lines: string[]): string | null {
 }
 
 function formatCoinHint(hint: string) {
-  if (hint === "本日暂未触发金币规则") return "还没点亮";
+  if (hint === "本日暂未触发金币规则" || hint === "本日暂未触发宝石规则") return "还没点亮";
   return hint
     .split(" · ")
     .map((part) =>
       part
         .replace(/本周新增宝石达到 30：\+1/g, "本周达标")
         .replace(/本周新增宝石达到 50：再 \+1/g, "本周进阶")
+        .replace(/本周新增金币达到 30：\+1/g, "本周达标")
+        .replace(/本周新增金币达到 50：再 \+1/g, "本周进阶")
         .replace(/双人连续 \d+ 天达到一般打卡：\+1/g, "连续坚持")
         .replace(/本周一起运动达到 2 次：\+1/g, "一起运动"),
     )
     .join(" · ");
-}
-
-function signedAmount(value: number) {
-  return value > 0 ? `+${value}` : "0";
-}
-
-/** 金币展示不依赖 emoji，避免部分字体不支持金币符号时语义丢失。 */
-function coinAmountLabel(value: number) {
-  return `金币 ${signedAmount(value)}`;
 }
 
 function sideInputFromRecord(record: DailyRecord, side: "fish" | "cat") {
@@ -127,7 +126,7 @@ function CoinHintText({ hint }: { hint: string }) {
 function BonusHintText({ active }: { active: boolean }) {
   return (
     <p className="growth-detail-extra-hint">
-      {active ? "一起点亮" : "满 30 分钟时点亮"}
+      {active ? "一起点亮" : "一起运动 30min 点亮"}
     </p>
   );
 }
@@ -154,29 +153,29 @@ function CompactField({
   return (
     <label className="compact-field">
       <span className="compact-field-label">{label}</span>
-      <div className="compact-field-input">
-        <input
+      <div className="app-compact-control">
+        <AppInput
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
+          inputSize="small"
           placeholder="0"
+          suffix={unit}
+          className="record-compact-input"
         />
-        {unit ? <span>{unit}</span> : null}
       </div>
     </label>
   );
 }
 
 function PersonDetailCard({
-  emoji,
-  title,
+  role,
   deficit,
   minutes,
   gems,
   lines,
 }: {
-  emoji: string;
-  title: string;
+  role: RoleKind;
   deficit: number;
   minutes: number;
   gems: number;
@@ -184,25 +183,30 @@ function PersonDetailCard({
 }) {
   const note = personGemNoteFromLines(lines);
   return (
-    <div className="growth-person-card">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="ui-text-main">
-          <span aria-hidden>{emoji}</span> {title}
-        </h3>
-        <span className="ui-price-pill ui-chip-primary">宝石 +{gems}</span>
+    <div className="growth-detail-extra-card growth-person-detail-card">
+      <div className="growth-person-detail-head">
+        <p className="growth-person-detail-role">
+          <AppRoleAvatar role={role} size={14} />
+        </p>
+        <AppCurrencyChip currency="coin" value={gems} size="sm" />
       </div>
-      <div className="growth-person-metrics">
-        <span>{deficit} kcal</span>
-        <span>{minutes} min</span>
+      <div className="growth-person-detail-metrics">
+        <div className="growth-person-detail-metric">
+          <span>缺口</span>
+          <strong>{deficit} kcal</strong>
+        </div>
+        <div className="growth-person-detail-metric">
+          <span>运动</span>
+          <strong>{minutes} min</strong>
+        </div>
       </div>
-      {note ? <p className="growth-person-note">{note}</p> : null}
+      {note ? <p className="growth-detail-extra-hint">{note}</p> : null}
     </div>
   );
 }
 
 function EditSide({
-  emoji,
-  title,
+  role,
   weight,
   setWeight,
   deficit,
@@ -210,8 +214,7 @@ function EditSide({
   minutes,
   setMinutes,
 }: {
-  emoji: string;
-  title: string;
+  role: RoleKind;
   weight: string;
   setWeight: (value: string) => void;
   deficit: string;
@@ -219,13 +222,14 @@ function EditSide({
   minutes: string;
   setMinutes: (value: string) => void;
 }) {
+  const title = role === "fish" ? "鱼鱼" : "猫猫";
   return (
-    <div className="growth-partner-form ui-soft-panel ui-card-item flex min-w-0 flex-col">
+    <AppCard variant="panel" className="growth-partner-form flex min-w-0 flex-col">
       <p className="text-[11px] font-bold ui-text-main">
-        <span aria-hidden>{emoji}</span> {title}
+        <AppRoleAvatar role={role} size={16} /> {title}
       </p>
       <CompactField
-        label="今日体重"
+        label="体重"
         value={weight}
         onChange={setWeight}
         inputMode="decimal"
@@ -245,11 +249,11 @@ function EditSide({
         inputMode="numeric"
         unit="kcal"
       />
-    </div>
+    </AppCard>
   );
 }
 
-function LogCard({
+export function GrowthLogLedgerRow({
   entry,
   onOpen,
 }: {
@@ -260,17 +264,131 @@ function LogCard({
     <button
       type="button"
       onClick={() => onOpen(entry)}
-      className="growth-log-row text-left transition hover:brightness-[1.02] active:scale-[0.99]"
+      className="growth-log-ledger-row"
     >
-      <span className="growth-log-date">{formatMonthDay(entry.recordDate)}</span>
-      <span className="growth-log-summary">
-        <span className="ui-price-pill ui-chip-primary">💎 +{totalGems(entry)}</span>
-        <span className="ui-price-pill ui-chip-reward">
-          {coinAmountLabel(entry.coins)}
-        </span>
-        <span className="growth-log-detail-link">详情 ›</span>
-      </span>
+      <span className="growth-log-ledger-date">{formatMonthDay(entry.recordDate)}</span>
+      <AppCurrencyChip currency="coin" value={totalGems(entry)} size="sm" />
+      <AppCurrencyChip currency="gem" value={entry.coins} size="sm" />
+      <span className="growth-log-detail-link">详情</span>
     </button>
+  );
+}
+
+export function GrowthRecordDetailModal({
+  record,
+  onClose,
+}: {
+  record: DailyRecord | null;
+  onClose: () => void;
+}) {
+  const { coinRules, dailyRecords, visualRules } = useHomeResources();
+  const detailInput = useMemo(
+    () =>
+      record
+        ? {
+            record,
+            fish: sideInputFromRecord(record, "fish"),
+            cat: sideInputFromRecord(record, "cat"),
+          }
+        : null,
+    [record],
+  );
+  const detailPreview = useSettlementPreview({
+    coinRules,
+    dailyRecords,
+    input: detailInput,
+    visualRules,
+  });
+
+  return (
+    <AppModal
+      open={Boolean(record)}
+      onClose={onClose}
+      maskClosable
+      width="min(92vw, 30rem)"
+      title={
+        record ? (
+          <div className="app-dialog-header shrink-0">
+            <p className="text-[10px] font-bold tracking-[0.18em] ui-text-primary">
+              记录详情
+            </p>
+            <Title size="small" color="app-yellow" className="mt-1">
+              {formatFullDate(record.recordDate)}
+            </Title>
+            <p className="mt-1 text-xs font-medium ui-text-muted">
+              今天也攒下了一点闪光
+            </p>
+          </div>
+        ) : null
+      }
+      footer={
+        record && detailPreview ? (
+          <div className="app-dialog-footer">
+            <AppButton
+              type="button"
+              onClick={onClose}
+              className="is-secondary flex-1 py-3 text-sm font-semibold"
+            >
+              关闭
+            </AppButton>
+          </div>
+        ) : null
+      }
+    >
+      {record && detailPreview ? (
+        <div className="app-modal-scroll-body app-modal-scroll-body--growth-detail">
+          <div className="growth-log-detail-stack">
+            <div className="growth-detail-summary">
+              <AppCurrencyChip currency="coin" value={totalGems(record)} />
+              <AppCurrencyChip currency="gem" value={record.coins} />
+            </div>
+
+            <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
+              <PersonDetailCard
+                role="fish"
+                deficit={record.fish.deficit}
+                minutes={record.fish.minutes}
+                gems={record.fish.gems}
+                lines={detailPreview.fishBreakdown.lines}
+              />
+              <PersonDetailCard
+                role="cat"
+                deficit={record.cat.deficit}
+                minutes={record.cat.minutes}
+                gems={record.cat.gems}
+                lines={detailPreview.catBreakdown.lines}
+              />
+            </div>
+
+            <AppCard variant="panel" className="mt-3">
+              <p className="text-center text-[11px] font-bold ui-text-reward">
+                这一天的小奖励
+              </p>
+              <div className="mt-2 grid min-w-0 grid-cols-2 gap-2">
+                <div className="growth-detail-extra-card">
+                  <div className="growth-detail-extra-row">
+                    <span className="growth-detail-extra-title">
+                      <AppRoleAvatar role="fish" size={14} /><AppRoleAvatar role="cat" size={14} />
+                    </span>
+                    <AppCurrencyChip currency="coin" value={record.bonus} size="sm" />
+                  </div>
+                  <BonusHintText active={record.bonus > 0} />
+                </div>
+                <div className="growth-detail-extra-card">
+                  <div className="growth-detail-extra-row">
+                    <span className="growth-detail-extra-title">
+                      <AppGameIcon name="gem" size={14} /> 宝石
+                    </span>
+                    <AppCurrencyChip currency="gem" value={record.coins} size="sm" />
+                  </div>
+                  <CoinHintText hint={detailPreview.coin.hint} />
+                </div>
+              </div>
+            </AppCard>
+          </div>
+        </div>
+      ) : null}
+    </AppModal>
   );
 }
 
@@ -344,7 +462,11 @@ function useSettlementPreview({
   }, [coinRules, dailyRecords, input, visualRules]);
 }
 
-export function GrowthLog() {
+export function GrowthLog({
+  variant = "button",
+}: {
+  variant?: "button" | "inline";
+}) {
   const {
     coinRules,
     dailyRecords,
@@ -352,8 +474,8 @@ export function GrowthLog() {
     updateDailyRecord,
     visualRules,
   } = useHomeResources();
+  const isInline = variant === "inline";
   const [open, setOpen] = useState(false);
-  const [sheetEnter, setSheetEnter] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [detailMode, setDetailMode] = useState<DetailMode>("detail");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -366,8 +488,7 @@ export function GrowthLog() {
       ? monthKeyFromDate(latestRecord.recordDate)
       : FALLBACK_MONTH_KEY;
   });
-  const titleId = useId();
-  const detailTitleId = useId();
+  const monthTouchedRef = useRef(false);
   const confirmTitleId = useId();
 
   const [fishW, setFishW] = useState("");
@@ -389,6 +510,7 @@ export function GrowthLog() {
     () =>
       [...dailyRecords]
         .filter((record) => monthKeyFromDate(record.recordDate) === viewMonth)
+        .filter(hasMeaningfulGrowthActivity)
         .sort((a, b) => b.recordDate.localeCompare(a.recordDate)),
     [dailyRecords, viewMonth],
   );
@@ -448,20 +570,7 @@ export function GrowthLog() {
   });
 
   useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    const outerId = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) setSheetEnter(true);
-      });
-    });
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(outerId);
-    };
-  }, [open]);
-
-  useEffect(() => {
+    if (monthTouchedRef.current) return;
     if (dailyRecords.length === 0 || viewMonth !== FALLBACK_MONTH_KEY) return;
     const latestRecord = [...dailyRecords].sort((a, b) =>
       b.recordDate.localeCompare(a.recordDate),
@@ -472,15 +581,6 @@ export function GrowthLog() {
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [dailyRecords, viewMonth]);
-
-  useEffect(() => {
-    if (!open && !selectedRecord) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open, selectedRecord]);
 
   useEffect(() => {
     if (!toast) return;
@@ -508,12 +608,17 @@ export function GrowthLog() {
   }, [confirmDeleteOpen, open, selectedRecord]);
 
   const closeSheet = () => {
-    setSheetEnter(false);
     setOpen(false);
   };
 
-  const onPrevMonth = () => setViewMonth((current) => addMonths(current, -1));
-  const onNextMonth = () => setViewMonth((current) => addMonths(current, 1));
+  const onPrevMonth = () => {
+    monthTouchedRef.current = true;
+    setViewMonth((current) => addMonths(current, -1));
+  };
+  const onNextMonth = () => {
+    monthTouchedRef.current = true;
+    setViewMonth((current) => addMonths(current, 1));
+  };
 
   const hydrateEditFields = (entry: GrowthLogEntry) => {
     setFishW(entry.fish.weightKg == null ? "" : String(entry.fish.weightKg));
@@ -568,155 +673,195 @@ export function GrowthLog() {
     setToast("删除失败，请再试一次");
   };
 
-  return (
+  const listBody = (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
-      >
-        <span aria-hidden>📒</span>
-        <span>成长日志</span>
-      </button>
-
-      {open ? (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center p-3 sm:p-4">
-          <button
-            type="button"
-            aria-label="关闭成长日志"
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
-              sheetEnter ? "opacity-100" : "opacity-0"
-            }`}
-            onClick={closeSheet}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            className={`ui-sheet growth-log-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out will-change-transform ${
-              sheetEnter
-                ? "translate-y-0 opacity-100 sm:scale-100"
-                : "translate-y-3 opacity-0 sm:scale-95"
-            }`}
-          >
-            <div className="record-sheet-header">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-base font-bold leading-6 tracking-tight ui-text-main">
-                    📒 成长日志
-                  </p>
-                  <p className="text-xs font-medium leading-4 ui-text-soft">
-                    一起攒下的每一天
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeSheet}
-                  className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
-                >
-                  收起
-                </button>
-              </div>
-
-              <div className="mt-2 flex justify-center">
-                <div className="ui-input-shell inline-flex items-center gap-4 px-4 py-1.5">
-                  <button
-                    type="button"
-                    onClick={onPrevMonth}
-                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
-                    aria-label="查看上个月"
-                  >
-                    ‹
-                  </button>
-                  <h2
-                    id={titleId}
-                    className="min-w-[7.2rem] text-center text-base font-semibold leading-6 tracking-tight ui-text-main"
-                  >
-                    {formatMonthLabel(viewMonth)}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={onNextMonth}
-                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
-                    aria-label="查看下个月"
-                  >
-                    ›
-                  </button>
-                </div>
-              </div>
+      <div className="record-sheet-header growth-log-page-header">
+        {!isInline ? (
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-base font-bold leading-6 tracking-tight ui-text-main">
+                <span aria-hidden><AppGameIcon name="log" size={18} /></span> 成长日志
+              </p>
+              <p className="text-xs font-medium leading-4 ui-text-soft">
+                一起攒下的每一天
+              </p>
             </div>
+            <AppButton
+              type="button"
+              onClick={closeSheet}
+              className="is-secondary shrink-0 px-3 py-1 text-xs font-semibold"
+            >
+              收起
+            </AppButton>
+          </div>
+        ) : null}
 
-            <div className="record-sheet-body">
-              {sortedRecords.length > 0 ? (
-                <div className="record-list growth-log-record-list">
-                  {sortedRecords.map((entry) => (
-                    <LogCard key={entry.id} entry={entry} onOpen={openDetail} />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
-                  这个月还没有成长记录
-                </div>
-              )}
-            </div>
+        <div className={isInline ? "flex justify-center" : "mt-2 flex justify-center"}>
+          <div className="app-input-shell inline-flex items-center gap-4 px-4 py-1.5">
+            <AppButton
+              type="button"
+              onClick={onPrevMonth}
+              className="is-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
+              aria-label="查看上个月"
+            >
+              ‹
+            </AppButton>
+            <span className="min-w-[7.2rem] text-center text-sm font-bold ui-text-main">
+              {formatMonthLabel(viewMonth)}
+            </span>
+            <AppButton
+              type="button"
+              onClick={onNextMonth}
+              className="is-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
+              aria-label="查看下个月"
+            >
+              ›
+            </AppButton>
           </div>
         </div>
+      </div>
+
+      <div className={`record-sheet-body ${isInline ? "growth-log-list-body--inline" : ""}`}>
+        {sortedRecords.length > 0 ? (
+          <div className="growth-log-notebook-list">
+            {sortedRecords.map((entry) => (
+              <GrowthLogLedgerRow key={entry.id} entry={entry} onOpen={openDetail} />
+            ))}
+          </div>
+        ) : (
+          <AppCard variant="item" className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
+            这个月还没有成长记录
+          </AppCard>
+        )}
+      </div>
+    </>
+  );
+
+  const listContent = isInline ? (
+    <div className="growth-log-notebook">{listBody}</div>
+  ) : (
+    <AppCard variant="panel" className="growth-log-notebook">
+      {listBody}
+    </AppCard>
+  );
+
+  return (
+    <>
+      {!isInline ? (
+        <AppButton
+          type="button"
+          onClick={() => setOpen(true)}
+          className="is-nav inline-flex w-full whitespace-nowrap text-sm"
+        >
+          <AppGameIcon name="log" size={16} />
+          <span>成长日志</span>
+        </AppButton>
       ) : null}
 
-      {selectedRecord ? (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center p-3 sm:items-center">
-          <button
-            type="button"
-            aria-label="关闭详情"
-            className="ui-modal-backdrop absolute inset-0"
-            onClick={closeDetail}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={detailTitleId}
-            className="ui-sheet growth-log-detail-sheet relative flex min-h-0 flex-col overflow-hidden"
-          >
-            <div className="ui-modal-header shrink-0">
+      {isInline ? listContent : null}
+
+      <AppModal
+        open={!isInline && open}
+        onClose={closeSheet}
+        maskClosable
+        width="min(92vw, 30rem)"
+        footer={null}
+      >
+        <div className="app-modal-scroll-body">{listContent}</div>
+      </AppModal>
+
+      <AppModal
+        open={Boolean(selectedRecord)}
+        onClose={closeDetail}
+        maskClosable
+        width="min(92vw, 30rem)"
+        title={
+          selectedRecord ? (
+            <div className="app-dialog-header shrink-0">
               <p className="text-[10px] font-bold tracking-[0.18em] ui-text-primary">
                 {detailMode === "detail" ? "记录详情" : "修改这一天"}
               </p>
-              <h2 id={detailTitleId} className="mt-1 text-lg font-bold ui-text-main">
+              <Title size="small" color="app-yellow" className="mt-1">
                 {formatFullDate(selectedRecord.recordDate)}
-              </h2>
+              </Title>
               <p className="mt-1 text-xs font-medium ui-text-muted">
                 {detailMode === "detail"
                   ? "今天也攒下了一点闪光"
                   : "轻轻改就好"}
               </p>
             </div>
-
-            <div className="ui-modal-body">
+          ) : null
+        }
+        footer={
+          selectedRecord && detailMode === "detail" && detailPreview ? (
+            <div className="app-dialog-footer">
+              <AppButton
+                type="button"
+                onClick={closeDetail}
+                className="is-secondary flex-1 py-3 text-sm font-semibold"
+              >
+                关闭
+              </AppButton>
+              <AppButton
+                type="button"
+                onClick={enterEditMode}
+                className="is-primary flex-[1.2] py-3 text-sm font-semibold transition active:scale-[0.99]"
+              >
+                编辑
+              </AppButton>
+            </div>
+          ) : selectedRecord && detailMode === "edit" && editPreview ? (
+            <div className="growth-log-edit-footer">
+              <AppButton
+                type="button"
+                onClick={() => setConfirmDeleteOpen(true)}
+                variant="ghost"
+                className="growth-log-delete-btn"
+              >
+                删除
+              </AppButton>
+              <div className="growth-log-edit-footer-actions">
+                <AppButton
+                  type="button"
+                  onClick={() => {
+                    if (selectedRecord) hydrateEditFields(selectedRecord);
+                    setDetailMode("detail");
+                  }}
+                  className="is-secondary min-w-0 flex-1 py-2.5 text-sm font-semibold sm:flex-none sm:px-5"
+                >
+                  取消编辑
+                </AppButton>
+                <AppButton
+                  type="button"
+                  onClick={onSaveEdit}
+                  className="is-primary min-w-0 flex-[1.2] py-2.5 text-sm font-semibold transition active:scale-[0.99] sm:flex-none sm:px-6"
+                >
+                  保存修改
+                </AppButton>
+              </div>
+            </div>
+          ) : null
+        }
+      >
+        {selectedRecord ? (
+            <div className="app-modal-scroll-body app-modal-scroll-body--growth-detail">
               {detailMode === "detail" && detailPreview ? (
-                <div className="space-y-2.5">
+                <div className="growth-log-detail-stack">
                   <div className="growth-detail-summary">
-                    <span className="growth-summary-pill ui-chip-primary ui-text-primary">
-                      <span aria-hidden>💎</span>
-                      <span>本日宝石 +{totalGems(selectedRecord)}</span>
-                    </span>
-                    <span className="growth-summary-pill ui-chip-reward ui-text-reward">
-                      <span aria-hidden>🪙</span>
-                      <span>本日{coinAmountLabel(selectedRecord.coins)}</span>
-                    </span>
+                    <AppCurrencyChip currency="coin" value={totalGems(selectedRecord)} />
+                    <AppCurrencyChip currency="gem" value={selectedRecord.coins} />
                   </div>
 
                   <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-2.5">
                     <PersonDetailCard
-                      emoji="🐟"
-                      title="鱼鱼"
+                      role="fish"
                       deficit={selectedRecord.fish.deficit}
                       minutes={selectedRecord.fish.minutes}
                       gems={selectedRecord.fish.gems}
                       lines={detailPreview.fishBreakdown.lines}
                     />
                     <PersonDetailCard
-                      emoji="🐱"
-                      title="猫猫"
+                      role="cat"
                       deficit={selectedRecord.cat.deficit}
                       minutes={selectedRecord.cat.minutes}
                       gems={selectedRecord.cat.gems}
@@ -724,58 +869,40 @@ export function GrowthLog() {
                     />
                   </div>
 
-                  <div className="grid min-w-0 grid-cols-2 gap-2">
-                    <div className="growth-detail-extra-card">
-                      <div className="growth-detail-extra-row">
-                        <span className="growth-detail-extra-title">🔥 一起加成</span>
-                        {selectedRecord.bonus > 0 ? (
-                          <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
-                            宝石 +{selectedRecord.bonus}
+                  <AppCard variant="panel" className="mt-3">
+                    <p className="text-center text-[11px] font-bold ui-text-reward">
+                      这一天的小奖励
+                    </p>
+                    <div className="mt-2 grid min-w-0 grid-cols-2 gap-2">
+                      <div className="growth-detail-extra-card">
+                        <div className="growth-detail-extra-row">
+                          <span className="growth-detail-extra-title">
+                            <AppRoleAvatar role="fish" size={14} /><AppRoleAvatar role="cat" size={14} />
                           </span>
-                        ) : (
-                          <span className="growth-detail-extra-value growth-detail-extra-value--muted">
-                            未点亮
+                          <AppCurrencyChip currency="coin" value={selectedRecord.bonus} size="sm" />
+                        </div>
+                        <BonusHintText active={selectedRecord.bonus > 0} />
+                      </div>
+                      <div className="growth-detail-extra-card">
+                        <div className="growth-detail-extra-row">
+                          <span className="growth-detail-extra-title">
+                            <AppGameIcon name="gem" size={14} /> 宝石
                           </span>
-                        )}
+                          <AppCurrencyChip currency="gem" value={selectedRecord.coins} size="sm" />
+                        </div>
+                        <CoinHintText hint={detailPreview.coin.hint} />
                       </div>
-                      <BonusHintText active={selectedRecord.bonus > 0} />
                     </div>
-                    <div className="growth-detail-extra-card">
-                      <div className="growth-detail-extra-row">
-                        <span className="growth-detail-extra-title">🪙 金币</span>
-                        <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
-                          {coinAmountLabel(selectedRecord.coins)}
-                        </span>
-                      </div>
-                      <CoinHintText hint={detailPreview.coin.hint} />
-                    </div>
-                  </div>
+                  </AppCard>
 
-                  <div className="ui-modal-footer">
-                    <button
-                      type="button"
-                      onClick={closeDetail}
-                      className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
-                    >
-                      关闭
-                    </button>
-                    <button
-                      type="button"
-                      onClick={enterEditMode}
-                      className="ui-button-primary flex-[1.2] py-3 text-sm font-semibold text-white transition active:scale-[0.99]"
-                    >
-                      编辑
-                    </button>
-                  </div>
                 </div>
               ) : null}
 
               {detailMode === "edit" && editPreview ? (
-                <div className="space-y-2.5">
+                <div className="growth-log-detail-stack">
                   <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                     <EditSide
-                      emoji="🐟"
-                      title="鱼鱼"
+                      role="fish"
                       weight={fishW}
                       setWeight={setFishW}
                       deficit={fishD}
@@ -784,8 +911,7 @@ export function GrowthLog() {
                       setMinutes={setFishM}
                     />
                     <EditSide
-                      emoji="🐱"
-                      title="猫猫"
+                      role="cat"
                       weight={catW}
                       setWeight={setCatW}
                       deficit={catD}
@@ -795,139 +921,92 @@ export function GrowthLog() {
                     />
                   </div>
 
-                  <div className="ui-soft-panel ui-card-item">
+                  <AppCard variant="panel">
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       修改后的小奖励
                     </p>
                     <ul className="mt-2 grid min-w-0 grid-cols-2 gap-2 text-xs font-semibold ui-text-main">
                       <li className="growth-detail-extra-card">
                         <span className="flex items-center justify-between gap-2">
-                          <span aria-hidden>🐟</span>
-                          <span className="tabular-nums ui-text-primary">
-                            宝石 +{editPreview.fishBreakdown.total}
-                          </span>
+                          <AppRoleAvatar role="fish" size={14} />
+                          <AppCurrencyChip currency="coin" value={editPreview.fishBreakdown.total} size="sm" />
                         </span>
                         <GemBreakdownText lines={editPreview.fishBreakdown.lines} />
                       </li>
                       <li className="growth-detail-extra-card">
                         <span className="flex items-center justify-between gap-2">
-                          <span aria-hidden>🐱</span>
-                          <span className="tabular-nums ui-text-primary">
-                            宝石 +{editPreview.catBreakdown.total}
-                          </span>
+                          <AppRoleAvatar role="cat" size={14} />
+                          <AppCurrencyChip currency="coin" value={editPreview.catBreakdown.total} size="sm" />
                         </span>
                         <GemBreakdownText lines={editPreview.catBreakdown.lines} />
                       </li>
                       <li className="growth-detail-extra-card">
                         <div className="growth-detail-extra-row">
-                          <span className="growth-detail-extra-title">🔥 一起加成</span>
-                          {editPreview.couple.gems > 0 ? (
-                            <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
-                              宝石 +{editPreview.couple.gems}
-                            </span>
-                          ) : (
-                            <span className="growth-detail-extra-value growth-detail-extra-value--muted">
-                              未点亮
-                            </span>
-                          )}
+                          <span className="growth-detail-extra-title">
+                            <AppRoleAvatar role="fish" size={14} /><AppRoleAvatar role="cat" size={14} />
+                          </span>
+                          <AppCurrencyChip currency="coin" value={editPreview.couple.gems} size="sm" />
                         </div>
                         <BonusHintText active={editPreview.couple.gems > 0} />
                       </li>
                       <li className="growth-detail-extra-card">
                         <div className="growth-detail-extra-row">
-                          <span className="growth-detail-extra-title">🪙 金币</span>
-                          <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
-                            {coinAmountLabel(editPreview.coin.delta)}
+                          <span className="growth-detail-extra-title">
+                            <AppGameIcon name="gem" size={14} /> 宝石
                           </span>
+                          <AppCurrencyChip currency="gem" value={editPreview.coin.delta} size="sm" />
                         </div>
                         <CoinHintText hint={editPreview.coin.hint} />
                       </li>
                     </ul>
-                  </div>
+                  </AppCard>
 
-                  <div className="growth-log-edit-footer">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteOpen(true)}
-                      className="growth-log-delete-btn"
-                    >
-                      删除
-                    </button>
-                    <div className="growth-log-edit-footer-actions">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (selectedRecord) hydrateEditFields(selectedRecord);
-                          setDetailMode("detail");
-                        }}
-                        className="ui-button-secondary min-w-0 flex-1 py-2.5 text-sm font-semibold sm:flex-none sm:px-5"
-                      >
-                        取消编辑
-                      </button>
-                      <button
-                        type="button"
-                        onClick={onSaveEdit}
-                        className="ui-button-primary min-w-0 flex-[1.2] py-2.5 text-sm font-semibold text-white transition active:scale-[0.99] sm:flex-none sm:px-6"
-                      >
-                        保存修改
-                      </button>
-                    </div>
-                  </div>
                 </div>
               ) : null}
             </div>
-          </div>
-        </div>
-      ) : null}
+        ) : null}
+      </AppModal>
 
-      {confirmDeleteOpen && selectedRecord ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <button
-            type="button"
-            aria-label="取消删除"
-            className="ui-modal-backdrop absolute inset-0"
-            onClick={() => setConfirmDeleteOpen(false)}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={confirmTitleId}
-            className="ui-dialog relative w-full max-w-sm overflow-hidden px-5 py-5 text-center"
-          >
-            <h3 id={confirmTitleId} className="text-lg font-bold ui-text-main">
-              要删除这一天吗？
-            </h3>
+      <AppModal
+        open={confirmDeleteOpen && Boolean(selectedRecord)}
+        onClose={() => setConfirmDeleteOpen(false)}
+        maskClosable
+        width="min(92vw, 24rem)"
+        title={<span id={confirmTitleId}>要删除这一天吗？</span>}
+        footer={
+          <div className="app-dialog-footer">
+            <AppButton
+              type="button"
+              onClick={() => setConfirmDeleteOpen(false)}
+              className="is-secondary flex-1 py-3 text-sm font-semibold"
+            >
+              取消
+            </AppButton>
+            <AppButton
+              type="button"
+              variant="danger"
+              onClick={onConfirmDelete}
+              className="flex-1 py-3 text-sm font-semibold"
+            >
+              确认删除
+            </AppButton>
+          </div>
+        }
+      >
             <p className="mt-2 text-xs leading-relaxed ui-text-muted">
               删掉就找不回这条啦。
             </p>
-            <div className="mt-5 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteOpen(false)}
-                className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                onClick={onConfirmDelete}
-                className="flex-1 rounded-[var(--radius-control)] border border-rose-100 bg-rose-50/70 px-4 py-3 text-sm font-semibold text-rose-500 transition active:scale-[0.99]"
-              >
-                确认删除
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </AppModal>
 
       {toast ? (
-        <div
+        <AppToast
           role="status"
-          className="ui-dialog pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[80] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
+          className="pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[80] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
         >
           {toast}
-        </div>
+        </AppToast>
       ) : null}
     </>
   );
 }
+

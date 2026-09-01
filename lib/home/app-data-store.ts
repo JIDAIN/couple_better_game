@@ -4,6 +4,7 @@ import type {
   HomeResourcesState,
   UserRuntimeData,
 } from "./types";
+import { CURRENT_CURRENCY_SEMANTICS_VERSION } from "./currency-semantics";
 
 export const APP_DATA_STORAGE_KEY = "couple-better-game:home-resources:v1";
 
@@ -45,7 +46,12 @@ export function snapshotFromHomeResourcesState(
     exchangeCategories: state.exchangeCategories,
   };
 
-  return { version: 1, runtime, config };
+  return {
+    version: 1,
+    currencySemanticsVersion: CURRENT_CURRENCY_SEMANTICS_VERSION,
+    runtime,
+    config,
+  };
 }
 
 export function snapshotFromLegacyHomeState(
