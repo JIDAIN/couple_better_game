@@ -93,9 +93,7 @@ describe("ChatGPT meal persistence protocol", () => {
     const result = prepareConfirmedChatgptMeal(
       {
         ...draft,
-        totalCaloriesKcal: 500,
-        calorieMinKcal: null,
-        calorieMaxKcal: null,
+        totalCaloriesKcal: 440,
       },
       "chatgpt:fish:2026-09-02:meal-003",
     );
