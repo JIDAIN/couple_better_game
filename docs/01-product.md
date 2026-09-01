@@ -20,6 +20,15 @@
 
 这是业务角色，不是账号权限。当前没有完整的“两个独立登录用户”系统。
 
+ChatGPT 饮食聊天当前约定：
+
+```text
+用户自己的饮食聊天 -> fish
+伴侣专用饮食聊天   -> cat
+```
+
+如果聊天上下文无法可靠判断角色，不允许猜测后写入。
+
 ## 3. 当前页面
 
 主界面由四个底部 Tab 组成：
@@ -34,6 +43,8 @@
 - 手动新增 / 编辑 / 删除餐食
 
 饮食功能继续使用原有 notice-board 场景，不新增第五个底部 Tab。
+
+ChatGPT 明确“记上”后的餐食会写入同一套 Supabase meal facts，因此下一次 Web 查询能直接看到，不需要再手动复制一次。
 
 ### 地图 `#map`
 
@@ -108,7 +119,34 @@
 
 如果没有有效 cloud session，饮食区域会提示先去“小窝 → 数据管理”连接云端，而不是绕过鉴权直连数据库。
 
-### 4.3 历史补录 / 编辑游戏记录
+### 4.3 ChatGPT “记上”
+
+```text
+发食物图片 / 描述
+-> ChatGPT 估算
+-> 用户补充或修正
+-> 仍然不写数据库
+-> 用户明确“记上”或等价保存意图
+-> 生成一次 chatgpt: 幂等键
+-> 调用 service-only create_chatgpt_meal_record
+-> 写现有 meals + meal_items
+-> 使用同 key 读回确认
+-> 成功后回复“已记上”
+```
+
+关键产品行为：
+
+- 没有明确确认时绝不保存；
+- 一次确认只有一个 idempotency key；
+- 工具调用结果不确定时先按同 key 查询，不换 key 盲目重试；
+- 保存时强制 `source=chatgpt`、`status=confirmed`；
+- 至少保存一个实际食物 item，而不是只存一个总 kcal 数字；
+- ChatGPT 餐食和 Web 手动餐食最终都进入同一个 meal domain；
+- 保存餐食不自动修改游戏 deficit、运动、体重、钱包或热力图。
+
+如果一餐已经成功写入，之后用户只是补充“其实米饭更少”之类的事实，不自动覆盖数据库。需要明确表达修改意图；P2 首版 ChatGPT 自动入口负责新增，已保存餐食可以直接从 Web UI 编辑/删除。
+
+### 4.4 历史补录 / 编辑游戏记录
 
 ```text
 成长日志
@@ -119,7 +157,7 @@
 -> 保存本地并待云端同步
 ```
 
-### 4.4 兑换
+### 4.5 兑换
 
 ```text
 商店选奖励
@@ -132,7 +170,7 @@
 
 历史兑换记录保存当时的名称、价格、资源类型和图标，不依赖之后修改过的分类。
 
-### 4.5 新设备首次使用
+### 4.6 新设备首次使用
 
 ```text
 打开数据管理
@@ -161,7 +199,7 @@
 
 真相源：`meals / meal_items`。
 
-当前 Web UI 已能直接读取和维护这套数据。
+当前 Web UI 和 ChatGPT 明确确认后的写入都使用这套数据。
 
 ### 5.2 游戏 deficit
 
@@ -182,7 +220,7 @@
 
 ### 已完成
 
-后端和 Web 首版已经支持：
+后端、Web 首版和 ChatGPT P2 已支持：
 
 - breakfast / lunch / dinner / snack / other
 - snack 时段
@@ -197,22 +235,24 @@
 - food items 展开查看
 - Web 手动新增 / 编辑 / 删除
 - loading / empty / unauthorized / API error 状态
+- ChatGPT 明确保存确认后写入
+- ChatGPT `chatgpt:` 幂等重试
+- ChatGPT 写后按 key 读回确认
+- ChatGPT RPC service-role only
 
-### 下一阶段
+### 后续可扩展
 
-尚缺：
-
-- 用户在 ChatGPT 中明确确认“记上”后的产品级写入入口
-- 更完整的 canonical food / alias 使用体验
-- 与体重趋势并列的统一每日总览
+- 更完整的 canonical food / alias 使用体验；
+- ChatGPT 对已保存餐食的专用受限更新/删除 RPC；
+- 与体重趋势并列的统一每日总览。
 
 ### ChatGPT 交互约定
 
 估算、讨论、纠正都不产生数据库写入。
 
-只有用户明确确认 **“记上”** 后才持久化，且只写饮食域，不直接影响游戏 deficit / 钱包 / 热力图。
+只有用户明确确认 **“记上”** 或等价保存意图后才持久化，且只写饮食域，不直接影响游戏 deficit / 钱包 / 热力图。
 
-未来 ChatGPT 写入要复用现有 meal schema / API 语义，不创建第二套“AI 饮食记录”。
+当前没有第二套“AI 饮食记录”，ChatGPT 写入和 Web UI 读取的是同一套 `meals / meal_items`。
 
 ## 7. 饮食 UI 视觉边界
 
@@ -227,6 +267,8 @@ notice-board
 ```
 
 它复用 `AppButton / AppCard / AppInput / AppModal / AppRoleAvatar` 和 animal-island-ui `Title`，不建立第二套视觉 primitive。
+
+P2 没有新增独立 UI，因此没有改变现有动森感布局或四 Tab 主导航。
 
 ## 8. 备份与复盘
 
@@ -253,6 +295,7 @@ notice-board
 - 自动冲突合并；
 - 服务端重新计算所有游戏奖励；
 - ChatGPT 自动保存未确认的饮食；
+- ChatGPT 专用已保存餐食更新/删除入口；
 - 医疗或营养诊断功能。
 
-当前共享同步密码只是一套小范围私人应用的访问保护，不应当成成熟的多用户身份系统。
+当前共享同步密码和 ChatGPT 连接能力都不应当成成熟的多用户身份系统。
