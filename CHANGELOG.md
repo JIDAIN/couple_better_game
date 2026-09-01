@@ -2,6 +2,19 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-02 — ChatGPT “记上”持久化流程
+
+- 完成 P2：ChatGPT 只有在用户明确表达“记上”或等价保存意图后才持久化餐食；讨论、估算、修正不会自动写库。
+- 新增 production migration `20260901162337_add_chatgpt_meal_persistence_rpc.sql`。
+- 新增 service-only `create_chatgpt_meal_record`，强制 `source=chatgpt`、`status=confirmed`，要求 `chatgpt:` 幂等键并校验食物明细和热量合计。
+- 同一幂等键使用事务 advisory lock，并继续复用现有 meals 唯一 idempotency 约束，避免网络/并发重试形成重复餐食。
+- 新增 `get_chatgpt_meal_record`，用于写入结果不确定时按同一 key 查询确认。
+- ChatGPT 使用用户已授权的 Supabase 连接能力调用受限 meal RPC，不把 `SUPABASE_SECRET_KEY`、service role key 或同步密码复制到聊天，也不新增公开写 API。
+- 新增 `lib/nutrition/chatgpt-meal-protocol.ts` 与对应 Vitest，固化 `chatgpt:` key、source/status 和 item-total 约束。
+- production smoke test 验证：首次创建成功、同 key 重试返回同一 meal ID、按 key 读回成功、service_role 可执行、anon/authenticated 不可执行；测试 meal 已硬删除，剩余 0 条。
+- 当前约定用户饮食聊天映射 `fish`，伴侣专用饮食聊天映射 `cat`；上下文不明确时不得猜测后写入。
+- P2 不改变游戏 deficit、运动、体重、钱包、金币、宝石或热力图；下一阶段为 P3 体重趋势。
+
 ## 2026-09-01 — 今日饮食 Web UI
 
 - 在现有 `#today` notice-board 中新增「饮食小记」，不增加第五个底部 Tab。
