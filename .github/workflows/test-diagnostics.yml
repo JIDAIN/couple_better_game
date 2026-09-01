@@ -1,0 +1,40 @@
+name: Test diagnostics
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-file:
+    name: ${{ matrix.file }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        file:
+          - tests/home/app-data-store.test.ts
+          - tests/home/daily-quote.test.ts
+          - tests/home/daily-record-service.test.ts
+          - tests/home/data-import-export.test.ts
+          - tests/home/exchange-service.test.ts
+          - tests/home/heatmap-grid.test.ts
+          - tests/home/home-stat-service.test.ts
+          - tests/home/home-state-service.test.ts
+          - tests/home/memory-app-data-store.test.ts
+          - tests/home/save-data-route.test.ts
+          - tests/home/settlement-rules.test.ts
+          - tests/home/sync-state-service.test.ts
+          - tests/nutrition/meal-service.test.ts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run ${{ matrix.file }}
