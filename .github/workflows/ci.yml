@@ -11,90 +11,41 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  test:
+    name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+      - run: npm ci
+      - run: npm run test
 
-      - name: Install dependencies
-        run: npm ci
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
 
-      - name: Test
-        id: test
-        shell: bash
-        run: |
-          set +e
-          npm run test > /tmp/test.log 2>&1
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" -eq 0 ]; then
-            echo "### ✅ Test" >> "$GITHUB_STEP_SUMMARY"
-          else
-            {
-              echo "### ❌ Test"
-              echo '```text'
-              tail -n 160 /tmp/test.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit 0
-
-      - name: Lint
-        id: lint
-        shell: bash
-        run: |
-          set +e
-          npm run lint > /tmp/lint.log 2>&1
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" -eq 0 ]; then
-            echo "### ✅ Lint" >> "$GITHUB_STEP_SUMMARY"
-          else
-            {
-              echo "### ❌ Lint"
-              echo '```text'
-              tail -n 160 /tmp/lint.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit 0
-
-      - name: Build
-        id: build
-        shell: bash
-        run: |
-          set +e
-          npm run build > /tmp/build.log 2>&1
-          code=$?
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          if [ "$code" -eq 0 ]; then
-            echo "### ✅ Build" >> "$GITHUB_STEP_SUMMARY"
-          else
-            {
-              echo "### ❌ Build"
-              echo '```text'
-              tail -n 160 /tmp/build.log
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit 0
-
-      - name: Verify baseline
-        if: always()
-        shell: bash
-        run: |
-          echo "test=${{ steps.test.outputs.exit_code }} lint=${{ steps.lint.outputs.exit_code }} build=${{ steps.build.outputs.exit_code }}"
-          if [ "${{ steps.test.outputs.exit_code }}" != "0" ] || \
-             [ "${{ steps.lint.outputs.exit_code }}" != "0" ] || \
-             [ "${{ steps.build.outputs.exit_code }}" != "0" ]; then
-            exit 1
-          fi
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
