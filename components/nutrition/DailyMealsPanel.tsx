@@ -95,6 +95,15 @@ function sortMeals(meals: MealRecord[]) {
   });
 }
 
+function mealLoadError(caught: unknown) {
+  if (caught instanceof MealApiError && caught.status === 401) {
+    return "还没有连接云端，请先到「小窝 → 数据管理」连接云端后再记录饮食";
+  }
+  return caught instanceof MealApiError
+    ? caught.message
+    : "饮食记录暂时没有加载出来，请稍后再试";
+}
+
 function MealCard({ meal, onEdit }: { meal: MealRecord; onEdit: () => void }) {
   const time = mealTime(meal);
   const source = sourceLabel(meal);
@@ -174,7 +183,12 @@ function MealCard({ meal, onEdit }: { meal: MealRecord; onEdit: () => void }) {
                   </p>
                   {item.portionDescription || item.estimatedWeightG != null ? (
                     <p className="mt-0.5 ui-text-soft">
-                      {[item.portionDescription, item.estimatedWeightG != null ? `约 ${item.estimatedWeightG}g` : null]
+                      {[
+                        item.portionDescription,
+                        item.estimatedWeightG != null
+                          ? `约 ${item.estimatedWeightG}g`
+                          : null,
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
@@ -229,23 +243,41 @@ export function DailyMealsPanel() {
     } catch (caught) {
       if (requestId !== requestIdRef.current) return;
       setMeals([]);
-      if (caught instanceof MealApiError && caught.status === 401) {
-        setError("还没有连接云端，请先到「小窝 → 数据管理」连接云端后再记录饮食");
-      } else {
-        setError(
-          caught instanceof MealApiError
-            ? caught.message
-            : "饮食记录暂时没有加载出来，请稍后再试",
-        );
-      }
+      setError(mealLoadError(caught));
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [selectedDate, selectedPartner]);
 
   useEffect(() => {
-    void loadMeals();
-  }, [loadMeals]);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    let cancelled = false;
+
+    void fetchMeals({
+      mealDate: selectedDate,
+      partnerKey: selectedPartner,
+    })
+      .then((records) => {
+        if (cancelled || requestId !== requestIdRef.current) return;
+        setMeals(sortMeals(records));
+        setError(null);
+      })
+      .catch((caught: unknown) => {
+        if (cancelled || requestId !== requestIdRef.current) return;
+        setMeals([]);
+        setError(mealLoadError(caught));
+      })
+      .finally(() => {
+        if (!cancelled && requestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, selectedPartner]);
 
   useEffect(() => {
     if (!toast) return;
@@ -257,6 +289,18 @@ export function DailyMealsPanel() {
     () => meals.reduce((sum, meal) => sum + meal.totalCaloriesKcal, 0),
     [meals],
   );
+
+  function selectDate(date: string) {
+    setLoading(true);
+    setError(null);
+    setSelectedDate(date);
+  }
+
+  function selectPartner(partner: NutritionPartnerKey) {
+    setLoading(true);
+    setError(null);
+    setSelectedPartner(partner);
+  }
 
   function openCreate() {
     setEditorMeal(null);
@@ -299,7 +343,7 @@ export function DailyMealsPanel() {
               type="date"
               value={selectedDate}
               max={today}
-              onChange={(event) => setSelectedDate(event.target.value)}
+              onChange={(event) => selectDate(event.target.value)}
               className="mt-1 w-full px-2.5 py-2 text-xs font-semibold"
             />
           </label>
@@ -312,7 +356,7 @@ export function DailyMealsPanel() {
                   key={role}
                   type="button"
                   aria-pressed={selectedPartner === role}
-                  onClick={() => setSelectedPartner(role)}
+                  onClick={() => selectPartner(role)}
                   className={`${selectedPartner === role ? "is-primary" : "is-secondary"} w-full px-1.5 py-2 text-[11px] font-semibold`}
                 >
                   <span className="inline-flex items-center justify-center gap-1">
@@ -374,27 +418,32 @@ export function DailyMealsPanel() {
         )}
       </AppSectionPanel>
 
-      <MealEditorModal
-        open={editorOpen}
-        meal={editorMeal}
-        initialPartner={selectedPartner}
-        initialDate={selectedDate}
-        onClose={() => setEditorOpen(false)}
-        onSaved={(saved) => {
-          setEditorOpen(false);
-          setToast(editorMeal ? "这餐已经更新" : "这餐已经记下");
-          if (saved.partnerKey !== selectedPartner || saved.mealDate !== selectedDate) {
-            setSelectedPartner(saved.partnerKey);
-            setSelectedDate(saved.mealDate);
-          } else {
-            void loadMeals();
-          }
-        }}
-        onRequestDelete={(meal) => {
-          setEditorOpen(false);
-          setPendingDelete(meal);
-        }}
-      />
+      {editorOpen ? (
+        <MealEditorModal
+          key={editorMeal?.id ?? `new-${selectedPartner}-${selectedDate}`}
+          open
+          meal={editorMeal}
+          initialPartner={selectedPartner}
+          initialDate={selectedDate}
+          onClose={() => setEditorOpen(false)}
+          onSaved={(saved) => {
+            setEditorOpen(false);
+            setToast(editorMeal ? "这餐已经更新" : "这餐已经记下");
+            if (saved.partnerKey !== selectedPartner || saved.mealDate !== selectedDate) {
+              setLoading(true);
+              setError(null);
+              setSelectedPartner(saved.partnerKey);
+              setSelectedDate(saved.mealDate);
+            } else {
+              void loadMeals();
+            }
+          }}
+          onRequestDelete={(meal) => {
+            setEditorOpen(false);
+            setPendingDelete(meal);
+          }}
+        />
+      ) : null}
 
       <AppModal
         open={Boolean(pendingDelete)}
