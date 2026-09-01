@@ -2,6 +2,19 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-01 — 今日饮食 Web UI
+
+- 在现有 `#today` notice-board 中新增「饮食小记」，不增加第五个底部 Tab。
+- 按日期和 fish/cat 查询 Supabase 餐食，展示当天餐数和 kcal 合计。
+- 餐食卡片支持早餐 / 午餐 / 晚餐 / 加餐 / 其他、时间、中心估算、上下限、备注和来源。
+- 食物明细可展开，显示份量、估重、单品 kcal 区间和已有宏量营养数据。
+- 新增手动餐食新增 / 完整编辑 / 删除确认 / 软删除 UI。
+- 新增 `lib/nutrition/meal-client.ts`，浏览器只走现有同源 meal API 和 HttpOnly cloud session，不直接访问 Supabase。
+- 新增 meal browser client 测试，并修正 React effect 初始化/加载方式以符合当前 lint 规则。
+- UI 继续复用 `AppSectionPanel / AppCard / AppButton / AppInput / AppTextarea / AppModal / AppRoleAvatar` 与 animal-island-ui `Title`，未建立第二套视觉 primitive。
+- 页面持续明确：实际摄入不会自动修改游戏 deficit、金币、宝石或热力图。
+- P1 完成；下一阶段为 ChatGPT 明确“记上”后的持久化流程。
+
 ## 2026-09-01 — Supabase migration 与工程 baseline 完成
 
 - 将 production `supabase_migrations.schema_migrations` 中保留的 12 条原始 migration SQL 回填到 `supabase/migrations/`，版本号与名称保持一致。
@@ -10,7 +23,7 @@
 - 建立 GitHub Actions Test / Lint / Build baseline。
 - 修复旧兑换记录缺失时间兜底的跨时区测试问题。
 - 当前 baseline：`npm run test`、`npm run lint`、`npm run build` 全部通过。
-- 工程治理 P0 完成，下一业务阶段为今日饮食 UI。
+- 工程治理 P0 完成。
 
 ## 2026-09-01 — 项目文档与 AI 规则治理
 
@@ -27,7 +40,7 @@
 - 新增 meal payload 校验、热量区间、source、idempotency key 支持。
 - 多表写入采用 Supabase 事务 RPC。
 - 完成新增 → 查询 → 修改 → 软删除的数据库冒烟验证。
-- 饮食 UI 尚未开始。
+- 当时饮食 UI 尚未开始；后续已在同日完成 P1 Web UI。
 
 ## 2026-09-01 — Supabase 成为唯一云端主数据源
 
