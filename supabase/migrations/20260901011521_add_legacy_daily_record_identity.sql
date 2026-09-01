@@ -1,0 +1,2 @@
+alter table public.daily_records add column if not exists legacy_id text;
+create unique index if not exists daily_records_legacy_unique on public.daily_records(couple_space_id, legacy_id) where legacy_id is not null;

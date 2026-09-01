@@ -1,0 +1,1 @@
+update public.couple_spaces set home_sync_updated_at = now() where slug='couple-better-game';
