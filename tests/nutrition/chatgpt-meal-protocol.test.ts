@@ -91,7 +91,12 @@ describe("ChatGPT meal persistence protocol", () => {
 
   it("rejects a meal total that does not equal item totals", () => {
     const result = prepareConfirmedChatgptMeal(
-      { ...draft, totalCaloriesKcal: 500 },
+      {
+        ...draft,
+        totalCaloriesKcal: 500,
+        calorieMinKcal: null,
+        calorieMaxKcal: null,
+      },
       "chatgpt:fish:2026-09-02:meal-003",
     );
 
