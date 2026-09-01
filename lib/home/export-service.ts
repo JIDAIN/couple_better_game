@@ -46,7 +46,7 @@ function normalizeExportExchangeRecord(
 ): ExchangeRecord {
   const createdAt = stringOr(
     record.createdAt,
-    stringOr(record.occurredAt, "1970-01-01T00:00:00.000Z"),
+    stringOr(record.occurredAt, "1970-01-01T00:00"),
   );
 
   return normalizeExchangeRecord({
