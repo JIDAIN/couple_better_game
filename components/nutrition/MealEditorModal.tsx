@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Title } from "animal-island-ui";
 import {
   AppButton,
@@ -285,13 +285,6 @@ export function MealEditorModal({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setDraft(initialDraft(meal, initialPartner, initialDate));
-    setSaving(false);
-    setError(null);
-  }, [open, meal, initialPartner, initialDate]);
 
   const previewTotal = useMemo(
     () =>
