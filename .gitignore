@@ -20,6 +20,9 @@
 # production
 /build
 
+# app data must stay out of Git
+/public/data/couple-data.json
+
 # misc
 .DS_Store
 *.pem
