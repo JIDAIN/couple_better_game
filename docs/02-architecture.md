@@ -2,12 +2,12 @@
 
 ## 1. 一句话架构
 
-项目是一个 **Next.js 一体化 Web 应用**：浏览器负责游戏 UI 和本地运行状态，Vercel API 负责安全边界，Supabase 负责云端持久化。
+项目是一个 **Next.js 一体化 Web 应用**：浏览器负责游戏 UI、饮食 UI 和本地游戏运行状态，Vercel API 负责安全边界，Supabase 负责云端持久化。
 
 ```text
 Browser
   ├─ UI + React state
-  ├─ localStorage cache
+  ├─ localStorage game cache
   └─ HTTPS
        ↓
 Next.js / Vercel
@@ -45,9 +45,24 @@ app/api/meals/[id]/route.ts
 1. 游戏 state/service/AppDataStore 编排；
 2. legacy-compatible 云端同步编排。
 
+### `components/nutrition/`
+
+饮食业务 UI。
+
+当前包含：
+
+```text
+DailyMealsPanel.tsx    今日公告板中的按日/角色饮食列表
+MealEditorModal.tsx    手动新增 / 编辑餐食弹窗
+```
+
+它只调用浏览器 meal client，不持有 Supabase secret，也不通过 `HomeResourcesProvider` 写游戏状态。
+
 ### `components/ui/`
 
 项目 UI adapter/wrapper 层，包装 `animal-island-ui` 并承载少量业务专有视觉组件。
+
+新增业务 UI 应优先组合这里的 `App*` wrapper，不创建第二套 Button/Card/Modal 视觉系统。
 
 ### `lib/home/`
 
@@ -68,7 +83,14 @@ sync-state-service 同步 guard / retry decision
 
 ### `lib/nutrition/`
 
-新营养领域。目前只有 `meal-service.ts`，负责类型和输入校验，不依赖 React/Supabase。
+营养领域：
+
+```text
+meal-service.ts    类型、写入 payload 校验、查询参数校验
+meal-client.ts     浏览器到同源 `/api/meals` 的轻量 client
+```
+
+`meal-client.ts` 只走 Next.js API 和 HttpOnly cloud session，不直接访问 Supabase。
 
 ### `lib/server/`
 
@@ -153,18 +175,52 @@ DataManagement
 
 ## 7. 饮食数据流
 
+### Web 手动记录
+
 ```text
-Web UI（下一阶段）/ external ChatGPT workflow
--> /api/meals
+Today notice-board / DailyMealsPanel
+-> lib/nutrition/meal-client
+-> /api/meals 或 /api/meals/[id]
+-> cloud request auth
 -> lib/nutrition/meal-service validation
 -> lib/server/supabase-nutrition
 -> transaction RPC
 -> meals + meal_items
 ```
 
+读取和写入都直接以 Supabase 饮食数据为准，不复制进游戏 `HomeResourcesState`。
+
 写入使用 RPC 的原因是保证“餐 + 多个明细”原子提交。
 
-## 8. 数据库访问边界
+### ChatGPT（P2）
+
+未来 ChatGPT “记上”也复用同一 meal domain / RPC，不创建第二套餐食结构：
+
+```text
+用户明确确认“记上”
+-> source=chatgpt canonical payload
+-> meal API / server path
+-> meals + meal_items
+```
+
+讨论和估算本身不写数据库。
+
+## 8. UI 场景边界
+
+当前底部仍只有四个主 Tab：
+
+```text
+今日 notice-board
+地图 growth-map
+兑换 shop
+小窝 nook-phone
+```
+
+P1 饮食功能作为“今日”公告板中的独立 `AppSectionPanel` 扩展，不新增第五个底部 Tab，也不新建独立视觉体系。
+
+新增/编辑餐食沿用当前 `AppModal + Title + AppInput + AppCard + AppButton` 模式。
+
+## 9. 数据库访问边界
 
 当前模式是 server-only：
 
@@ -178,25 +234,40 @@ service role             经 API/RPC 使用
 
 这不是 Supabase Auth 架构。未来如果加入真实账号，需要重新设计 auth_user_id、RLS policy 和 membership。
 
-## 9. AppDataStore 的现实定位
+## 10. Supabase migration 版本管理
+
+production 已执行的 12 条历史 migration 已按原 version / name / SQL 回填到：
+
+```text
+supabase/migrations/
+```
+
+规则：
+
+- 已执行历史 migration 不回头改写；
+- 新 DDL / function / view / grant / RLS 变化新增 migration；
+- migration 管结构和规则，不代替真实 production 数据备份。
+
+详细规则见 `supabase/README.md`。
+
+## 11. AppDataStore 的现实定位
 
 最初设计中 `AppDataStore` 被设想为将来直接替换成 remote store。
 
 当前实际演进不是“remote store 替换 local store”，而是：
 
-- local AppDataStore 继续作为运行缓存；
-- 云端同步通过独立 Provider/API 流程完成。
+- local AppDataStore 继续作为游戏运行缓存；
+- 游戏云端同步通过独立 Provider/API 流程完成；
+- 饮食 UI 直接经 meal API 使用 Supabase，不进入游戏 AppDataStore。
 
 因此以后不要再写“替换 AppDataStore 就完成云同步”这种过时描述。
 
-## 10. 当前技术债
+## 12. 当前技术债
 
-### P0/P1
-
-- 早期 Supabase schema/RPC migration SQL 尚未完整回填到仓库版本控制。
 - Provider 内部仍有 GitHub 命名和兼容 URL。
 - cloud-session token 生成逻辑在部分旧 route / proxy 中仍有重复，可后续统一。
 - 同步 metadata/password 仍有组件/Provider 直接 localStorage 访问。
 - 游戏最终结算仍不是 server-authoritative。
+- 当前共享 password/session 不是完整用户身份和 membership 模型。
 
 这些是明确的 roadmap 项，不应在无关功能中顺手重构。
