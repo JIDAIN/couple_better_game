@@ -2,6 +2,16 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-01 — Supabase migration 与工程 baseline 完成
+
+- 将 production `supabase_migrations.schema_migrations` 中保留的 12 条原始 migration SQL 回填到 `supabase/migrations/`，版本号与名称保持一致。
+- 新增 `supabase/README.md`，明确数据库变更、RLS、service_role 和空库重建规则。
+- 确认 `coin_deficit_streak_days` 已通过历史 migration 将默认值从 7 统一为当前规则的 5。
+- 建立 GitHub Actions Test / Lint / Build baseline。
+- 修复旧兑换记录缺失时间兜底的跨时区测试问题。
+- 当前 baseline：`npm run test`、`npm run lint`、`npm run build` 全部通过。
+- 工程治理 P0 完成，下一业务阶段为今日饮食 UI。
+
 ## 2026-09-01 — 项目文档与 AI 规则治理
 
 - 暂停功能开发，重新审查 README、AGENTS、CLAUDE、项目 Skill 与全部 docs。
