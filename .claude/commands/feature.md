@@ -1,71 +1,49 @@
 # Implement Feature
 
-请按本项目规则实现用户描述的小功能。
+请实现用户描述的功能，但先按当前项目架构判断影响范围。
 
-## 自动前置要求
-
-开始前必须先阅读：
+## 前置阅读
 
 1. `AGENTS.md`
-2. `CLAUDE.md`
-3. `README.md`
-4. 与功能相关的 `docs/` 文档和源码
+2. `docs/README.md`
+3. `docs/09-status-roadmap.md`
+4. 与功能相关的主文档和源码
 
-如果 `AGENTS.md` 或 `CLAUDE.md` 不存在，请先提醒用户。
+## 先分类
 
-## 影响范围判断
+判断属于：
 
-开始实现前，请先判断该功能是否涉及：
+- game
+- nutrition
+- weight
+- sync/auth
+- UI
+- Supabase/infrastructure
 
-- UI 展示
-- 用户交互
-- `HomeResourcesProvider.tsx`
-- `lib/home/` 业务规则
-- 数据结构
-- `AppDataStore`
-- `localStorage`
-- snapshot / legacy 兼容
-- 热力图
-- 兑换系统
-- 导入导出
-- 测试
+如果跨域，明确每个写入属于哪个数据域。
 
-如果影响超过 3 个主要文件，先给方案再修改。
+## 必守边界
 
-## 项目边界
+- intake / deficit / weight / exercise 不混淆。
+- UI 不重新实现业务规则。
+- secret 只在服务端。
+- 不恢复 GitHub public JSON。
+- 多表写入考虑事务。
+- 不根据 legacy coin/gem 变量名猜业务语义。
+- Provider 大改前先考虑 service/client 下沉。
 
-必须遵守：
+## 验证
 
-- UI 只负责展示和交互
-- 业务规则放在 `lib/home/`
-- 不要在 UI 组件里直接读写 `localStorage`
-- 不要把复杂业务逻辑塞回 `HomeResourcesProvider.tsx`
-- 不要擅自安装依赖
-- 不要执行 `git commit`
-- 不要执行 `git push`
+按 `docs/07-development-testing.md` 选择测试；能运行时完成相关 test/lint/build。
 
-## 测试要求
-
-如果功能涉及以下内容，必须补充或更新测试：
-
-- 结算规则
-- 钱包计算
-- 数据结构
-- store
-- snapshot
-- legacy 兼容
-- 热力图日期
-- 导入导出
-
-## 输出格式
-
-完成后用中文输出：
+## 完成输出
 
 1. 实现摘要
-2. 修改文件
-3. 验证方式
-4. 是否已运行测试、lint、build
-5. 风险或未完成事项
+2. 修改文件 / migration
+3. 验证结果
+4. 数据/安全影响
+5. 未完成项
+6. 是否更新 CHANGELOG / roadmap
 
 ## 用户输入
 

@@ -1,52 +1,27 @@
 # Fix Bug
 
-请按本项目规则修复用户描述的 bug。
+请按当前项目真实架构做最小修复。
 
-## 自动前置要求
+## 流程
 
-开始前必须先阅读：
+1. 阅读 `AGENTS.md`、`docs/09-status-roadmap.md` 和相关主文档。
+2. 从真实代码 / logs / schema 找根因，不用旧文档猜。
+3. 判断 bug 属于 game / nutrition / weight / sync / UI / infra。
+4. 给出最小修复范围。
+5. 修改并补回归测试。
+6. 运行能执行的 targeted test / lint / build。
 
-1. `AGENTS.md`
-2. `CLAUDE.md`
-3. `README.md`
-4. 与当前 bug 相关的 `docs/` 文档和源码
+## 禁止
 
-如果 `AGENTS.md` 或 `CLAUDE.md` 不存在，请先提醒用户，不要跳过项目规则。
+- 顺手大重构；
+- 用 meal/intake 修 deficit；
+- 暴露 Supabase secret；
+- 绕过 cloud-session / first-device guard；
+- 凭 gem/coin legacy 名称改语义；
+- 修一个 UI bug 顺便改结算规则。
 
-## 工作方式
+## 输出
 
-1. 先理解 bug 现象和期望行为
-2. 阅读相关代码
-3. 判断可能涉及的文件
-4. 找到根因
-5. 做最小修改
-6. 涉及业务规则、数据结构、store、snapshot、热力图、导入导出时，补充或更新测试
-7. 修改后说明验证方式
-
-## 项目边界
-
-必须遵守：
-
-- 不要在 UI 组件中直接读写 `localStorage`
-- 不要把业务规则写回 UI 组件
-- 不要把复杂业务逻辑塞回 `HomeResourcesProvider.tsx`
-- 不要擅自安装依赖
-- 不要擅自修改 `package.json`
-- 不要执行 `git commit`
-- 不要执行 `git push`
-- 不要扩大修改范围
-
-## 输出格式
-
-完成后用中文输出：
-
-1. 问题原因
-2. 修改摘要
-3. 修改文件
-4. 验证方式
-5. 是否已运行测试、lint、build
-6. 风险或未完成事项
-
-## 用户输入
+根因、修复、验证、风险、未完成项。
 
 $ARGUMENTS

@@ -1,51 +1,134 @@
-# 恋爱宝库 / 变美变瘦大作战
+# 🐟和🐱变美变瘦大作战
 
-这是一个基于 Next.js 的本地 Web MVP。当前数据仍然存储在浏览器 `localStorage`，项目已经为未来接 API、数据库或云同步做了 store 抽象，但目前还没有接入登录、后端或数据库。
+一个给两个人共同使用的健康习惯养成 Web 应用：每天记录游戏化的热量缺口、运动与体重快照，通过金币/宝石、成长地图和兑换商店形成持续反馈；同时正在扩展真实饮食记录和体重趋势能力。
 
-## 项目文档
+> 当前已经不是“纯前端 localStorage MVP”。生产环境由 **Next.js + Vercel + Supabase** 组成；浏览器保留 localStorage 作为运行缓存和离线兜底，Supabase 是云端主数据源。
 
-如果你是第一次阅读这个项目，建议按下面顺序查看：
+## 当前能做什么
 
-1. [docs/architecture-after-refactor.md](docs/architecture-after-refactor.md)
-2. [docs/data-management-after-refactor.md](docs/data-management-after-refactor.md)
-3. [docs/module-map-after-refactor.md](docs/module-map-after-refactor.md)
-4. [docs/development-guide-after-refactor.md](docs/development-guide-after-refactor.md)
-5. [docs/testing-guide.md](docs/testing-guide.md)
-6. [docs/rules-confirmation.md](docs/rules-confirmation.md)
-7. [docs/heatmap-date-logic.md](docs/heatmap-date-logic.md)
-8. [docs/ui-inventory.md](docs/ui-inventory.md)
+### 已上线
 
-如果后续再补充产品说明或需求说明文档，可以把它们放在最前面，作为更高层的阅读入口。
+- 双人每日记录：鱼鱼 / 猫猫分别记录体重快照、`deficit`、运动分钟。
+- 游戏化结算：根据当前规则产生每日金币、周期宝石、情侣奖励。
+- 成长地图：按自然月、周六到周五展示双人热力图。
+- 成长日志：查看、补录、编辑、删除历史记录。
+- 兑换商店：维护奖励分类、兑换、查看和修改兑换记录。
+- 数据管理：本地缓存、云端同步、完整 JSON 备份/恢复、每周复盘 CSV。
+- 云端数据：Supabase 保存规范化的游戏、钱包、营养和体重数据。
+- 新设备安全接入：先验证同步密码并下载云端数据，防止空本地状态覆盖云端。
+- 饮食后端：`/api/meals` CRUD 和 Supabase 事务 RPC 已上线并验证。
 
-## 当前项目状态
+### 尚未上线到 UI
 
-- 这是一个纯前端 Web MVP
-- 当前状态主要通过 React Context、`AppDataStore` 和 `localStorage` 协同管理
-- 结算规则、统计逻辑、每日记录逻辑、兑换逻辑都已经拆到 `lib/home/`
-- `HomeResourcesProvider.tsx` 目前主要负责状态编排和对外暴露 action
+- 今日饮食页面和手动餐食 CRUD UI。
+- ChatGPT 对话中明确说“记上”后写入饮食数据库的完整产品流程。
+- 独立体重趋势 API / 折线图。
+- 饮食、体重、游戏数据的统一每日总览。
+- 完整用户账号 / 多成员权限系统。
 
-## 常用命令
+当前进度和下一步以 [`docs/09-status-roadmap.md`](docs/09-status-roadmap.md) 为准。
+
+## 四个必须分开的数据域
+
+| 数据域 | 含义 | 当前真相来源 |
+|---|---|---|
+| 饮食摄入 | 实际吃了什么、估算摄入多少 kcal | `meals` / `meal_items` |
+| `deficit` | 现有游戏打卡字段 | `daily_record_sides.deficit_kcal` / `DailyRecordSide.deficit` |
+| 体重 | 真实测量时间序列 | `weight_measurements` |
+| 运动 | 当天运动分钟 | `daily_record_sides.exercise_minutes` |
+
+**不要把 `deficit` 当作饮食摄入，也不要由餐食热量自动反推或覆盖 `deficit`。** 这是项目最重要的数据边界之一。
+
+## 当前架构
+
+```text
+浏览器
+├─ components/home      游戏业务 UI
+├─ components/ui        animal-island-ui 项目 wrapper
+├─ HomeResourcesProvider
+├─ lib/home             游戏规则 / service / snapshot / localStorage store
+└─ localStorage         运行缓存、同步元数据
+        │
+        │ HTTPS
+        ▼
+Vercel / Next.js
+├─ app/api/home-data    云端游戏快照读取
+├─ app/api/save-data    云端游戏快照写入
+├─ app/api/cloud-session
+├─ app/api/meals        饮食查询 / 新增
+├─ app/api/meals/[id]   饮食修改 / 删除
+└─ lib/server           服务端鉴权和 Supabase RPC client
+        │
+        ▼
+Supabase PostgreSQL
+├─ 游戏规范化表
+├─ 钱包 / 流水
+├─ meals / meal_items / foods
+├─ weight_measurements
+└─ 只允许服务端 secret-key 路径访问
+```
+
+详细边界见 [`docs/02-architecture.md`](docs/02-architecture.md)。
+
+## 本地开发
 
 ```bash
+npm install
 npm run dev
+```
+
+常用检查：
+
+```bash
 npm run test
 npm run lint
 npm run build
 ```
 
-其中：
+应用核心界面可以使用本地缓存运行；要测试云端 API，需要配置服务端环境变量。环境变量名称和安全要求见 [`docs/08-deployment-security.md`](docs/08-deployment-security.md)。
 
-- `npm run test`：运行 Vitest 单元测试
-- `npm run lint`：检查代码风格和类型相关的静态问题
-- `npm run build`：执行生产构建
+## 目录
 
-## 目录提示
+```text
+app/                     Next.js 页面与 API Route
+components/home/         游戏业务 UI / Provider
+components/ui/           项目 UI wrapper
+lib/home/                游戏领域、规则、store、导入导出
+lib/nutrition/           饮食类型和参数校验
+lib/server/              服务端鉴权和 Supabase 访问
+tests/home/              游戏领域测试
+tests/nutrition/         饮食领域测试
+docs/                    当前有效项目文档
+.codex/skills/           项目维护 Skill
+```
 
-- `app/`：Next.js 页面入口
-- `components/home/`：首页 UI 组件
-- `lib/home/`：类型、规则、数据服务、store 抽象、工具函数
-- `tests/home/`：首页核心逻辑测试
+## 文档入口
 
-## 未来扩展方向
+第一次阅读项目，建议按顺序看：
 
-当前项目已经把数据访问抽象成 `AppDataStore`，后续如果接 API 或数据库，优先替换存储实现层，不需要先改 UI。  
+1. [`docs/README.md`](docs/README.md) — 文档地图
+2. [`docs/01-product.md`](docs/01-product.md) — 产品和功能
+3. [`docs/02-architecture.md`](docs/02-architecture.md) — 当前实现架构
+4. [`docs/03-data-model.md`](docs/03-data-model.md) — 数据真相与数据库
+5. [`docs/04-api-and-sync.md`](docs/04-api-and-sync.md) — API、同步、鉴权
+6. [`docs/05-business-rules.md`](docs/05-business-rules.md) — 当前游戏规则
+7. [`docs/09-status-roadmap.md`](docs/09-status-roadmap.md) — 当前进度和下一步
+
+AI / 自动化修改代码前必须先阅读 [`AGENTS.md`](AGENTS.md)。
+
+## 数据与隐私
+
+- Supabase secret key 只能存在于 Vercel / 服务端环境变量，禁止 `NEXT_PUBLIC_*` 暴露。
+- 浏览器不直接连接带服务端权限的 Supabase client。
+- 旧的公开 GitHub JSON 同步已经退出，`public/data/couple-data.json` 不再属于当前版本。
+- 历史 Git 缓存清理仍由 GitHub Support 工单跟进，状态见 roadmap。
+
+## 当前原则
+
+这个项目优先保证：
+
+1. **事实数据不混淆。**
+2. **游戏规则可回算。**
+3. **云端写入有保护，不因新设备误覆盖。**
+4. **UI、业务规则、服务端和数据库边界清楚。**
+5. **文档描述当前真实实现，不把“未来方案”写成“已经实现”。**

@@ -1,255 +1,223 @@
 # AGENTS.md
 
-本文件是给 AI 编程助手使用的项目规则。任何 AI 助手在修改代码前，都必须先阅读本文件，并结合 `README.md` 与 `docs/` 下的项目文档工作。
+本文件是所有 AI 编程助手和自动化开发工具的项目级规则。修改代码、数据库、测试、文档前必须先阅读本文件。
 
-## 项目概况
+## 1. 项目现状
 
-本项目是「恋爱宝库 / 变美变瘦大作战」本地 Web MVP。
+项目是「🐟和🐱变美变瘦大作战」，技术栈为：
 
-技术栈：
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
+- Next.js 16 / React 19 / TypeScript / Tailwind CSS
+- `animal-island-ui`
 - Vitest
+- Vercel
+- Supabase PostgreSQL
 
-当前项目没有登录、后端、数据库或云同步。
+当前不是纯前端项目：
 
-当前数据主要存储在浏览器 `localStorage` 中，但已经通过 `AppDataStore` 做了抽象，未来可能替换为 API、数据库或云同步。
+- 浏览器 `localStorage` 是运行缓存和离线兜底；
+- Supabase 是生产云端主数据源；
+- Next.js API Route 是浏览器与 Supabase 的服务端边界；
+- Supabase secret key 只允许服务端使用。
 
-## 必读文档顺序
+## 2. 开始任务前的阅读顺序
 
-开始任何开发任务前，请按需阅读：
+至少阅读：
 
 1. `README.md`
-2. `docs/architecture-after-refactor.md`
-3. `docs/data-management-after-refactor.md`
-4. `docs/module-map-after-refactor.md`
-5. `docs/development-guide-after-refactor.md`
-6. `docs/testing-guide.md`
+2. `docs/README.md`
+3. `docs/09-status-roadmap.md`
+4. 与任务相关的主文档和源码
 
-如果任务涉及热力图日期逻辑，还必须阅读：
+按任务追加：
 
-- `docs/heatmap-date-logic.md`
+| 任务 | 必读 |
+|---|---|
+| 产品 / 页面流程 | `docs/01-product.md` |
+| 架构 / 重构 | `docs/02-architecture.md` |
+| 数据字段 / Supabase | `docs/03-data-model.md` |
+| API / 同步 / 鉴权 | `docs/04-api-and-sync.md` |
+| 金币 / 宝石 / 热力图 | `docs/05-business-rules.md` |
+| UI / animal-island-ui | `docs/06-ui-guidelines.md` |
+| 开发 / 测试 | `docs/07-development-testing.md` |
+| 部署 / 安全 | `docs/08-deployment-security.md` |
 
-如果任务涉及 UI 样式或组件盘点，还必须阅读：
+如果使用 Codex 项目 Skill，再读取：
 
-- `docs/ui-inventory.md`
+- `.codex/skills/couple-better-game-maintainer/SKILL.md`
 
-如果任务涉及规则确认，还必须阅读：
+## 3. 四个领域绝对不能混淆
 
-- `docs/rules-confirmation.md`
+```text
+饮食摄入 ≠ deficit ≠ 体重 ≠ 运动
+```
 
-## 目录职责
+- **饮食摄入**：实际吃了什么，写 `meals / meal_items`。
+- **deficit**：现有游戏打卡字段，写 `daily_record_sides.deficit_kcal`；不要解释成“摄入热量”。
+- **体重**：真实趋势写 `weight_measurements`；`daily_record_sides.weight_kg` 只是当天游戏快照。
+- **运动**：每日游戏事实 `exercise_minutes`。
 
-- `app/`：Next.js 页面入口和路由挂载
-- `components/home/`：首页 UI、交互、弹窗、Context 消费
-- `lib/home/`：类型、规则、服务、store 抽象、日期工具、默认配置、seed 数据
-- `tests/home/`：核心业务逻辑测试
-- `docs/`：项目架构、数据管理、开发指南、测试指南和规则说明文档
+任何新功能都不得因为“看起来可以计算”而自动把一个域覆盖到另一个域。
 
-## 核心架构原则
+## 4. Source of Truth 与派生数据
 
-必须保持当前分层。
+### 游戏事实 / 配置
 
-不要把已经拆出去的逻辑重新塞回 UI、组件或 Provider。
+主要事实数据：
 
-### UI 层规则
+- `daily_records` + `daily_record_sides`
+- `exchange_records`
+- `exchange_categories`
+- `app_configs`
+- `wallet_ledger`（资源变化审计事实）
 
-`components/home/` 只负责展示和交互。
+### 营养事实
+
+- `meals`
+- `meal_items`
+- 可选引用 `foods / food_aliases`
+
+餐食保存时必须保留 `raw_name`；无法解析到 canonical food 时，`food_id = null` 不能阻塞保存。
+
+### 体重事实
+
+- `weight_measurements`
+
+### 派生 / 可回算数据
+
+- 当前钱包余额快照 `wallets`
+- 前端 `wallet`
+- `weekGemTotal / weekCoinTotal`
+- `streakDays / weeklySuccessDays / cumulativeSuccessDays`
+- 今日 / 昨日奖励汇总
+- heatmap overrides
+
+修改历史事实后，应优先重算派生值，不要手工拼出一个“看起来正确”的余额。
+
+## 5. 前端分层
+
+### `components/home/`
+
+负责业务 UI、表单、弹窗、页面组合和调用 action。
 
 禁止：
 
-- 在 UI 组件中直接读写 `localStorage`
-- 在 UI 组件中计算钱包、金币、热力图等级、热力图角标
-- 在 UI 组件中写死结算规则
-- 为了一个小需求大规模重构 UI 结构
-- 在 UI 层直接拼装完整备份结构或导入结构
+- 把结算规则重新写进 JSX；
+- 直接使用 Supabase secret 或服务端 SDK；
+- 自己计算钱包最终余额；
+- 为小功能大规模重构 Provider。
 
-应该：
+### `components/ui/`
 
-- 通过 `useHomeResources()` 获取状态和 action
-- 让 `lib/home/` 中的 service 或 rules 负责业务计算
-- 保持现有视觉风格和交互习惯
-- 尽量复用已有组件和样式
+项目视觉 wrapper。UI 改动优先复用已有 `App*` 组件和 `animal-island-ui`，见 `docs/06-ui-guidelines.md`。
 
-### Provider 规则
+### `HomeResourcesProvider.tsx`
 
-`HomeResourcesProvider.tsx` 当前应该保持为状态编排器。
+当前是游戏状态编排器和同步编排器。应尽量只：
 
-它可以负责：
+- 持有 React state；
+- 调用 `lib/home` service；
+- 写入 AppDataStore；
+- 编排云端同步；
+- 向 UI 暴露 action。
 
-- 创建 Context
-- 暴露 `useHomeResources()`
-- 初始化 store
-- 调用 service
-- 把 service 结果提交进 React state
-- 对外暴露 action
+如果单次修改 Provider 超过约 50 行，先判断逻辑是否应该下沉到 `lib/home` 或独立 client/service。
 
-它不应该重新负责：
+### localStorage 规则
 
-- 结算规则
-- 钱包重算
-- 每日记录纯计算
-- 历史补录纯计算
-- 兑换记录纯计算
-- snapshot 拼装细节
-- `localStorage` 读写细节
-- 热力图等级计算
-- 复杂导入导出逻辑
+业务快照只能通过 `AppDataStore` 访问。
 
-如果需要修改 `HomeResourcesProvider.tsx` 超过约 50 行，请先说明为什么这些逻辑不能放到 `lib/home/`。
+当前同步元数据 / 同步密码仍有 Provider / DataManagement 直接访问 localStorage/sessionStorage 的兼容代码，这是**现存技术债**，不是新代码可以继续扩散的模式。
 
-### 业务规则规则
+## 6. 游戏领域代码
 
-如果要修改这些内容，优先看 `lib/home/`：
+优先位置：
 
-- 结算规则
-- 金币规则
-- 钱包重算
-- 热力图等级
-- 运动角标
-- 恢复日奖励
-- 情侣 bonus
-- 历史补录
-- 每日记录
-- 兑换逻辑
-- 数据导入导出
-- snapshot 恢复
-- legacy 数据兼容
+- 类型：`lib/home/types.ts`
+- 规则：`lib/home/settlement-rules.ts`
+- 每日记录：`lib/home/daily-record-service.ts`
+- 兑换：`lib/home/exchange-service.ts`
+- 统计 / 钱包：`lib/home/home-stat-service.ts`
+- 状态恢复：`lib/home/home-state-service.ts`
+- snapshot：`lib/home/app-data-store.ts`
+- 导入导出：`lib/home/import-service.ts`、`export-service.ts`
 
-常见位置：
+不要根据变量名猜当前金币 / 宝石语义。项目经历过 currency semantics 迁移，存在 legacy 字段名；修改规则前必须读 `docs/05-business-rules.md` 和 `lib/home/currency-semantics.ts`。
 
-- `lib/home/settlement-rules.ts`
-- `lib/home/daily-record-service.ts`
-- `lib/home/exchange-service.ts`
-- `lib/home/home-stat-service.ts`
-- `lib/home/home-state-service.ts`
-- `lib/home/app-data-store.ts`
-- `lib/home/local-storage-app-data-store.ts`
-- `lib/home/export-service.ts`
-- `lib/home/import-service.ts`
+## 7. 营养领域代码
 
-## 数据管理规则
+- 参数 / 类型 / 校验：`lib/nutrition/meal-service.ts`
+- 服务端 Supabase 调用：`lib/server/supabase-nutrition.ts`
+- API：`app/api/meals/**`
+- 测试：`tests/nutrition/**`
 
-当前数据分为：
+### ChatGPT 餐食原则
 
-- `UserRuntimeData`：用户运行时数据
-- `AppConfigData`：配置数据
-- `AppDataSnapshot`：持久化快照
+“讨论 / 估算”不等于保存。
 
-不要把 runtime 数据和 config 数据混在一起。
+只有用户明确确认 **“记上”** 后，ChatGPT 工作流才应持久化餐食；写入时：
 
-### Source of Truth
+- `source = "chatgpt"`
+- 只改 `meals / meal_items`（以及明确需要的 food/alias 引用）
+- 不直接改 deficit、钱包、金币、宝石、热力图
+- 使用 `idempotency_key` 防止重复提交
 
-核心源数据包括：
+## 8. API 与服务端规则
 
-- `dailyRecords`
-- `exchangeRecords`
-- `exchangeCategories`
-- `heatmapStartDate`
-- `coinRules`
-- `visualRules`
+浏览器访问路径必须是：
 
-### Derived Data
+```text
+Browser -> Next.js API -> lib/server -> Supabase
+```
 
-以下字段属于派生数据，应优先通过服务重算，而不是手动拼：
+禁止：
 
-- `wallet`
-- `weekGemTotal`
-- `weekCoinTotal`
-- `streakDays`
-- `weeklySuccessDays`
-- `cumulativeSuccessDays`
-- `yesterdayGemTotal`
-- `todayFishGems`
-- `todayCatGems`
-- `todayBonusGems`
-- `fishHeatmapOverrides`
-- `catHeatmapOverrides`
+- 在前端暴露 `SUPABASE_SECRET_KEY` / service role key；
+- 使用 `NEXT_PUBLIC_SUPABASE_SECRET_KEY`；
+- 恢复公开 GitHub JSON 作为用户数据源；
+- 让匿名浏览器直接获得当前 server-only 数据权限。
 
-## 新增用户数据字段规则
+当前鉴权是“共享同步密码 + HttpOnly cloud session”，不是完整用户账号系统。不要把它描述成用户级身份认证。
 
-如果新增用户操作产生的数据字段，处理顺序是：
+多表写入必须考虑原子性；餐食等多表写入优先使用事务 RPC。
 
-1. 更新 `lib/home/types.ts`
-2. 更新 `AppDataSnapshot` 相关转换
-3. 更新 `home-state-service.ts` 恢复逻辑
-4. 补充或更新测试
-5. 最后让 UI 使用新字段
+## 9. Supabase / 数据库修改规则
 
-不要只改 UI，不改 snapshot 和恢复逻辑。
+DDL 必须通过 migration 执行，不要用临时 SQL 手改完就结束。
 
-## 新增配置项规则
+当前生产 schema 已存在，但早期 migration SQL 尚未完整回填到仓库，这是 roadmap 的 P0 技术债。新增数据库改动必须从现在开始做到：
 
-如果新增配置项，处理顺序是：
+1. migration 可追踪；
+2. 权限 / RLS 一并审查；
+3. service_role 能力最小化；
+4. anon / authenticated 不应意外获得 server-only RPC；
+5. 多表写入验证事务性；
+6. 文档同步 `docs/03-data-model.md` / `04-api-and-sync.md`。
 
-1. 更新 `AppConfigData`
-2. 更新默认配置
-3. 更新 snapshot 恢复逻辑
-4. 更新相关文档
-5. 最后让 UI 使用配置
+## 10. 云端同步安全规则
 
-配置项应该和运行时数据分开，不要混在一起。
+必须保留：
 
-## localStorage 规则
+- 新设备首次写入保护；
+- dirty local reload guard；
+- HttpOnly cloud-session；
+- server-side password validation；
+- Supabase server-only access；
+- local backup / JSON export 能力。
 
-禁止 UI 直接读写 `localStorage`。
+不要删除兼容 proxy 或旧内部函数名，除非已经同时迁移调用方并验证生产读取链路。
 
-`localStorage` 只应该通过 `AppDataStore` 接口访问。
+## 11. UI 规则
 
-当前本地存储实现集中在：
+- 优先用 `components/ui/App*` wrapper；
+- wrapper 不够时先确认 `animal-island-ui` 当前安装版本真实 API；
+- 不凭想象臆造组件 props；
+- 业务页面不应散落第二套按钮 / 卡片 / 弹窗视觉；
+- 热力图日期仍按周六到周五完整周展示，跨月日期可读但弱化；
+- UI 迁移已经完成，当前任务是维护，不再执行旧“全量迁移 phase”流程。
 
-- `lib/home/local-storage-app-data-store.ts`
+## 12. 测试规则
 
-状态恢复、fallback、legacy 兼容和重算逻辑集中在：
-
-- `lib/home/home-state-service.ts`
-
-## 导入导出规则
-
-涉及数据备份、导入、CSV 导出时，优先扩展：
-
-- `lib/home/export-service.ts`
-- `lib/home/import-service.ts`
-
-不要在 UI 组件中拼装备份结构。
-
-导入逻辑必须注意：
-
-- 失败时不应该提交部分状态
-- 覆盖导入需要保护数据一致性
-- 需要兼容当前 snapshot 结构
-- 必要时补充测试
-
-## 热力图规则
-
-修改热力图日期逻辑时，需要同步关注：
-
-- `components/home/mockHeatmapData.ts`
-- `tests/home/heatmap-grid.test.ts`
-- `docs/heatmap-date-logic.md`
-
-不要只改展示，不改测试。
-
-## 测试规则
-
-如果修改以下内容，必须补充或更新 `tests/home/` 下的测试：
-
-- 结算规则
-- 金币规则
-- 钱包计算
-- 热力图等级
-- 热力图日期逻辑
-- `DailyRecord` 结构
-- `ExchangeRecord` 结构
-- snapshot 恢复逻辑
-- store 逻辑
-- 导入导出逻辑
-- legacy 数据兼容逻辑
-
-常用命令：
+核心命令：
 
 ```bash
 npm run test
@@ -257,95 +225,39 @@ npm run lint
 npm run build
 ```
 
-提交前建议至少运行：
+必须补测试的典型变化：
 
-```bash
-npm run test
-npm run lint
-npm run build
-```
+- 游戏结算 / 钱包 / 周规则；
+- DailyRecord / ExchangeRecord / snapshot；
+- 导入导出和 legacy migration；
+- 热力图日期；
+- 同步 guard；
+- meal payload / API 语义；
+- 数据库事务和权限发生变化时，应至少做 DB smoke test。
 
-如果只改文档，可以不运行 build，但需要说明没有运行的原因。
+只改 Markdown / Skill 时可以不运行 build，但完成时必须明确说明。
 
-## AI 修改代码规则
+## 13. 文档规则
 
-AI 助手必须遵守：
+当前有效文档只以 `docs/README.md` 索引的主文档为准。
 
-1. 修改前先阅读相关文件，不要凭空猜测。
-2. 优先做最小修改。
-3. 不要为了一个小 bug 大重构。
-4. 不要擅自安装依赖。
-5. 不要擅自修改 `package.json`，除非任务明确需要。
-6. 不要擅自删除用户数据、seed 数据或历史兼容逻辑。
-7. 不要擅自执行 `git commit`。
-8. 不要擅自执行 `git push`。
-9. 不要擅自改 README 或 docs，除非任务涉及文档同步。
-10. 改完必须说明修改了哪些文件、为什么改、如何测试。
-11. 如果不确定，请明确说明不确定，不要假装确定。
-12. 如果改动会超过 3 个文件，先给方案再修改，除非用户明确要求直接改。
+每完成一个里程碑，应至少更新：
 
-## Bug 修复流程
+- `CHANGELOG.md`
+- `docs/09-status-roadmap.md`
+- 如果接口 / 数据 / 规则 / 架构变化，再更新对应主文档
 
-遇到 bug 时，按这个流程：
+不要再创建“xxx-after-refactor”“xxx-migration-report”“临时 audit”作为长期主文档。临时分析应放 PR / issue / 对话；稳定结论合并到主文档。
 
-1. 阅读 `AGENTS.md`、相关文档和相关代码
-2. 复现或根据现象推断复现路径
-3. 找到可能根因
-4. 给出最小修复方案
-5. 修改代码
-6. 补充或更新测试
-7. 运行相关检查
-8. 输出变更总结和验证步骤
+## 14. AI 执行规则
 
-## 新功能开发流程
-
-开发新功能时，按这个流程：
-
-1. 明确功能属于 UI、业务规则、数据结构、导入导出、热力图还是兑换系统
-2. 阅读相关文档和代码
-3. 先给实现方案和影响范围
-4. 小步实现
-5. 必要时补测试
-6. 最后同步文档
-
-## 输出格式要求
-
-每次完成任务后，请用中文输出：
-
-1. 修改摘要
-2. 修改文件
-3. 验证方式
-4. 是否已运行测试、lint、build
-5. 风险或未完成事项
-
-## Markdown 和公式规则
-
-如果生成 Markdown 内容或项目文档：
-
-- 数学公式必须使用 LaTeX
-- 行内公式使用 `$...$`
-- 块级公式使用 `$$...$$`
-- 不要使用普通文本伪公式
-- 面向 Obsidian 的内容应尽量使用标准 Markdown
-
-## 禁止事项
-
-禁止执行或建议执行危险命令，例如：
-
-```bash
-rm -rf
-git reset --hard
-git clean -fd
-```
-
-除非用户明确知道后果并要求执行。
-
-禁止在没有说明原因的情况下：
-
-- 安装新依赖
-- 删除文件
-- 大规模重构
-- 改变数据结构
-- 改变持久化格式
-- 清空本地数据
-- 删除 legacy 兼容逻辑
+1. 先读真实代码和数据结构，不凭旧文档猜。
+2. 先判断属于 game / nutrition / weight / sync / UI / infrastructure 哪个域。
+3. 优先最小改动，禁止顺手大重构。
+4. 不擅自安装依赖或改 package 配置。
+5. 不删除兼容逻辑、用户数据或生产安全保护，除非任务明确要求且有迁移方案。
+6. 不在输出或代码中暴露 secret。
+7. 如果现状与文档冲突，以已验证的运行代码 / schema 为准，并同步修正文档。
+8. 重大改动先给影响范围和回退路径。
+9. 完成后说明：修改摘要、文件、验证、风险、未完成项。
+10. git commit / push 由用户工作流决定；除非用户明确授权，不主动做不可逆仓库操作。
