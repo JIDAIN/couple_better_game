@@ -14,6 +14,8 @@
 
 旧文档中的 `/api/home/snapshot`、`/api/daily-records`、`/api/exchanges` 等只是曾经的未来草案，当前不存在。
 
+ChatGPT “记上”不是浏览器 API：当前由**已授权的 Supabase 连接能力**调用 service-only RPC，不向聊天或浏览器暴露 Supabase secret。
+
 ## 2. 当前鉴权模型
 
 这是私人小范围应用的共享访问保护，不是完整用户登录。
@@ -54,6 +56,22 @@ Cookie 不保存原始同步密码。
 - `x-couple-password` 请求头中的正确同步密码
 
 `/api/save-data` 当前 request body 仍显式包含 `password`，并额外要求已建立 cloud session 才允许真正写入。
+
+### ChatGPT 连接认证
+
+ChatGPT P2 不复制 `DATA_EDIT_PASSWORD` 或 `SUPABASE_SECRET_KEY` 到对话中，也不新增匿名写接口。
+
+当前路径是：
+
+```text
+ChatGPT conversation
+-> 已连接并获用户授权的 Supabase 能力
+-> service-only ChatGPT meal RPC
+-> existing create_meal_record transaction RPC
+-> meals + meal_items
+```
+
+`anon` / `authenticated` 不获得这些 RPC 的 execute 权限。
 
 ## 3. 首次连接流程
 
@@ -277,23 +295,132 @@ ChatGPT 只有用户明确“记上”后才应提交 `source=chatgpt`。
 - foodId 如存在必须为 UUID；
 - rawName 必须存在。
 
-## 10. RPC 映射
+## 10. ChatGPT “记上”持久化协议
 
-| API / service | RPC |
+### 10.1 确认边界
+
+```text
+讨论 / 看图 / 估算 / 用户修正
+!= 数据库写入
+```
+
+只有用户明确表达“记上”“把这餐记下来”或语义等价的**保存意图**后，才进入持久化步骤。
+
+仅仅说：
+
+```text
+“其实米饭只有半碗”
+“热量再算低一点”
+“那大概是多少”
+```
+
+都只是在修改当前草稿，不产生写入。
+
+已经成功写入后，如果用户只是补充事实，也不自动覆盖数据库；需要明确表达“改一下刚才那餐”“把记录改成……”等更新意图。当前 P2 首版的自动持久化入口负责新增；已保存餐食也可继续通过 Web UI 编辑/删除。
+
+### 10.2 角色映射
+
+当前约定：
+
+```text
+用户自己的饮食聊天 -> fish
+伴侣专用饮食聊天   -> cat
+```
+
+如果上下文无法可靠判断角色，不允许猜测后写入。
+
+### 10.3 创建步骤
+
+明确确认后：
+
+1. 以最终确认过的食物、份量、热量估算构造 meal payload；
+2. 至少保留一个 `meal_item`，并保留用户原始食物名称到 `rawName`；
+3. 生成一次性但可重试的 `chatgpt:` 幂等键；
+4. 调用 `create_chatgpt_meal_record`；
+5. RPC 强制 `source=chatgpt`、`status=confirmed`；
+6. RPC 重新汇总 item kcal，整餐中心值必须与 item 之和一致；
+7. 使用同一幂等键调用 `get_chatgpt_meal_record` 做读回确认；
+8. 成功后再告诉用户“已记上”。
+
+### 10.4 幂等键
+
+推荐格式：
+
+```text
+chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
+```
+
+例如：
+
+```text
+chatgpt:fish:2026-09-02:20260902T122030-a1b2c3
+```
+
+要求：
+
+- 以 `chatgpt:` 开头；
+- 最长 200 字符；
+- 一次明确确认生成一个 key；
+- 网络错误或结果不确定时，**必须复用原 key**，不能生成新 key 重试；
+- 用户明确表示“再记一顿”时才生成新 key。
+
+数据库 wrapper 对相同 key 使用 transaction advisory lock，并继续复用 `meals(couple_space_id, idempotency_key)` 唯一约束，避免并发重试形成重复餐食。
+
+### 10.5 失败恢复
+
+如果创建调用结果不确定：
+
+```text
+先 get_chatgpt_meal_record(same key)
+-> 找到：视为已经成功，不再重复创建
+-> 找不到：使用 same key 重试 create 一次
+```
+
+不得因为工具超时就换 key 再写。
+
+### 10.6 数据边界
+
+ChatGPT “记上”只允许影响：
+
+```text
+meals
+meal_items
+必要时 foods / food_aliases
+```
+
+不得直接影响：
+
+```text
+daily_record_sides.deficit_kcal
+exercise_minutes
+weight_measurements
+wallets
+wallet_ledger
+金币 / 宝石 / heatmap
+```
+
+## 11. RPC 映射
+
+| 调用方 / service | RPC |
 |---|---|
 | game cloud read | `export_home_sync_snapshot` |
 | game cloud write | `replace_home_sync_snapshot` |
-| meal list | `list_meals` |
-| meal create | `create_meal_record` |
-| meal update | `update_meal_record` |
-| meal delete | `delete_meal_record` |
+| Web meal list | `list_meals` |
+| Web meal create | `create_meal_record` |
+| Web meal update | `update_meal_record` |
+| Web meal delete | `delete_meal_record` |
+| ChatGPT confirmed meal create | `create_chatgpt_meal_record` |
+| ChatGPT idempotency verification | `get_chatgpt_meal_record` |
 
-## 11. 当前 API 安全边界
+`create_chatgpt_meal_record` 最终仍调用现有 `create_meal_record`，因此没有第二套餐食事实表。
 
-- 所有数据 API 必须验证共享 password/session；
-- Supabase secret 只存在服务端；
+## 12. 当前 API / RPC 安全边界
+
+- 所有浏览器数据 API 必须验证共享 password/session；
+- Supabase secret 只存在服务端或连接器授权层，不进入聊天文本和浏览器；
 - API 响应 `no-store`；
 - server-only RPC 不授权给 anon/authenticated；
+- ChatGPT P2 RPC 同样只授权 service_role；
 - 这是共享空间保护，不是单用户授权模型。
 
 未来加入账号后，需要重新设计：
