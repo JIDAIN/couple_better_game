@@ -5,10 +5,10 @@ description: >
   Use it for feature work, bug fixes, architecture changes, Supabase/API work,
   nutrition and weight features, game-rule changes, UI maintenance, testing,
   documentation updates, and production-safety reviews.
-version: 2.1.0
+version: 2.2.0
 ---
 
-# Couple Better Game Maintainer Skill v2.1.0
+# Couple Better Game Maintainer Skill v2.2.0
 
 ## Mission
 
@@ -20,8 +20,9 @@ version: 2.1.0
 数据域不混淆
 业务规则不漂移
 云端数据不被误覆盖
-secret 不进入浏览器
+secret 不进入浏览器或普通聊天
 延续既有动森感 UI，不为新功能另造视觉体系
+ChatGPT 未明确确认时绝不写餐食
 UI / service / API / DB 分层清楚
 修改可测试、可回滚、可文档化
 ```
@@ -104,8 +105,10 @@ foods / food_aliases（可选引用）
 - `components/nutrition/**`
 - `lib/nutrition/meal-service.ts`
 - `lib/nutrition/meal-client.ts`
+- `lib/nutrition/chatgpt-meal-protocol.ts`
 - `lib/server/supabase-nutrition.ts`
 - `app/api/meals/**`
+- `supabase/migrations/20260901162337_add_chatgpt_meal_persistence_rpc.sql`
 - `tests/nutrition/**`
 
 保存餐食时：
@@ -137,23 +140,69 @@ foods / food_aliases（可选引用）
 - intake 不进入游戏 `HomeResourcesState`；
 - 不为 ChatGPT 来源创建第二套 UI / 表。
 
-### “记上”协议
+### ChatGPT “记上”协议
 
 ChatGPT 可以先讨论、修正、估算，但**不得因为已经给出估算就自动写数据库**。
 
-仅当用户明确表达“记上”或等价的保存确认后：
+明确保存确认后才执行：
 
 ```text
-source = chatgpt
-写 meals / meal_items
-必要时写 canonical food / alias
+用户明确“记上”/“把这餐记下来”等保存意图
+-> 构造最终 meal draft
+-> 生成 chatgpt: idempotency key
+-> create_chatgpt_meal_record
+-> get_chatgpt_meal_record 读回
+-> 成功后回复“已记上”
+```
+
+当前调用入口不是公开 HTTP API，而是用户已授权的 Supabase 连接能力。禁止把 `SUPABASE_SECRET_KEY`、service role key 或同步密码复制进聊天来实现 P2。
+
+`create_chatgpt_meal_record`：
+
+- service-role only；
+- 强制 `source = chatgpt`；
+- 强制 `status = confirmed`；
+- 要求至少一个 item；
+- 校验 item 名称、kcal 和区间；
+- 整餐中心 kcal 必须等于 item 之和；
+- 要求 `chatgpt:` 前缀 idempotency key；
+- 对同 key 使用 transaction advisory lock；
+- 最终仍复用 `create_meal_record` 和现有 `meals / meal_items`。
+
+幂等规则：
+
+```text
+chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
+```
+
+- 一次明确确认只生成一个 key；
+- 调用超时/结果不确定时，先 `get_chatgpt_meal_record(same key)`；
+- 已存在则视为成功；
+- 不存在才用 **same key** 重试；
+- 不允许换新 key 盲目重试；
+- 用户明确说“再记一顿”才新建 key。
+
+当前角色映射：
+
+```text
+用户自己的饮食聊天 -> fish
+伴侣专用饮食聊天   -> cat
+```
+
+上下文不明确时不能猜测后写入。
+
+已经成功写入后，普通事实补充不自动改库；需要明确更新意图。P2 首版自动持久化入口负责新增，已有餐食仍可从 Web UI 编辑/删除。
+
+无论任何 ChatGPT 餐食写入：
+
+```text
 不写 deficit
-不写 wallet
+不写 exercise
+不写 weight
+不写 wallet / ledger
 不写金币/宝石
 不写 heatmap
 ```
-
-P2 实现必须复用现有 meal schema / API / RPC；ChatGPT 成功写入后，现有 DailyMealsPanel 应能直接读到同一条数据。
 
 ## 5. Weight 修改协议
 
@@ -163,7 +212,7 @@ P2 实现必须复用现有 meal schema / API / RPC；ChatGPT 成功写入后，
 
 ## 6. API / Sync 修改协议
 
-当前浏览器不能直接持有数据库高权限凭证。
+浏览器不能直接持有数据库高权限凭证。
 
 必须保持：
 
@@ -171,13 +220,22 @@ P2 实现必须复用现有 meal schema / API / RPC；ChatGPT 成功写入后，
 Browser -> Next.js API -> server helper -> Supabase RPC/Table
 ```
 
+ChatGPT P2 例外是受授权的非浏览器连接路径：
+
+```text
+ChatGPT -> authorized connector -> service-only meal RPC -> Supabase
+```
+
 ### 禁止
 
 - `NEXT_PUBLIC_SUPABASE_SECRET_KEY`
 - service role / secret key 写前端
+- service role / secret key / 同步密码复制进普通聊天
+- 为 ChatGPT 新增匿名写 API
 - 公开 `/api/home-data`
 - 公开 GitHub JSON 用户数据镜像
 - 新设备首次连接直接上传本地空快照
+- 日常“记上”路径使用任意 SQL 去修改游戏/钱包表
 
 ### 兼容同步
 
@@ -187,7 +245,7 @@ Provider 仍使用旧内部命名和 `/data/couple-data.json` 兼容请求；`pr
 
 ## 7. Supabase 修改协议
 
-production 已执行的 12 条历史 migration 已按原 version / name / SQL 回填到：
+production migrations 持续纳入：
 
 ```text
 supabase/migrations/
@@ -202,7 +260,7 @@ supabase/migrations/
 5. server-only RPC 不给 anon/authenticated；
 6. 多表操作优先 transaction RPC；
 7. production smoke test 后清理测试数据；
-8. 更新数据模型和 API 文档。
+8. 更新数据模型和 API / 安全文档。
 
 migration 管数据库结构和规则，不等于 production 业务数据备份。数据库维护细节以 `supabase/README.md` 为准。
 
@@ -275,6 +333,7 @@ lib/server
 | API TypeScript | build + auth/error path |
 | Supabase RPC | DB CRUD smoke + permission check + cleanup |
 | nutrition validation/client | `tests/nutrition` + build |
+| ChatGPT persistence | protocol tests + DB idempotency smoke + read-back + grants + cleanup |
 | UI | test/lint/build；条件允许时做关键移动端交互 smoke |
 | production sync | Vercel READY + 真实读取/写入证据 |
 
@@ -305,10 +364,12 @@ npm run build
 
 ```text
 [ ] 没有混淆 intake / deficit / weight / exercise
-[ ] 没有把 secret 放入浏览器
+[ ] 没有把 secret 放入浏览器或普通聊天
 [ ] 没有恢复 public GitHub data
 [ ] 没有绕过新设备保护
 [ ] 没有凭 legacy 变量名误改 currency
+[ ] ChatGPT 未确认时没有写 meal
+[ ] ChatGPT 重试复用了同一 idempotency key
 [ ] 多表写入考虑事务
 [ ] 派生数据可以从事实重算
 [ ] UI 延续现有 App* / animal-island-ui 体系
