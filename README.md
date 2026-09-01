@@ -18,10 +18,10 @@
 - 新设备安全接入：先验证同步密码并下载云端数据，防止空本地状态覆盖云端。
 - 饮食后端：`/api/meals` CRUD 和 Supabase 事务 RPC 已上线并验证。
 - 今日饮食 UI：在现有「今日」公告板中按日期和鱼鱼/猫猫查看饮食，支持手动新增、编辑、软删除、热量区间和食物明细展开。
+- ChatGPT “记上”：只有明确保存确认后，通过 service-only Supabase RPC 写入同一套 `meals / meal_items`；带 `chatgpt:` 幂等键并读回确认，不自动修改游戏 deficit / 钱包 / 热力图。
 
 ### 尚未上线
 
-- ChatGPT 对话中明确说“记上”后写入饮食数据库的完整产品流程。
 - 独立体重趋势 API / 折线图。
 - 饮食、体重、游戏数据的统一每日总览。
 - 完整用户账号 / 多成员权限系统。
@@ -48,7 +48,7 @@
 ├─ components/ui           animal-island-ui 项目 wrapper
 ├─ HomeResourcesProvider   游戏状态/同步编排
 ├─ lib/home                游戏规则 / service / snapshot / localStorage store
-├─ lib/nutrition           餐食类型、校验、浏览器 meal client
+├─ lib/nutrition           餐食类型、校验、浏览器 meal client、ChatGPT payload protocol
 └─ localStorage            游戏运行缓存、同步元数据
         │
         │ HTTPS
@@ -67,7 +67,13 @@ Supabase PostgreSQL
 ├─ 钱包 / 流水
 ├─ meals / meal_items / foods
 ├─ weight_measurements
-└─ 只允许服务端 secret-key 路径访问
+└─ server-only / service-only RPC
+
+ChatGPT（明确“记上”后）
+-> 已授权 Supabase 连接能力
+-> create_chatgpt_meal_record
+-> get_chatgpt_meal_record 验证
+-> 同一 meals / meal_items
 ```
 
 详细边界见 [`docs/02-architecture.md`](docs/02-architecture.md)。
@@ -82,6 +88,17 @@ Supabase PostgreSQL
 - 大型视觉改版才重新做整体 UI 设计审查。
 
 详细规范见 [`docs/06-ui-guidelines.md`](docs/06-ui-guidelines.md)。
+
+## ChatGPT “记上”原则
+
+```text
+估算 / 讨论 / 修正 ≠ 保存
+明确“记上”或等价保存意图 -> 才写入
+```
+
+当前约定：用户自己的饮食聊天映射 `fish`，伴侣专用饮食聊天映射 `cat`。一次确认只生成一个 `chatgpt:` 幂等键；工具结果不确定时先按同 key 查询，再用同 key 重试，禁止换 key 盲目重写。
+
+详细流程见 [`docs/04-api-and-sync.md`](docs/04-api-and-sync.md)。
 
 ## 本地开发
 
@@ -108,7 +125,7 @@ components/home/         游戏业务 UI / Provider
 components/nutrition/    饮食列表与餐食编辑 UI
 components/ui/           项目 UI wrapper
 lib/home/                游戏领域、规则、store、导入导出
-lib/nutrition/           饮食类型、校验、浏览器 API client
+lib/nutrition/           饮食类型、校验、browser client、ChatGPT protocol
 lib/server/              服务端鉴权和 Supabase 访问
 supabase/migrations/     production 数据库结构变更历史
 tests/home/              游戏领域测试
@@ -133,8 +150,9 @@ AI / 自动化修改代码前必须先阅读 [`AGENTS.md`](AGENTS.md)。
 
 ## 数据与隐私
 
-- Supabase secret key 只能存在于 Vercel / 服务端环境变量，禁止 `NEXT_PUBLIC_*` 暴露。
+- Supabase secret key 只能存在于 Vercel / 服务端环境变量或受授权连接层，禁止 `NEXT_PUBLIC_*` 暴露，也不复制到普通聊天文本。
 - 浏览器不直接连接带服务端权限的 Supabase client。
+- ChatGPT 持久化只使用受限 meal RPC，不把聊天连接能力当作通用游戏数据库写入口。
 - 旧的公开 GitHub JSON 同步已经退出，`public/data/couple-data.json` 不再属于当前版本。
 - 历史 Git 缓存清理仍由 GitHub Support 工单跟进，状态见 roadmap。
 
