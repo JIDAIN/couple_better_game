@@ -29,10 +29,72 @@ jobs:
         run: npm ci
 
       - name: Test
-        run: npm run test
+        id: test
+        shell: bash
+        run: |
+          set +e
+          npm run test > /tmp/test.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 0 ]; then
+            echo "### ✅ Test" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ❌ Test"
+              echo '```text'
+              tail -n 160 /tmp/test.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
 
       - name: Lint
-        run: npm run lint
+        id: lint
+        shell: bash
+        run: |
+          set +e
+          npm run lint > /tmp/lint.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 0 ]; then
+            echo "### ✅ Lint" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ❌ Lint"
+              echo '```text'
+              tail -n 160 /tmp/lint.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
 
       - name: Build
-        run: npm run build
+        id: build
+        shell: bash
+        run: |
+          set +e
+          npm run build > /tmp/build.log 2>&1
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 0 ]; then
+            echo "### ✅ Build" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### ❌ Build"
+              echo '```text'
+              tail -n 160 /tmp/build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+
+      - name: Verify baseline
+        if: always()
+        shell: bash
+        run: |
+          echo "test=${{ steps.test.outputs.exit_code }} lint=${{ steps.lint.outputs.exit_code }} build=${{ steps.build.outputs.exit_code }}"
+          if [ "${{ steps.test.outputs.exit_code }}" != "0" ] || \
+             [ "${{ steps.lint.outputs.exit_code }}" != "0" ] || \
+             [ "${{ steps.build.outputs.exit_code }}" != "0" ]; then
+            exit 1
+          fi
