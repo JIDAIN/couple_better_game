@@ -1,8 +1,8 @@
 # 🐟和🐱变美变瘦大作战
 
-一个给两个人共同使用的健康习惯养成 Web 应用：每天记录游戏化的热量缺口、运动与体重快照，通过金币/宝石、成长地图和兑换商店形成持续反馈；同时正在扩展真实饮食记录和体重趋势能力。
+一个给两个人共同使用的健康习惯养成 Web 应用：每天记录游戏化的热量缺口、运动与体重快照，通过金币/宝石、成长地图和兑换商店形成持续反馈；同时记录实际饮食，并继续扩展真实体重趋势能力。
 
-> 当前已经不是“纯前端 localStorage MVP”。生产环境由 **Next.js + Vercel + Supabase** 组成；浏览器保留 localStorage 作为运行缓存和离线兜底，Supabase 是云端主数据源。
+> 当前已经不是“纯前端 localStorage MVP”。生产环境由 **Next.js + Vercel + Supabase** 组成；浏览器保留 localStorage 作为游戏运行缓存和离线兜底，Supabase 是云端主数据源。
 
 ## 当前能做什么
 
@@ -17,10 +17,10 @@
 - 云端数据：Supabase 保存规范化的游戏、钱包、营养和体重数据。
 - 新设备安全接入：先验证同步密码并下载云端数据，防止空本地状态覆盖云端。
 - 饮食后端：`/api/meals` CRUD 和 Supabase 事务 RPC 已上线并验证。
+- 今日饮食 UI：在现有「今日」公告板中按日期和鱼鱼/猫猫查看饮食，支持手动新增、编辑、软删除、热量区间和食物明细展开。
 
-### 尚未上线到 UI
+### 尚未上线
 
-- 今日饮食页面和手动餐食 CRUD UI。
 - ChatGPT 对话中明确说“记上”后写入饮食数据库的完整产品流程。
 - 独立体重趋势 API / 折线图。
 - 饮食、体重、游戏数据的统一每日总览。
@@ -43,21 +43,23 @@
 
 ```text
 浏览器
-├─ components/home      游戏业务 UI
-├─ components/ui        animal-island-ui 项目 wrapper
-├─ HomeResourcesProvider
-├─ lib/home             游戏规则 / service / snapshot / localStorage store
-└─ localStorage         运行缓存、同步元数据
+├─ components/home         游戏业务 UI
+├─ components/nutrition    饮食业务 UI
+├─ components/ui           animal-island-ui 项目 wrapper
+├─ HomeResourcesProvider   游戏状态/同步编排
+├─ lib/home                游戏规则 / service / snapshot / localStorage store
+├─ lib/nutrition           餐食类型、校验、浏览器 meal client
+└─ localStorage            游戏运行缓存、同步元数据
         │
         │ HTTPS
         ▼
 Vercel / Next.js
-├─ app/api/home-data    云端游戏快照读取
-├─ app/api/save-data    云端游戏快照写入
+├─ app/api/home-data       云端游戏快照读取
+├─ app/api/save-data       云端游戏快照写入
 ├─ app/api/cloud-session
-├─ app/api/meals        饮食查询 / 新增
-├─ app/api/meals/[id]   饮食修改 / 删除
-└─ lib/server           服务端鉴权和 Supabase RPC client
+├─ app/api/meals           饮食查询 / 新增
+├─ app/api/meals/[id]      饮食修改 / 删除
+└─ lib/server              服务端鉴权和 Supabase RPC client
         │
         ▼
 Supabase PostgreSQL
@@ -69,6 +71,17 @@ Supabase PostgreSQL
 ```
 
 详细边界见 [`docs/02-architecture.md`](docs/02-architecture.md)。
+
+## UI 原则
+
+项目已经完成 animal-island-ui 视觉迁移。新增功能继续维护原有“动物岛 / 手账 / Nook 商店”视觉语言：
+
+- 优先复用 `components/ui/App*` wrapper；
+- 不另造第二套 Button / Card / Modal 风格；
+- 当前饮食 UI 作为「今日」notice-board 的一部分，不擅自增加第五个底部 Tab；
+- 大型视觉改版才重新做整体 UI 设计审查。
+
+详细规范见 [`docs/06-ui-guidelines.md`](docs/06-ui-guidelines.md)。
 
 ## 本地开发
 
@@ -85,17 +98,19 @@ npm run lint
 npm run build
 ```
 
-应用核心界面可以使用本地缓存运行；要测试云端 API，需要配置服务端环境变量。环境变量名称和安全要求见 [`docs/08-deployment-security.md`](docs/08-deployment-security.md)。
+应用游戏核心界面可以使用本地缓存运行；饮食 CRUD 和云端 API 需要有效 cloud session / 服务端环境变量。环境变量名称和安全要求见 [`docs/08-deployment-security.md`](docs/08-deployment-security.md)。
 
 ## 目录
 
 ```text
 app/                     Next.js 页面与 API Route
 components/home/         游戏业务 UI / Provider
+components/nutrition/    饮食列表与餐食编辑 UI
 components/ui/           项目 UI wrapper
 lib/home/                游戏领域、规则、store、导入导出
-lib/nutrition/           饮食类型和参数校验
+lib/nutrition/           饮食类型、校验、浏览器 API client
 lib/server/              服务端鉴权和 Supabase 访问
+supabase/migrations/     production 数据库结构变更历史
 tests/home/              游戏领域测试
 tests/nutrition/         饮食领域测试
 docs/                    当前有效项目文档
