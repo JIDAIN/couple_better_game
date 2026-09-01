@@ -5,10 +5,10 @@ description: >
   Use it for feature work, bug fixes, architecture changes, Supabase/API work,
   nutrition and weight features, game-rule changes, UI maintenance, testing,
   documentation updates, and production-safety reviews.
-version: 2.0.0
+version: 2.1.0
 ---
 
-# Couple Better Game Maintainer Skill v2.0.0
+# Couple Better Game Maintainer Skill v2.1.0
 
 ## Mission
 
@@ -21,6 +21,7 @@ version: 2.0.0
 业务规则不漂移
 云端数据不被误覆盖
 secret 不进入浏览器
+延续既有动森感 UI，不为新功能另造视觉体系
 UI / service / API / DB 分层清楚
 修改可测试、可回滚、可文档化
 ```
@@ -100,7 +101,9 @@ foods / food_aliases（可选引用）
 
 入口：
 
+- `components/nutrition/**`
 - `lib/nutrition/meal-service.ts`
+- `lib/nutrition/meal-client.ts`
 - `lib/server/supabase-nutrition.ts`
 - `app/api/meals/**`
 - `tests/nutrition/**`
@@ -112,6 +115,27 @@ foods / food_aliases（可选引用）
 - 热量区间必须满足 min <= estimate <= max；
 - 多明细写入使用事务；
 - 重试路径必须考虑 `idempotencyKey`。
+
+### Web 餐食协议
+
+当前 Web 饮食 UI 已上线：
+
+```text
+#today notice-board
+-> DailyMealsPanel
+-> MealEditorModal
+-> meal-client
+-> /api/meals
+-> Supabase
+```
+
+规则：
+
+- 手动新增使用 `source = manual`；
+- 编辑已有 ChatGPT/import 餐食保留原 source，除非有明确迁移；
+- 浏览器只调用同源 Next.js API，不直接接 Supabase secret/service role；
+- intake 不进入游戏 `HomeResourcesState`；
+- 不为 ChatGPT 来源创建第二套 UI / 表。
 
 ### “记上”协议
 
@@ -128,6 +152,8 @@ source = chatgpt
 不写金币/宝石
 不写 heatmap
 ```
+
+P2 实现必须复用现有 meal schema / API / RPC；ChatGPT 成功写入后，现有 DailyMealsPanel 应能直接读到同一条数据。
 
 ## 5. Weight 修改协议
 
@@ -161,17 +187,24 @@ Provider 仍使用旧内部命名和 `/data/couple-data.json` 兼容请求；`pr
 
 ## 7. Supabase 修改协议
 
+production 已执行的 12 条历史 migration 已按原 version / name / SQL 回填到：
+
+```text
+supabase/migrations/
+```
+
 新增 / 修改 DDL：
 
-1. 使用 migration；
+1. 使用新 migration；
 2. migration 纳入仓库版本控制；
-3. 审查 RLS / grants；
-4. server-only RPC 不给 anon/authenticated；
-5. 多表操作优先 transaction RPC；
-6. production smoke test 后清理测试数据；
-7. 更新数据模型和 API 文档。
+3. **不得回头修改已经执行的历史 migration**；
+4. 审查 RLS / grants；
+5. server-only RPC 不给 anon/authenticated；
+6. 多表操作优先 transaction RPC；
+7. production smoke test 后清理测试数据；
+8. 更新数据模型和 API 文档。
 
-注意：早期生产 schema migration SQL 还未完整回填仓库，这是 P0 技术债，不要继续扩大。
+migration 管数据库结构和规则，不等于 production 业务数据备份。数据库维护细节以 `supabase/README.md` 为准。
 
 ## 8. UI 修改协议
 
@@ -184,21 +217,50 @@ Provider 仍使用旧内部命名和 `/data/couple-data.json` 兼容请求；`pr
 - fallback 必须有明确“官方组件无法承载”的理由；
 - CSS 主要负责布局、safe-area、业务专有可视化，不重画官方 primitive。
 
+### 当前主导航约束
+
+底部主导航当前固定为：
+
+```text
+今日 / 地图 / 兑换 / 小窝
+```
+
+饮食功能当前属于 `#today` notice-board，并使用 `AppSectionPanel` 承载。普通营养功能迭代**不得因为模块变多就擅自增加第五个 Tab**。
+
+只有用户明确要求信息架构调整，或现有场景经产品审查确认无法承载时，才重新设计主导航。
+
+### 当前饮食 UI 视觉组合
+
+优先延续：
+
+```text
+AppSectionPanel
+AppCard
+AppButton
+AppInput
+AppTextarea
+AppModal
+AppRoleAvatar
+animal-island-ui Title
+```
+
 大型视觉变更才需要重新做 UI audit；普通功能不要启动旧 migration phase/checkpoint 流程。
 
 ## 9. Provider 与 storage 协议
 
-`HomeResourcesProvider` 是编排器，不是规则容器。
+`HomeResourcesProvider` 是**游戏**编排器，不是所有新领域的全局状态容器。
 
-业务快照通过 `AppDataStore` 读写。
+业务游戏快照通过 `AppDataStore` 读写。
 
 当前 Provider / DataManagement 对同步元数据、同步密码的 localStorage/sessionStorage 直接访问属于兼容债务；新功能不要复制这种模式。
+
+饮食 UI 当前直接通过 meal API 读取 Supabase，不应为了“统一状态”把 meals 再塞入 HomeResourcesProvider/localStorage snapshot。
 
 如果 Provider 改动 > 约 50 行，优先拆到：
 
 ```text
 lib/home service
-lib/nutrition service
+lib/nutrition service / browser client
 lib/server
 独立 browser client/service
 ```
@@ -212,8 +274,8 @@ lib/server
 | snapshot / import / sync | 对应 tests + build |
 | API TypeScript | build + auth/error path |
 | Supabase RPC | DB CRUD smoke + permission check + cleanup |
-| nutrition validation | `tests/nutrition` + build |
-| UI | lint/build + 关键移动端交互 smoke |
+| nutrition validation/client | `tests/nutrition` + build |
+| UI | test/lint/build；条件允许时做关键移动端交互 smoke |
 | production sync | Vercel READY + 真实读取/写入证据 |
 
 能运行时，提交前执行：
@@ -226,6 +288,8 @@ npm run build
 
 无法运行某项时必须明确说明，不得写“已验证”。
 
+**Test/Lint/Build 通过不等于视觉已验证。** 如果没有真实浏览器/手机视觉检查，完成说明必须明确这一点。
+
 ## 11. 文档同步协议
 
 长期主文档只有 `docs/README.md` 索引中的文件。
@@ -234,7 +298,7 @@ npm run build
 
 1. `CHANGELOG.md` 记完成事实；
 2. `docs/09-status-roadmap.md` 移动状态；
-3. 接口 / schema / 规则 / 安全 / UI 发生变化时更新对应主文档；
+3. 接口 / schema / 规则 / 安全 / UI / 架构发生变化时更新对应主文档；
 4. 不新增长期 `*-after-refactor.md` / `*-migration-report.md` / `*-audit.md`。
 
 ## 12. 完成前检查
@@ -247,9 +311,12 @@ npm run build
 [ ] 没有凭 legacy 变量名误改 currency
 [ ] 多表写入考虑事务
 [ ] 派生数据可以从事实重算
+[ ] UI 延续现有 App* / animal-island-ui 体系
+[ ] 未擅自改变四 Tab 主导航
 [ ] 必需测试已补
 [ ] 文档状态已同步
 [ ] 测试 / lint / build 的真实执行情况已说明
+[ ] 未把 CI 通过误写成“视觉已验证”
 ```
 
 ## 13. 输出格式
