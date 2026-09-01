@@ -16,7 +16,7 @@
 + 营养后端第一阶段
 ```
 
-当前主动暂停新功能开发，先完成文档 / Skill / 项目治理。本次治理完成后再恢复功能开发。
+2026-09-01 的项目治理与工程基线整理已经完成，可以恢复业务功能开发。
 
 ## 2. 功能进度
 
@@ -28,24 +28,27 @@
 | 月度成长地图 | ✅ 完成 | 周六到周五，跨月真实记录 |
 | 成长日志 | ✅ 完成 | 查看和管理历史 |
 | 兑换商店 | ✅ 完成 | 分类、兑换、历史记录 |
-| JSON 备份 / 恢复 | ✅ 完成 | schemaVersion 1 兼容 |
+| JSON 备份 / 恢复 | ✅ 完成 | schemaVersion 1 + currency semantics 兼容 |
 | 周复盘 CSV | ✅ 完成 | 只导出 |
 | animal-island-ui 视觉体系 | ✅ 完成 | App* wrapper 已建立 |
-| Supabase 规范化游戏 schema | ✅ 生产可用 | 迁移 SQL 版本控制待回填 |
+| Supabase 规范化 schema | ✅ 完成 | 12 条 production migration 已回填 Git |
+| Supabase schema 版本管理 | ✅ 完成 | `supabase/migrations/` 为结构变更历史 |
 | 游戏云端读取 / 写入 | ✅ 完成 | Supabase-only 主路径 |
 | 新设备首次连接保护 | ✅ 完成 | download-before-write |
 | 公开 GitHub JSON 退出 | ✅ 当前代码完成 | GitHub cached view 清理待 Support |
 | Nutrition schema | ✅ 完成 | meals/items/foods/aliases |
 | Meal CRUD API | ✅ 完成 | transaction RPC，已 smoke test |
-| Meal Web UI | ⏳ 未开始 | 下一业务功能 |
+| Meal Web UI | ⏳ 未开始 | 当前下一业务功能 |
 | ChatGPT “记上”持久化流程 | ⏳ 未开始 | 需以明确确认触发 |
 | Weight schema | ✅ 完成 | `weight_measurements` 已存在 |
-| Weight API / trend UI | ⏳ 未开始 | 之后开发 |
+| Weight API / trend UI | ⏳ 未开始 | 饮食流程之后开发 |
 | Goal period schema | ✅ 完成 | UI 未实现 |
 | 完整用户账号 / membership | ⏳ Later | 当前只共享密码/session |
 | Server-authoritative 游戏结算 | ⏳ Later | 当前服务端保存兼容快照，不独立重算规则 |
 
-## 3. 本次治理完成项
+## 3. 2026-09-01 治理与 P0 完成项
+
+### 文档 / AI 规则
 
 - [x] 重写 README，使项目当前架构一眼可见。
 - [x] 重写 AGENTS / CLAUDE，移除“无后端/无数据库”旧假设。
@@ -55,57 +58,83 @@
 - [x] 把 live Supabase、Meal API、云端同步安全写入主文档。
 - [x] 校正恢复奖励、heatmap、currency semantics 等旧文档错误。
 
-## 4. P0 — 恢复功能开发前先做
+### Supabase 可重建性
 
-### 4.1 回填 Supabase migrations
+- [x] 从 production `supabase_migrations.schema_migrations` 恢复原始 migration SQL。
+- [x] 建立 `supabase/migrations/`，按原 version / name 保存 12 条 migration。
+- [x] 建立 `supabase/README.md`，明确 migration、RLS、secret 与重建规则。
+- [x] 验证当前 production 公共业务表均启用 RLS。
+- [x] 验证当前没有向 `anon` / `authenticated` 开放业务 policy。
+- [x] 验证当前业务 RPC 只授权服务端 `service_role`。
+- [x] 确认 `coin_deficit_streak_days` 已通过历史 migration 从初始默认 7 修正为 5；当前 production default 也是 5。
 
-当前 production schema 可用，但仓库不能完整从空库复现早期 schema/RPC。
+注意：migration 负责数据库结构，不包含当前真实情侣业务数据。结构可重建不等于 production 数据备份。
 
-目标：
+### 工程 baseline
 
-```text
-建立 supabase/migrations（或明确等价目录）
--> 回填当前 production schema/functions/grants
--> 后续所有 DDL 版本化
-```
-
-这是当前最重要的工程治理技术债。
-
-### 4.2 修正 schema default drift
-
-当前：
+GitHub Actions 已建立：
 
 ```text
-代码/production config deficitStreakDays = 5
-DB column default = 7
-```
-
-应通过 migration 统一为 5，避免未来新 CoupleSpace 默认规则漂移。
-
-### 4.3 建立当前 baseline 验证
-
-在继续功能前跑一次完整：
-
-```bash
 npm run test
 npm run lint
 npm run build
 ```
 
-记录已知失败（如果有），避免后续把历史问题误判为新功能回归。
+基线检查结果：
 
-## 5. P1 — 今日饮食 UI
+```text
+Test  ✅
+Lint  ✅
+Build ✅
+```
 
-目标：
+期间发现并修复一个旧兑换记录兜底时间的跨时区测试问题：缺失时间不再使用会被本地时区转换的 `...Z` UTC 占位，而使用确定的本地 `1970-01-01T00:00` 占位。正常有时间的兑换记录不受影响。
 
-- 按 fish/cat + 日期显示早餐/午餐/晚餐/加餐；
-- 每餐显示 estimate 和区间，如 `520 kcal（480–570）`；
-- 展开显示 food items；
-- Web 手动新增 / 编辑 / 删除；
-- 使用现有 `/api/meals`，不新造第二套数据结构；
-- 移动端风格与当前 animal-island-ui 一致。
+## 4. P1 — 今日饮食 UI（当前下一步）
 
-## 6. P2 — ChatGPT “记上”流程
+目标：让已经完成的 Meal backend 真正可在 Web 中使用。
+
+### 4.1 首版范围
+
+- 按日期查看当天饮食；
+- fish / cat 明确分开；
+- 显示早餐、午餐、晚餐、加餐、其他；
+- 每餐显示中心估算与区间，如 `520 kcal（480–570）`；
+- 展开查看 food items；
+- 手动新增餐食；
+- 编辑已有餐食；
+- 删除餐食；
+- 使用现有 `/api/meals` 和 `/api/meals/[id]`，不造第二套数据结构；
+- 移动端风格保持当前 animal-island-ui / App* wrapper 体系。
+
+### 4.2 数据边界
+
+饮食 UI 只操作：
+
+```text
+meals
+meal_items
+必要时 foods / food_aliases
+```
+
+不得：
+
+```text
+根据 intake 自动覆盖 deficit
+直接改 daily_record_sides.deficit_kcal
+直接改 wallet / gems / coins
+把体重写进 meal
+```
+
+### 4.3 首版暂不做
+
+- 自动根据餐食计算游戏 deficit；
+- 自动奖励金币/宝石；
+- 完整食物数据库管理后台；
+- 用户账号体系；
+- 复杂营养推荐算法。
+
+## 5. P2 — ChatGPT “记上”流程
 
 目标行为：
 
@@ -126,7 +155,7 @@ npm run build
 - 不碰游戏钱包；
 - 重试不重复建餐。
 
-## 7. P3 — 体重趋势
+## 6. P3 — 体重趋势
 
 目标：
 
@@ -136,7 +165,7 @@ npm run build
 - 旧每日打卡 weight snapshot 与 measurement 的事务性关联；
 - 后续 daily overview 使用真实 measurement summary。
 
-## 8. P4 — 统一每日总览
+## 7. P4 — 统一每日总览
 
 基于已有 views：
 
@@ -156,7 +185,7 @@ partner_daily_overview
 
 四个域并列展示，但不互相偷偷改值。
 
-## 9. P5 / Later — 架构强化
+## 8. P5 / Later — 架构强化
 
 ### 游戏结算服务端权威化
 
@@ -184,7 +213,7 @@ partner_daily_overview
 
 不要在业务功能中顺手做这些迁移。
 
-## 10. 外部事项
+## 9. 外部事项
 
 ### GitHub cached views
 
@@ -195,20 +224,18 @@ GitHub Support `Clear Cached Views` 工单已创建。等待平台完成后：
 3. 记录完成时间到 CHANGELOG；
 4. 再评估是否还有 Vercel 历史 deployment 残留。
 
-## 11. “下一步是什么”的简单答案
+## 10. “下一步是什么”的简单答案
 
-在当前文档治理提交后：
+当前 P0 已完成：
 
 ```text
-P0：把 Supabase schema/RPC migration 正式纳入仓库
+P1：今日饮食 UI
 ↓
-跑完整 baseline test/lint/build
-↓
-P1：开发今日饮食 UI
-↓
-P2：接 ChatGPT “记上”
+P2：ChatGPT “记上”
 ↓
 P3：体重趋势
+↓
+P4：统一每日总览
 ```
 
 除非用户改变优先级，以这个顺序推进。
