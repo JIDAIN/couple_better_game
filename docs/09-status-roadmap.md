@@ -1,6 +1,6 @@
 # 当前状态与 Roadmap
 
-**状态日期：2026-09-01**
+**状态日期：2026-09-02**
 
 这份文件是“现在做到哪一步、下一步做什么”的唯一主状态页。
 
@@ -15,9 +15,10 @@
 + Next.js 安全 API
 + 营养后端
 + 今日饮食 Web UI
++ ChatGPT 明确确认后的餐食持久化
 ```
 
-2026-09-01 的项目治理、P0 工程基线和 P1 饮食 Web 首版已经完成。当前下一阶段是 **P2：ChatGPT “记上”持久化流程**。
+P0 工程治理、P1 饮食 Web 首版和 **P2 ChatGPT “记上”持久化流程**已经完成。当前下一阶段是 **P3：体重趋势**。
 
 ## 2. 功能进度
 
@@ -32,7 +33,7 @@
 | JSON 备份 / 恢复 | ✅ 完成 | schemaVersion 1 + currency semantics 兼容 |
 | 周复盘 CSV | ✅ 完成 | 只导出 |
 | animal-island-ui 视觉体系 | ✅ 完成 | App* wrapper 已建立并持续维护 |
-| Supabase 规范化 schema | ✅ 完成 | 12 条 production migration 已回填 Git |
+| Supabase 规范化 schema | ✅ 完成 | production migration 已回填并继续版本化 |
 | Supabase schema 版本管理 | ✅ 完成 | `supabase/migrations/` 为结构变更历史 |
 | 游戏云端读取 / 写入 | ✅ 完成 | Supabase-only 主路径 |
 | 新设备首次连接保护 | ✅ 完成 | download-before-write |
@@ -40,9 +41,9 @@
 | Nutrition schema | ✅ 完成 | meals/items/foods/aliases |
 | Meal CRUD API | ✅ 完成 | transaction RPC，已 smoke test |
 | Meal Web UI | ✅ 完成 | 今日公告板内按日期/角色 CRUD + 明细 |
-| ChatGPT “记上”持久化流程 | ⏳ 当前下一步 | 需以明确确认触发 |
+| ChatGPT “记上”持久化流程 | ✅ 完成 | explicit confirm + service-only RPC + idempotency + read-back |
 | Weight schema | ✅ 完成 | `weight_measurements` 已存在 |
-| Weight API / trend UI | ⏳ 未开始 | ChatGPT 饮食流程之后开发 |
+| Weight API / trend UI | ⏳ 当前下一步 | P3 |
 | Goal period schema | ✅ 完成 | UI 未实现 |
 | 完整用户账号 / membership | ⏳ Later | 当前只共享密码/session |
 | Server-authoritative 游戏结算 | ⏳ Later | 当前服务端保存兼容快照，不独立重算规则 |
@@ -62,7 +63,7 @@
 ### Supabase 可重建性
 
 - [x] 从 production `supabase_migrations.schema_migrations` 恢复原始 migration SQL。
-- [x] 建立 `supabase/migrations/`，按原 version / name 保存 12 条 migration。
+- [x] 建立 `supabase/migrations/`，按原 version / name 保存历史 migration。
 - [x] 建立 `supabase/README.md`，明确 migration、RLS、secret 与重建规则。
 - [x] 验证当前 production 公共业务表均启用 RLS。
 - [x] 验证当前没有向 `anon` / `authenticated` 开放业务 policy。
@@ -110,7 +111,7 @@ Build ✅
 - [x] 按日期查看当天饮食；
 - [x] fish / cat 明确切换；
 - [x] 显示早餐、午餐、晚餐、加餐、其他；
-- [x] 每餐显示中心估算与可用区间，如 `520 kcal（480–570）`；
+- [x] 每餐显示中心估算与可用区间；
 - [x] 展开查看 food items；
 - [x] 显示已有 optional macro 信息；
 - [x] 当天餐数 + kcal 合计；
@@ -120,7 +121,7 @@ Build ✅
 - [x] loading / empty / unauthorized / retry / toast 状态；
 - [x] 使用现有 `/api/meals` 和 `/api/meals/[id]`；
 - [x] 新增 `lib/nutrition/meal-client.ts`，浏览器只请求同源 Next.js API；
-- [x] 使用现有 `AppSectionPanel / AppCard / AppButton / AppInput / AppTextarea / AppModal / AppRoleAvatar`；
+- [x] 使用现有 App* / animal-island-ui 体系；
 - [x] 不引入第二套 UI primitive；
 - [x] 不把 intake 自动写入 deficit / wallet / heatmap。
 
@@ -145,39 +146,129 @@ Test / Lint / Build
 
 UI 实际观感仍应在真实手机/浏览器上人工检查。没有做过真实视觉检查时，不把“CI 通过”等同于“视觉已验证”。
 
-## 5. P2 — ChatGPT “记上”流程（当前下一步）
+## 5. P2 — ChatGPT “记上”流程（已完成）
 
-目标行为：
+### 5.1 最终调用路径
+
+没有新增公开写 API，也没有把 Supabase secret / 同步密码复制进聊天。
+
+当前路径：
 
 ```text
-发食物图片/描述
--> ChatGPT 讨论估算
--> 用户修正
--> 用户明确“记上”
--> 构造 source=chatgpt meal payload
--> 带 idempotency key 写入
--> 成功后可查询确认
--> 今日饮食 UI 自动能看到同一条 meal 数据
+食物图片 / 描述
+-> ChatGPT 讨论、估算、修正
+-> 用户明确“记上”或等价保存意图
+-> 已授权 Supabase 连接能力
+-> create_chatgpt_meal_record
+-> existing create_meal_record
+-> meals + meal_items
+-> get_chatgpt_meal_record read-back
+-> 今日饮食 UI 读取同一条数据
 ```
 
-铁律：
+### 5.2 确认边界
 
-- 未确认不写；
-- 不把 intake 写成 deficit；
-- 不碰游戏钱包；
-- 重试不重复建餐；
-- 复用现有 `meals / meal_items` 和 meal API/RPC，不建立 AI 专用第二套表；
-- fish 对应当前用户饮食聊天，cat 对应伴侣专用饮食聊天时必须明确上下文映射。
+- [x] 估算、讨论、修正不写；
+- [x] 只有明确保存意图才创建 meal；
+- [x] 已保存后普通补充事实不自动覆盖；
+- [x] 保存成功后才向用户确认“已记上”；
+- [x] 不自动导入历史聊天中的旧估算。
 
-### P2 实施前要先明确
+### 5.3 幂等与失败恢复
 
-- ChatGPT 到 meal API 的授权/调用入口；
-- idempotency key 生成规则；
-- “记上”确认边界和修改后再确认的行为；
-- 写入成功后的查询验证和失败反馈；
-- 不把聊天中的临时估算、历史讨论自动导入。
+一次保存确认只生成一个：
 
-## 6. P3 — 体重趋势
+```text
+chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
+```
+
+- [x] key 最长 200；
+- [x] DB wrapper 强制 `chatgpt:` 前缀；
+- [x] 同 key 使用 transaction advisory lock；
+- [x] 继续复用 meals 唯一 idempotency index；
+- [x] 重试必须复用同 key；
+- [x] 结果不确定时先 `get_chatgpt_meal_record` 查询，再决定是否重试。
+
+### 5.4 ChatGPT 专用安全 wrapper
+
+production migration：
+
+```text
+20260901162337_add_chatgpt_meal_persistence_rpc.sql
+```
+
+新增：
+
+```text
+create_chatgpt_meal_record
+auto -> source=chatgpt
+auto -> status=confirmed
+item validation
+item total reconciliation
+idempotency lock
+
+get_chatgpt_meal_record
+-> 按 chatgpt idempotency key 读回确认
+```
+
+没有新增 AI 专用数据表，最终仍写现有 `meals / meal_items`。
+
+### 5.5 角色映射
+
+当前约定：
+
+```text
+用户自己的饮食聊天 -> fish
+伴侣专用饮食聊天   -> cat
+```
+
+上下文不明确时禁止猜测后写入。
+
+### 5.6 数据域边界
+
+P2 只写 intake：
+
+```text
+meals / meal_items
+```
+
+不会自动改：
+
+```text
+deficit
+exercise
+weight
+wallet / ledger
+coin / gem
+heatmap
+```
+
+### 5.7 验证
+
+production smoke test 已完成并清理：
+
+```text
+create temporary meal                  ✅
+source forced to chatgpt               ✅
+status forced to confirmed             ✅
+same idempotency key returns same ID   ✅
+get-by-key read-back                    ✅
+service_role execute                    ✅
+anon execute                            ❌
+authenticated execute                   ❌
+smoke meal hard-deleted                 ✅ remaining = 0
+```
+
+代码侧增加：
+
+```text
+lib/nutrition/chatgpt-meal-protocol.ts
+tests/nutrition/chatgpt-meal-protocol.test.ts
+```
+
+用于固化 payload、`chatgpt:` key 和 item-total 约束。
+
+## 6. P3 — 体重趋势（当前下一步）
 
 目标：
 
@@ -185,7 +276,8 @@ UI 实际观感仍应在真实手机/浏览器上人工检查。没有做过真�
 - 当前体重和趋势折线；
 - 同日多次测量策略；
 - 旧每日打卡 weight snapshot 与 measurement 的事务性关联；
-- 后续 daily overview 使用真实 measurement summary。
+- 后续 daily overview 使用真实 measurement summary；
+- UI 继续复用现有动森感 App* 体系，不因新增趋势图重做主导航。
 
 ## 7. P4 — 统一每日总览
 
@@ -253,10 +345,9 @@ GitHub Support `Clear Cached Views` 工单已创建。等待平台完成后：
 ```text
 P0 工程治理        ✅
 P1 今日饮食 UI     ✅
+P2 ChatGPT “记上”  ✅
 ↓
-P2 ChatGPT “记上”  当前下一步
-↓
-P3 体重趋势
+P3 体重趋势        当前下一步
 ↓
 P4 统一每日总览
 ```
