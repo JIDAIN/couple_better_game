@@ -47,9 +47,14 @@ AppBottomNavItem
 AppHeatmapMarker
 ```
 
-### `components/home/*`
+### 业务 UI
 
-业务 UI。优先组合 wrapper，不要在这里重新造一整套 primitive。
+```text
+components/home/*       游戏 UI
+components/nutrition/*  饮食 UI
+```
+
+业务层优先组合 wrapper，不要在这里重新造一整套 primitive。
 
 ## 3. 使用优先级
 
@@ -117,7 +122,55 @@ node_modules/animal-island-ui/dist/types/index.d.ts
 
 场景是视觉组织方式，不改变业务组件边界。
 
-## 7. 移动端优先
+### 主导航稳定性
+
+当前主导航固定为四个 Tab：
+
+```text
+今日 / 地图 / 兑换 / 小窝
+```
+
+一般业务扩展应先判断能否自然落入现有场景，不要为一个新模块立即增加新的底部 Tab。
+
+只有明确的产品级信息架构改版，才重新评估主导航。
+
+## 7. 当前饮食 UI 约定
+
+P1 饮食 UI 已落在现有 `#today` notice-board，不新造“营养中心”页面：
+
+```text
+今日 notice-board
+└─ AppSectionPanel「饮食小记」
+   ├─ 日期
+   ├─ fish / cat 角色切换
+   ├─ 当天 kcal / 餐数
+   ├─ AppCard 餐食记录
+   └─ AppModal 新增 / 编辑 / 删除确认
+```
+
+实现使用：
+
+```text
+AppSectionPanel
+AppCard
+AppButton
+AppInput
+AppTextarea
+AppModal
+AppRoleAvatar
+animal-island-ui Title
+```
+
+### 饮食 UI 不允许做的事
+
+- 为饮食单独创造一套与当前项目不同的色板、卡片、按钮、弹窗；
+- 因为“营养功能很多”就擅自添加第五个底部 Tab；
+- 用真实摄入的视觉文案暗示它会自动修改游戏 deficit；
+- 把 ChatGPT 来源记录做成另一套 UI / 数据结构。
+
+如果未来饮食功能明显超过今日公告板可承载范围，应先更新产品信息架构文档，再做页面迁移，而不是边开发边改导航。
+
+## 8. 移动端优先
 
 主要使用环境是手机浏览器，因此新增 UI 需要重点检查：
 
@@ -129,7 +182,9 @@ node_modules/animal-island-ui/dist/types/index.d.ts
 - 数字列 tabular / 不抖动；
 - loading / disabled / error 有可见状态。
 
-## 8. 热力图日期视觉
+饮食首版已经采用窄屏两列/按钮网格、可滚动 AppModal、tabular kcal 和 loading/empty/error 状态；后续修改不能破坏这些基础可用性。
+
+## 9. 热力图日期视觉
 
 成长地图：
 
@@ -140,7 +195,7 @@ node_modules/animal-island-ui/dist/types/index.d.ts
 - 不显示左侧“第 N 周”标签；
 - 改热力图布局不能顺手改变金币/宝石业务周规则。
 
-## 9. 资源 UI
+## 10. 资源 UI
 
 当前 currency semantics v2 下：
 
@@ -149,7 +204,32 @@ node_modules/animal-island-ui/dist/types/index.d.ts
 
 业务 UI 必须通过语义明确的 label / icon 展示。由于底层仍有 legacy 字段名，页面不要直接用变量英文名当中文文案。
 
-## 10. 维护原则
+饮食 kcal 不是 coin/gem，也不能复用资源奖励语义做展示。
+
+## 11. 视觉变更验证
+
+代码层最低要求：
+
+```text
+npm run test
+npm run lint
+npm run build
+```
+
+但这三项只能说明代码层通过，**不能代替真实视觉检查**。
+
+涉及布局、Modal、移动端可用性的改动，在条件允许时还应人工检查：
+
+- 常用手机窄屏；
+- 长食物名 / 长备注；
+- 多个 food items；
+- loading / empty / error；
+- 弹窗滚动与底部按钮；
+- 底部导航遮挡。
+
+未进行真实设备/浏览器视觉检查时，不要在文档或完成说明中写“视觉已验证”。
+
+## 12. 维护原则
 
 旧的：
 
