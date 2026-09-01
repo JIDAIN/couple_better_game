@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore, useState } from "react";
 import { useHomeResources, type DailyRecord } from "./HomeResourcesProvider";
@@ -14,6 +14,7 @@ import { GameTitle } from "./GameTitle";
 import { GrowthLog, GrowthLogLedgerRow, GrowthRecordDetailModal } from "./GrowthLog";
 import { HomeResourcesProvider } from "./HomeResourcesProvider";
 import { RecordTodayButton } from "./RecordTodayButton";
+import { DailyMealsPanel } from "../nutrition/DailyMealsPanel";
 import {
   AppBottomNavItem,
   AppButton,
@@ -444,6 +445,7 @@ export function HomeScreen() {
                 </div>
                 <CoupleGrowthPanel />
                 <EncouragementQuote />
+                <DailyMealsPanel />
               </AppSceneBoard>
             ) : activeTab === "map" ? (
               <AppSceneBoard scene="growth-map">
@@ -506,4 +508,3 @@ export function HomeScreen() {
     </HomeResourcesProvider>
   );
 }
-
