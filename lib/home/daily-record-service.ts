@@ -2,6 +2,7 @@ import { formatRecordDateFromIso, parseIsoDate, previousIsoDate, todayIsoDate } 
 import {
   buildHeatmapOverrides,
   findRecordByIso,
+  hasMeaningfulDailyInput,
   normalizeHistoricalSideInput,
   orderDailyRecords,
   recordGems,
@@ -246,11 +247,29 @@ export function upsertDailyRecordInState(
 
   const deduped = dedupeRecordsByRecordDate(state.dailyRecords);
   const existing = findRecordByIso(deduped, recordDate);
+
+  const normalizedFish = normalizeHistoricalSideInput(fishInput) ?? zeroSide();
+  const normalizedCat = normalizeHistoricalSideInput(catInput) ?? zeroSide();
+
+  if (!hasMeaningfulDailyInput(normalizedFish, normalizedCat)) {
+    if (existing) {
+      const nextRecords = deduped.filter((item) => item.id !== existing.id);
+      return {
+        result: { ok: true, updatedExisting: false },
+        state: rebuildDailyRecordDerivedState(state, nextRecords),
+      };
+    }
+    return {
+      result: { ok: true, updatedExisting: false },
+      state,
+    };
+  }
+
   const record = buildDailyRecordForDate(
     { ...state, dailyRecords: deduped },
     recordDate,
-    normalizeHistoricalSideInput(fishInput) ?? zeroSide(),
-    normalizeHistoricalSideInput(catInput) ?? zeroSide(),
+    normalizedFish,
+    normalizedCat,
     existing,
   );
   if (!record) {

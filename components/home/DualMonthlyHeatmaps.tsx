@@ -10,6 +10,7 @@ import { HeatmapLegend } from "./HeatmapLegend";
 import { PlayerHeatmap } from "./PlayerHeatmap";
 import { useHomeResources } from "./HomeResourcesProvider";
 import type { HeatmapDay } from "./types";
+import { AppButton, AppInput } from "../ui";
 
 function lastDateOfMonth(date: Date) {
   const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
@@ -92,7 +93,7 @@ export function DualMonthlyHeatmaps() {
 
   return (
     <section
-      className="ui-card-hero ui-card-main relative w-full overflow-hidden sm:p-5"
+      className="app-card--hero app-card--main relative w-full overflow-hidden sm:p-5"
       aria-label="当月成就"
     >
       <div
@@ -105,27 +106,27 @@ export function DualMonthlyHeatmaps() {
       />
 
       <div className="relative mx-auto max-w-[28rem]">
-        <div className="ui-soft-panel ui-card-main text-center sm:px-5">
+        <div className="app-card--panel app-card--main text-center sm:px-5">
           <div className="flex items-center justify-between gap-2">
-            <button
+            <AppButton
               type="button"
               onClick={handlePrevMonth}
-              className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
+              className="app-button--ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
               aria-label="查看上个月"
             >
               ←
-            </button>
+            </AppButton>
             <h2 className="text-[1rem] font-bold tracking-tight ui-text-main sm:text-[1.08rem]">
               {monthLabel} · 成长地图
             </h2>
-            <button
+            <AppButton
               type="button"
               onClick={handleNextMonth}
-              className="ui-button-ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
+              className="app-button--ghost inline-flex h-8 w-8 items-center justify-center text-sm font-bold"
               aria-label="查看下个月"
             >
               →
-            </button>
+            </AppButton>
           </div>
           <p className="mt-2 text-[13px] font-semibold ui-text-primary sm:text-[14px]">
             本周已坚持 {weeklySuccessDays} 天 🌟
@@ -133,17 +134,17 @@ export function DualMonthlyHeatmaps() {
         </div>
       </div>
 
-      <div className="ui-soft-panel ui-card-compact relative mt-3">
+      <div className="app-card--panel app-card--compact relative mt-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold ui-text-muted">作战开始日</p>
           </div>
-          <input
+          <AppInput
             type="date"
             value={visibleStartDate}
             max={monthEndDate}
             onChange={(event) => updateHeatmapStartDate(event.target.value)}
-            className="ui-input w-[8.7rem] shrink-0 px-2.5 py-2 text-xs font-semibold outline-none transition"
+            className="app-input w-[8.7rem] shrink-0 px-2.5 py-2 text-xs font-semibold outline-none transition"
           />
         </div>
       </div>
@@ -163,7 +164,7 @@ export function DualMonthlyHeatmaps() {
         />
       </div>
 
-      <div className="ui-card-soft ui-card-compact relative mt-3.5">
+      <div className="app-card--soft app-card--compact relative mt-3.5">
         <HeatmapLegend />
       </div>
     </section>

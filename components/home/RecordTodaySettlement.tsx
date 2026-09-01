@@ -13,6 +13,8 @@ import {
   parseOptionalWeight,
   type SideLogInput,
 } from "./settlement-rules";
+import { yesterdayIsoDate } from "@/lib/home/date-utils";
+import { AppButton, AppInput, AppToast } from "../ui";
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
@@ -122,8 +124,8 @@ function CompactField({
   return (
     <label className="compact-field">
       <span className="compact-field-label">{label}</span>
-      <div className="compact-field-input">
-        <input
+      <div className="app-compact-control">
+        <AppInput
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
@@ -155,12 +157,12 @@ function PartnerColumn({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="growth-partner-form ui-soft-panel ui-card-item flex min-w-0 flex-col">
+    <div className="growth-partner-form app-card--panel app-card--item flex min-w-0 flex-col">
       <p className="text-[11px] font-bold ui-text-main">
         <span aria-hidden>{emoji}</span> {title}
       </p>
       <CompactField
-        label="今日体重"
+        label="体重"
         value={weight}
         onChange={setWeight}
         inputMode="decimal"
@@ -193,16 +195,17 @@ type RecordTodaySettlementProps = {
 export function RecordTodaySettlement({
   buttonVariant = "full",
 }: RecordTodaySettlementProps) {
-  const { coinRules, dailyRecords, upsertDailyRecord, visualRules } =
+  const { coinRules, dailyRecords, deleteDailyRecord, upsertDailyRecord, visualRules } =
     useHomeResources();
   const [open, setOpen] = useState(false);
   const [entered, setEntered] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const titleId = useId();
 
-  // Must not freeze at mount: long sessions and cross-midnight need a fresh "today".
+  // Must not freeze at mount: long sessions and cross-midnight need a fresh value.
   const todayDate = getCurrentIsoDate();
-  const [recordDate, setRecordDate] = useState(todayDate);
+  const yesterdayDate = yesterdayIsoDate();
+  const [recordDate, setRecordDate] = useState(yesterdayDate);
   const [fishW, setFishW] = useState("");
   const [fishD, setFishD] = useState("0");
   const [fishM, setFishM] = useState("0");
@@ -227,13 +230,13 @@ export function RecordTodaySettlement({
   }, []);
 
   const openSheet = useCallback(() => {
-    const date = todayDate;
+    const date = yesterdayDate;
     const record =
       dailyRecords.find((item) => recordIsoDate(item) === date) ?? null;
     setRecordDate(date);
     hydrateInputs(record);
     setOpen(true);
-  }, [dailyRecords, hydrateInputs, todayDate]);
+  }, [dailyRecords, hydrateInputs, yesterdayDate]);
 
   const fishInput: SideLogInput = useMemo(
     () => ({
@@ -379,7 +382,19 @@ export function RecordTodaySettlement({
   }, [toast]);
 
   const onConfirm = useCallback(() => {
-    if (!hasAnyEffort || recordDay == null) return;
+    if (recordDay == null) return;
+
+    if (!hasAnyEffort) {
+      if (existingRecord) {
+        deleteDailyRecord(recordDate);
+        setOpen(false);
+        setToast("这一天的记录已清空");
+      } else {
+        setOpen(false);
+      }
+      return;
+    }
+
     const result = upsertDailyRecord(recordDate, fishInput, catInput);
     if (!result.ok) {
       setToast(
@@ -389,49 +404,54 @@ export function RecordTodaySettlement({
     }
     setOpen(false);
     setToast(
-      recordDate === todayDate
-        ? "今天已经存好啦，明天继续并肩"
-        : result.updatedExisting
-          ? "这一天已经更新完成"
-          : "这一天已经补录完成",
+      recordDate === yesterdayDate
+        ? "昨天已经存好啦，今天继续并肩"
+        : recordDate === todayDate
+          ? "今天已经存好啦，明天继续并肩"
+          : result.updatedExisting
+            ? "这一天已经更新完成"
+            : "这一天已经补录完成",
     );
   }, [
     catInput,
+    existingRecord,
     fishInput,
     hasAnyEffort,
+    deleteDailyRecord,
     recordDate,
     recordDay,
     todayDate,
+    yesterdayDate,
     upsertDailyRecord,
   ]);
 
-  const buttonLabel = buttonVariant === "history" ? "补录记录" : "记录今天";
+  const buttonLabel = buttonVariant === "history" ? "补录记录" : "记录昨日";
 
   return (
     <>
       <div className="space-y-2 pt-1">
-        <button
+        <AppButton
           type="button"
           onClick={openSheet}
           className={
             buttonVariant === "history"
-              ? "ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
-              : "ui-button-primary relative w-full overflow-hidden px-6 py-3.5 text-base font-semibold text-white will-change-transform sm:py-4"
+              ? "app-button--nav inline-flex w-full whitespace-nowrap text-sm"
+              : "app-button--primary relative w-full overflow-hidden px-6 py-3.5 text-base font-semibold text-white will-change-transform sm:py-4"
           }
         >
           <span className="relative flex items-center justify-center gap-2 drop-shadow-sm">
             {buttonVariant === "history" ? <span aria-hidden>📝</span> : null}
             {buttonLabel}
           </span>
-        </button>
+        </AppButton>
       </div>
 
       {open ? (
         <div className="fixed inset-0 z-[55] flex items-end justify-center p-3 sm:items-center">
-          <button
+          <AppButton
             type="button"
             aria-label="关闭"
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
+            className={`app-dialog-backdrop absolute inset-0 transition-opacity duration-300 ${
               entered ? "opacity-100" : "opacity-0"
             }`}
             onClick={() => setOpen(false)}
@@ -440,28 +460,40 @@ export function RecordTodaySettlement({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`ui-sheet growth-record-day-sheet relative flex max-h-[min(92dvh,640px)] w-full max-w-lg flex-col overflow-hidden transition-all duration-300 ease-out ${
+            className={`app-dialog-shell growth-record-day-sheet relative flex max-h-[min(92dvh,640px)] w-full max-w-lg flex-col overflow-hidden transition-all duration-300 ease-out ${
               entered
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-6 opacity-0 sm:translate-y-0 sm:scale-95"
             }`}
           >
-            <div className="ui-modal-header shrink-0">
+            <div className="app-dialog-header shrink-0">
               <p className="text-[10px] font-bold tracking-[0.2em] ui-text-primary">
-                {recordDate === todayDate ? "今日收工啦" : "补录这一天"}
+                {recordDate === yesterdayDate
+                  ? "昨日收工啦"
+                  : recordDate === todayDate
+                    ? "今日收工啦"
+                    : "补录这一天"}
               </p>
               <h2 id={titleId} className="mt-1 text-lg font-bold ui-text-main">
-                {recordDate === todayDate ? "今天的小记录" : "保存这一天"}
+                {recordDate === yesterdayDate
+                  ? "昨天的小记录"
+                  : recordDate === todayDate
+                    ? "今天的小记录"
+                    : "保存这一天"}
               </h2>
               <p className="mt-1 text-xs font-medium ui-text-muted">
-                把今天轻轻存起来
+                {recordDate === yesterdayDate
+                  ? "把昨天轻轻存起来"
+                  : recordDate === todayDate
+                    ? "把今天轻轻存起来"
+                    : "把这一天轻轻存起来"}
               </p>
             </div>
 
-            <div className="ui-modal-body">
+            <div className="app-dialog-body">
               <label className="mb-3 block">
                 <span className="ui-field-label">记录日期</span>
-                <input
+                <AppInput
                   type="date"
                   value={recordDate}
                   max={todayDate}
@@ -474,7 +506,7 @@ export function RecordTodaySettlement({
                     setRecordDate(nextDate);
                     hydrateInputs(nextRecord);
                   }}
-                  className="ui-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
+                  className="app-input mt-1 w-full px-3 py-2.5 text-sm font-semibold outline-none"
                 />
               </label>
 
@@ -501,7 +533,7 @@ export function RecordTodaySettlement({
                 />
               </div>
 
-              <div className="ui-soft-panel ui-card-item mt-3">
+              <div className="app-card--panel app-card--item mt-3">
                 <p className="text-center text-[11px] font-bold ui-text-reward">
                   这一天的小奖励
                 </p>
@@ -509,7 +541,7 @@ export function RecordTodaySettlement({
                   <li className="growth-detail-extra-card">
                     <span className="flex items-center justify-between gap-2">
                       <span aria-hidden>🐟</span>
-                      <span className="tabular-nums ui-text-primary">
+                      <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
                         💎 +{preview.fg}
                       </span>
                     </span>
@@ -518,7 +550,7 @@ export function RecordTodaySettlement({
                   <li className="growth-detail-extra-card">
                     <span className="flex items-center justify-between gap-2">
                       <span aria-hidden>🐱</span>
-                      <span className="tabular-nums ui-text-primary">
+                      <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
                         💎 +{preview.cg}
                       </span>
                     </span>
@@ -526,25 +558,25 @@ export function RecordTodaySettlement({
                   </li>
                   <li className="growth-detail-extra-card">
                     <div className="growth-detail-extra-row">
-                      <span className="growth-detail-extra-title">🔥 一起加成</span>
+                      <span className="growth-detail-extra-title">🐟🐱</span>
                       {preview.couple.gems > 0 ? (
-                        <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
+                        <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
                           💎 +{preview.couple.gems}
                         </span>
                       ) : (
-                        <span className="growth-detail-extra-value growth-detail-extra-value--muted">
-                          未点亮
+                        <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
+                          💎 +0
                         </span>
                       )}
                     </div>
                     <p className="growth-detail-extra-hint">
-                      {preview.couple.gems > 0 ? "一起点亮" : "满 30 分钟时点亮"}
+                      {preview.couple.gems > 0 ? "一起点亮" : "一起运动 30min 点亮"}
                     </p>
                   </li>
                   <li className="growth-detail-extra-card">
                     <div className="growth-detail-extra-row">
                       <span className="growth-detail-extra-title">🪙 金币</span>
-                      <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
+                      <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward shrink-0 whitespace-nowrap">
                         {coinAmountLabel(preview.coin.delta)}
                       </span>
                     </div>
@@ -553,24 +585,30 @@ export function RecordTodaySettlement({
                 </ul>
               </div>
 
-              <div className="ui-modal-footer">
-                <button
+              <div className="app-dialog-footer">
+                <AppButton
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
+                  className="app-button--secondary flex-1 py-3 text-sm font-semibold"
                 >
                   下次再记
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="button"
                   disabled={
-                    !hasAnyEffort || recordDay == null || recordDate > todayDate
+                    (!hasAnyEffort && !existingRecord) || recordDay == null || recordDate > todayDate
                   }
                   onClick={onConfirm}
-                  className="ui-button-primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="app-button--primary flex-[1.35] py-3 text-sm font-semibold text-white transition enabled:active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {recordDate === todayDate ? "存好今天" : "保存这一天"}
-                </button>
+                  {!hasAnyEffort && existingRecord
+                    ? "清空记录"
+                    : recordDate === yesterdayDate
+                      ? "存好昨天"
+                      : recordDate === todayDate
+                        ? "存好今天"
+                        : "保存这一天"}
+                </AppButton>
               </div>
             </div>
           </div>
@@ -578,12 +616,12 @@ export function RecordTodaySettlement({
       ) : null}
 
       {toast ? (
-        <div
+        <AppToast
           role="status"
-          className="ui-dialog pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
+          className="app-dialog pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[60] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
         >
           {toast}
-        </div>
+        </AppToast>
       ) : null}
     </>
   );

@@ -22,6 +22,10 @@ export type HomeBackupJson = {
   visualRules: HomeResourcesState["visualRules"];
 };
 
+export type HomeSyncJson = Omit<HomeBackupJson, "exportedAt"> & {
+  updatedAt: string;
+};
+
 function stringOr(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
@@ -87,6 +91,28 @@ export function serializeHomeBackup(
   exportedAt?: string,
 ) {
   return JSON.stringify(buildHomeBackup(state, exportedAt), null, 2);
+}
+
+export function buildHomeSyncData(
+  state: HomeResourcesState,
+  updatedAt = new Date().toISOString(),
+): HomeSyncJson {
+  const { exportedAt: _exportedAt, ...backup } = buildHomeBackup(
+    state,
+    updatedAt,
+  );
+  void _exportedAt;
+  return {
+    ...backup,
+    updatedAt,
+  };
+}
+
+export function serializeHomeSyncData(
+  state: HomeResourcesState,
+  updatedAt?: string,
+) {
+  return JSON.stringify(buildHomeSyncData(state, updatedAt), null, 2);
 }
 
 function csvCell(value: string | number) {

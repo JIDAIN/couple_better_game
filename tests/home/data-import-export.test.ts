@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHomeBackup,
+  buildHomeSyncData,
   exportWeeklyReviewCsv,
   serializeHomeBackup,
 } from "../../lib/home/export-service";
@@ -146,6 +147,35 @@ describe("data import/export", () => {
       occurredAt: "1970-01-01T08:00",
     });
     expect(backup.exchangeRecords[0].date).toContain("08:00");
+  });
+
+  it("exports github sync json with updatedAt and exchange snapshots", () => {
+    const state = makeState({
+      exchangeRecords: [
+        {
+          id: "legacy-sync",
+          date: "",
+          createdAt: "",
+          occurredAt: "",
+          time: "",
+        } as ExchangeRecord,
+      ],
+    });
+
+    const data = buildHomeSyncData(state, "2026-05-18T10:00:00.000Z");
+
+    expect(data).toMatchObject({
+      schemaVersion: 1,
+      updatedAt: "2026-05-18T10:00:00.000Z",
+    });
+    expect("exportedAt" in data).toBe(false);
+    expect(data.exchangeRecords[0]).toMatchObject({
+      category: "未知兑换",
+      icon: "🎁",
+      resourceKind: "gem",
+      price: 0,
+      remark: "",
+    });
   });
 
   it("imports a complete backup and keeps exchange record snapshots", () => {

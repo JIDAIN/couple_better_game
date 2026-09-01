@@ -70,3 +70,30 @@ export function buildHeatmapOverrides(
     return acc;
   }, {});
 }
+
+export function hasMeaningfulDailyInput(
+  fish: { weightKg: number | null; deficit: number; minutes: number },
+  cat: { weightKg: number | null; deficit: number; minutes: number },
+): boolean {
+  return (
+    fish.deficit !== 0 ||
+    fish.minutes > 0 ||
+    fish.weightKg != null ||
+    cat.deficit !== 0 ||
+    cat.minutes > 0 ||
+    cat.weightKg != null
+  );
+}
+
+export function hasMeaningfulGrowthActivity(record: DailyRecord): boolean {
+  return (
+    record.fish.deficit !== 0 ||
+    record.cat.deficit !== 0 ||
+    record.fish.minutes > 0 ||
+    record.cat.minutes > 0 ||
+    record.fish.gems > 0 ||
+    record.cat.gems > 0 ||
+    record.bonus > 0 ||
+    record.coins > 0
+  );
+}

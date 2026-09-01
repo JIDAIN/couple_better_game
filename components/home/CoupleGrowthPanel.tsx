@@ -26,7 +26,7 @@ function StatBubble({
   const icon = resourceIcon(tone);
 
   return (
-    <div className={`ui-card-soft ui-card-item relative overflow-hidden ${toneRing}`}>
+    <div className={`app-card--soft app-card--item relative overflow-hidden ${toneRing}`}>
       <p className="text-[11px] font-semibold tracking-wide ui-text-muted">
         {label}
       </p>
@@ -50,7 +50,7 @@ function GemTreasureBar({
   const pct = Math.min(100, Math.round((current / max) * 100));
 
   return (
-    <div className="ui-card-soft ui-card-item ui-sparkle-card relative overflow-hidden">
+    <div className="app-card--soft app-card--item ui-sparkle-card relative overflow-hidden">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[13px] font-bold ui-text-main">💎 宝石小宝箱</span>
         <span suppressHydrationWarning className="text-[11px] font-semibold tabular-nums ui-text-muted">
@@ -88,7 +88,7 @@ export function CoupleGrowthPanel() {
 
   return (
     <section
-      className="ui-card ui-card-main animate-card-breathe sm:p-5"
+      className="app-card--default app-card--main animate-card-breathe sm:p-5"
       aria-label="情侣成长资源"
     >
       <div className="flex items-center justify-between gap-2">
@@ -117,7 +117,7 @@ export function CoupleGrowthPanel() {
         <StatBubble label="金币存钱罐" value={coinStock} tone="coin" />
       </div>
 
-      <div className="ui-card-soft ui-card-item ui-tinted-primary mt-3">
+      <div className="app-card--soft app-card--item ui-tinted-primary mt-3">
         <div className="flex items-center justify-between gap-2">
           <div>
             <p className="text-[10px] font-semibold tracking-wide ui-text-primary">

@@ -12,6 +12,8 @@ import {
   parseOptionalWeight,
   type SideLogInput,
 } from "./settlement-rules";
+import { hasMeaningfulGrowthActivity } from "@/lib/home/daily-record-utils";
+import { AppButton, AppInput, AppToast } from "../ui";
 
 type GrowthLogEntry = DailyRecord;
 type DetailMode = "detail" | "edit";
@@ -127,7 +129,7 @@ function CoinHintText({ hint }: { hint: string }) {
 function BonusHintText({ active }: { active: boolean }) {
   return (
     <p className="growth-detail-extra-hint">
-      {active ? "一起点亮" : "满 30 分钟时点亮"}
+      {active ? "一起点亮" : "一起运动 30min 点亮"}
     </p>
   );
 }
@@ -154,8 +156,8 @@ function CompactField({
   return (
     <label className="compact-field">
       <span className="compact-field-label">{label}</span>
-      <div className="compact-field-input">
-        <input
+      <div className="app-compact-control">
+        <AppInput
           value={value}
           onChange={(event) => onChange(event.target.value)}
           inputMode={inputMode}
@@ -184,18 +186,24 @@ function PersonDetailCard({
 }) {
   const note = personGemNoteFromLines(lines);
   return (
-    <div className="growth-person-card">
+    <div className="growth-partner-form app-card--panel app-card--item flex min-w-0 flex-col">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="ui-text-main">
+        <p className="text-[11px] font-bold ui-text-main">
           <span aria-hidden>{emoji}</span> {title}
-        </h3>
-        <span className="ui-price-pill ui-chip-primary">宝石 +{gems}</span>
+        </p>
+        <span className="ui-price-pill ui-chip-primary text-[0.7rem]">
+          💎 +{gems}
+        </span>
       </div>
-      <div className="growth-person-metrics">
-        <span>{deficit} kcal</span>
-        <span>{minutes} min</span>
+      <div className="growth-detail-metric">
+        <span className="growth-detail-metric-label">热量缺口</span>
+        <span className="growth-detail-metric-value">{deficit} kcal</span>
       </div>
-      {note ? <p className="growth-person-note">{note}</p> : null}
+      <div className="growth-detail-metric">
+        <span className="growth-detail-metric-label">运动时长</span>
+        <span className="growth-detail-metric-value">{minutes} min</span>
+      </div>
+      {note ? <p className="growth-detail-metric-note">{note}</p> : null}
     </div>
   );
 }
@@ -220,12 +228,12 @@ function EditSide({
   setMinutes: (value: string) => void;
 }) {
   return (
-    <div className="growth-partner-form ui-soft-panel ui-card-item flex min-w-0 flex-col">
+    <div className="growth-partner-form app-card--panel app-card--item flex min-w-0 flex-col">
       <p className="text-[11px] font-bold ui-text-main">
         <span aria-hidden>{emoji}</span> {title}
       </p>
       <CompactField
-        label="今日体重"
+        label="体重"
         value={weight}
         onChange={setWeight}
         inputMode="decimal"
@@ -257,7 +265,7 @@ function LogCard({
   onOpen: (entry: GrowthLogEntry) => void;
 }) {
   return (
-    <button
+    <AppButton
       type="button"
       onClick={() => onOpen(entry)}
       className="growth-log-row text-left transition hover:brightness-[1.02] active:scale-[0.99]"
@@ -270,7 +278,7 @@ function LogCard({
         </span>
         <span className="growth-log-detail-link">详情 ›</span>
       </span>
-    </button>
+    </AppButton>
   );
 }
 
@@ -344,7 +352,11 @@ function useSettlementPreview({
   }, [coinRules, dailyRecords, input, visualRules]);
 }
 
-export function GrowthLog() {
+export function GrowthLog({
+  variant = "button",
+}: {
+  variant?: "button" | "inline";
+}) {
   const {
     coinRules,
     dailyRecords,
@@ -352,6 +364,7 @@ export function GrowthLog() {
     updateDailyRecord,
     visualRules,
   } = useHomeResources();
+  const isInline = variant === "inline";
   const [open, setOpen] = useState(false);
   const [sheetEnter, setSheetEnter] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
@@ -389,6 +402,7 @@ export function GrowthLog() {
     () =>
       [...dailyRecords]
         .filter((record) => monthKeyFromDate(record.recordDate) === viewMonth)
+        .filter(hasMeaningfulGrowthActivity)
         .sort((a, b) => b.recordDate.localeCompare(a.recordDate)),
     [dailyRecords, viewMonth],
   );
@@ -568,23 +582,94 @@ export function GrowthLog() {
     setToast("删除失败，请再试一次");
   };
 
+  const listContent = (
+    <>
+      <div className="record-sheet-header">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-base font-bold leading-6 tracking-tight ui-text-main">
+              📒 成长日志
+            </p>
+            <p className="text-xs font-medium leading-4 ui-text-soft">
+              一起攒下的每一天
+            </p>
+          </div>
+          {!isInline ? (
+            <AppButton
+              type="button"
+              onClick={closeSheet}
+              className="app-button--secondary shrink-0 px-3 py-1 text-xs font-semibold"
+            >
+              收起
+            </AppButton>
+          ) : null}
+        </div>
+
+        <div className="mt-2 flex justify-center">
+          <div className="app-input-shell inline-flex items-center gap-4 px-4 py-1.5">
+            <AppButton
+              type="button"
+              onClick={onPrevMonth}
+              className="app-button--ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
+              aria-label="查看上个月"
+            >
+              ‹
+            </AppButton>
+            <h2
+              id={titleId}
+              className="min-w-[7.2rem] text-center text-base font-semibold leading-6 tracking-tight ui-text-main"
+            >
+              {formatMonthLabel(viewMonth)}
+            </h2>
+            <AppButton
+              type="button"
+              onClick={onNextMonth}
+              className="app-button--ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
+              aria-label="查看下个月"
+            >
+              ›
+            </AppButton>
+          </div>
+        </div>
+      </div>
+
+      <div className="record-sheet-body">
+        {sortedRecords.length > 0 ? (
+          <div className="record-list growth-log-record-list">
+            {sortedRecords.map((entry) => (
+              <LogCard key={entry.id} entry={entry} onOpen={openDetail} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
+            这个月还没有成长记录
+          </div>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="ui-nav-button inline-flex w-full whitespace-nowrap text-sm"
-      >
-        <span aria-hidden>📒</span>
-        <span>成长日志</span>
-      </button>
+      {!isInline ? (
+        <AppButton
+          type="button"
+          onClick={() => setOpen(true)}
+          className="app-button--nav inline-flex w-full whitespace-nowrap text-sm"
+        >
+          <span aria-hidden>📒</span>
+          <span>成长日志</span>
+        </AppButton>
+      ) : null}
 
-      {open ? (
+      {isInline ? (
+        listContent
+      ) : open ? (
         <div className="fixed inset-0 z-[55] flex items-center justify-center p-3 sm:p-4">
-          <button
+          <AppButton
             type="button"
             aria-label="关闭成长日志"
-            className={`ui-modal-backdrop absolute inset-0 transition-opacity duration-300 ${
+            className={`app-dialog-backdrop absolute inset-0 transition-opacity duration-300 ${
               sheetEnter ? "opacity-100" : "opacity-0"
             }`}
             onClick={closeSheet}
@@ -593,91 +678,32 @@ export function GrowthLog() {
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className={`ui-sheet growth-log-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out will-change-transform ${
+            className={`app-dialog-shell growth-log-sheet relative flex flex-col overflow-hidden transition-all duration-300 ease-out will-change-transform ${
               sheetEnter
                 ? "translate-y-0 opacity-100 sm:scale-100"
                 : "translate-y-3 opacity-0 sm:scale-95"
             }`}
           >
-            <div className="record-sheet-header">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-base font-bold leading-6 tracking-tight ui-text-main">
-                    📒 成长日志
-                  </p>
-                  <p className="text-xs font-medium leading-4 ui-text-soft">
-                    一起攒下的每一天
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeSheet}
-                  className="ui-button-secondary shrink-0 px-3 py-1 text-xs font-semibold"
-                >
-                  收起
-                </button>
-              </div>
-
-              <div className="mt-2 flex justify-center">
-                <div className="ui-input-shell inline-flex items-center gap-4 px-4 py-1.5">
-                  <button
-                    type="button"
-                    onClick={onPrevMonth}
-                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
-                    aria-label="查看上个月"
-                  >
-                    ‹
-                  </button>
-                  <h2
-                    id={titleId}
-                    className="min-w-[7.2rem] text-center text-base font-semibold leading-6 tracking-tight ui-text-main"
-                  >
-                    {formatMonthLabel(viewMonth)}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={onNextMonth}
-                    className="ui-button-ghost inline-flex h-7 w-7 items-center justify-center text-sm font-bold leading-none"
-                    aria-label="查看下个月"
-                  >
-                    ›
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="record-sheet-body">
-              {sortedRecords.length > 0 ? (
-                <div className="record-list growth-log-record-list">
-                  {sortedRecords.map((entry) => (
-                    <LogCard key={entry.id} entry={entry} onOpen={openDetail} />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-full min-h-[12rem] items-center justify-center py-8 text-center text-sm font-semibold ui-text-muted">
-                  这个月还没有成长记录
-                </div>
-              )}
-            </div>
+            {listContent}
           </div>
         </div>
       ) : null}
 
       {selectedRecord ? (
         <div className="fixed inset-0 z-[60] flex items-end justify-center p-3 sm:items-center">
-          <button
+          <AppButton
             type="button"
             aria-label="关闭详情"
-            className="ui-modal-backdrop absolute inset-0"
+            className="app-dialog-backdrop absolute inset-0"
             onClick={closeDetail}
           />
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby={detailTitleId}
-            className="ui-sheet growth-log-detail-sheet relative flex min-h-0 flex-col overflow-hidden"
+            className="app-dialog-shell growth-log-detail-sheet relative flex min-h-0 flex-col overflow-hidden"
           >
-            <div className="ui-modal-header shrink-0">
+            <div className="app-dialog-header shrink-0">
               <p className="text-[10px] font-bold tracking-[0.18em] ui-text-primary">
                 {detailMode === "detail" ? "记录详情" : "修改这一天"}
               </p>
@@ -691,7 +717,7 @@ export function GrowthLog() {
               </p>
             </div>
 
-            <div className="ui-modal-body">
+            <div className="app-dialog-body">
               {detailMode === "detail" && detailPreview ? (
                 <div className="space-y-2.5">
                   <div className="growth-detail-summary">
@@ -724,48 +750,53 @@ export function GrowthLog() {
                     />
                   </div>
 
-                  <div className="grid min-w-0 grid-cols-2 gap-2">
-                    <div className="growth-detail-extra-card">
-                      <div className="growth-detail-extra-row">
-                        <span className="growth-detail-extra-title">🔥 一起加成</span>
-                        {selectedRecord.bonus > 0 ? (
-                          <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
-                            宝石 +{selectedRecord.bonus}
-                          </span>
-                        ) : (
-                          <span className="growth-detail-extra-value growth-detail-extra-value--muted">
-                            未点亮
-                          </span>
-                        )}
+                  <div className="app-card--panel app-card--item mt-3">
+                    <p className="text-center text-[11px] font-bold ui-text-reward">
+                      这一天的小奖励
+                    </p>
+                    <div className="mt-2 grid min-w-0 grid-cols-2 gap-2">
+                      <div className="growth-detail-extra-card">
+                        <div className="growth-detail-extra-row">
+                          <span className="growth-detail-extra-title">🐟🐱</span>
+                          {selectedRecord.bonus > 0 ? (
+                            <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
+                              💎 +{selectedRecord.bonus}
+                            </span>
+                          ) : (
+                            <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
+                              💎 +0
+                            </span>
+                          )}
+                        </div>
+                        <BonusHintText active={selectedRecord.bonus > 0} />
                       </div>
-                      <BonusHintText active={selectedRecord.bonus > 0} />
-                    </div>
-                    <div className="growth-detail-extra-card">
-                      <div className="growth-detail-extra-row">
-                        <span className="growth-detail-extra-title">🪙 金币</span>
-                        <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
-                          {coinAmountLabel(selectedRecord.coins)}
-                        </span>
+                      <div className="growth-detail-extra-card">
+                        <div className="growth-detail-extra-row">
+                          <span className="growth-detail-extra-title">🪙 金币</span>
+                          <span className="growth-detail-extra-value-pill ui-chip-reward ui-text-reward">
+                            {coinAmountLabel(selectedRecord.coins)}
+                          </span>
+                        </div>
+                        <CoinHintText hint={detailPreview.coin.hint} />
                       </div>
-                      <CoinHintText hint={detailPreview.coin.hint} />
                     </div>
                   </div>
 
-                  <div className="ui-modal-footer">
-                    <button
+                  <div className="app-dialog-footer">
+                    <AppButton
                       type="button"
                       onClick={closeDetail}
-                      className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
+                      className="app-button--secondary flex-1 py-3 text-sm font-semibold"
                     >
                       关闭
-                    </button>
-                    <button
+                    </AppButton>
+                    <AppButton
                       type="button"
                       onClick={enterEditMode}
-                      className="ui-button-primary flex-[1.2] py-3 text-sm font-semibold text-white transition active:scale-[0.99]"
+                      className="app-button--primary flex-[1.2] py-3 text-sm font-semibold text-white transition active:scale-[0.99]"
                     >
                       编辑
-                    </button>
+                    </AppButton>
                   </div>
                 </div>
               ) : null}
@@ -795,7 +826,7 @@ export function GrowthLog() {
                     />
                   </div>
 
-                  <div className="ui-soft-panel ui-card-item">
+                  <div className="app-card--panel app-card--item">
                     <p className="text-center text-[11px] font-bold ui-text-reward">
                       修改后的小奖励
                     </p>
@@ -803,8 +834,8 @@ export function GrowthLog() {
                       <li className="growth-detail-extra-card">
                         <span className="flex items-center justify-between gap-2">
                           <span aria-hidden>🐟</span>
-                          <span className="tabular-nums ui-text-primary">
-                            宝石 +{editPreview.fishBreakdown.total}
+                          <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
+                            💎 +{editPreview.fishBreakdown.total}
                           </span>
                         </span>
                         <GemBreakdownText lines={editPreview.fishBreakdown.lines} />
@@ -812,22 +843,22 @@ export function GrowthLog() {
                       <li className="growth-detail-extra-card">
                         <span className="flex items-center justify-between gap-2">
                           <span aria-hidden>🐱</span>
-                          <span className="tabular-nums ui-text-primary">
-                            宝石 +{editPreview.catBreakdown.total}
+                          <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
+                            💎 +{editPreview.catBreakdown.total}
                           </span>
                         </span>
                         <GemBreakdownText lines={editPreview.catBreakdown.lines} />
                       </li>
                       <li className="growth-detail-extra-card">
                         <div className="growth-detail-extra-row">
-                          <span className="growth-detail-extra-title">🔥 一起加成</span>
+                          <span className="growth-detail-extra-title">🐟🐱</span>
                           {editPreview.couple.gems > 0 ? (
-                            <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary">
-                              宝石 +{editPreview.couple.gems}
+                            <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
+                              💎 +{editPreview.couple.gems}
                             </span>
                           ) : (
-                            <span className="growth-detail-extra-value growth-detail-extra-value--muted">
-                              未点亮
+                            <span className="growth-detail-extra-value-pill ui-chip-primary ui-text-primary shrink-0 whitespace-nowrap">
+                              💎 +0
                             </span>
                           )}
                         </div>
@@ -846,31 +877,31 @@ export function GrowthLog() {
                   </div>
 
                   <div className="growth-log-edit-footer">
-                    <button
+                    <AppButton
                       type="button"
                       onClick={() => setConfirmDeleteOpen(true)}
                       className="growth-log-delete-btn"
                     >
                       删除
-                    </button>
+                    </AppButton>
                     <div className="growth-log-edit-footer-actions">
-                      <button
+                      <AppButton
                         type="button"
                         onClick={() => {
                           if (selectedRecord) hydrateEditFields(selectedRecord);
                           setDetailMode("detail");
                         }}
-                        className="ui-button-secondary min-w-0 flex-1 py-2.5 text-sm font-semibold sm:flex-none sm:px-5"
+                        className="app-button--secondary min-w-0 flex-1 py-2.5 text-sm font-semibold sm:flex-none sm:px-5"
                       >
                         取消编辑
-                      </button>
-                      <button
+                      </AppButton>
+                      <AppButton
                         type="button"
                         onClick={onSaveEdit}
-                        className="ui-button-primary min-w-0 flex-[1.2] py-2.5 text-sm font-semibold text-white transition active:scale-[0.99] sm:flex-none sm:px-6"
+                        className="app-button--primary min-w-0 flex-[1.2] py-2.5 text-sm font-semibold text-white transition active:scale-[0.99] sm:flex-none sm:px-6"
                       >
                         保存修改
-                      </button>
+                      </AppButton>
                     </div>
                   </div>
                 </div>
@@ -882,17 +913,17 @@ export function GrowthLog() {
 
       {confirmDeleteOpen && selectedRecord ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <button
+          <AppButton
             type="button"
             aria-label="取消删除"
-            className="ui-modal-backdrop absolute inset-0"
+            className="app-dialog-backdrop absolute inset-0"
             onClick={() => setConfirmDeleteOpen(false)}
           />
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby={confirmTitleId}
-            className="ui-dialog relative w-full max-w-sm overflow-hidden px-5 py-5 text-center"
+            className="app-dialog relative w-full max-w-sm overflow-hidden px-5 py-5 text-center"
           >
             <h3 id={confirmTitleId} className="text-lg font-bold ui-text-main">
               要删除这一天吗？
@@ -901,32 +932,32 @@ export function GrowthLog() {
               删掉就找不回这条啦。
             </p>
             <div className="mt-5 flex gap-2">
-              <button
+              <AppButton
                 type="button"
                 onClick={() => setConfirmDeleteOpen(false)}
-                className="ui-button-secondary flex-1 py-3 text-sm font-semibold"
+                className="app-button--secondary flex-1 py-3 text-sm font-semibold"
               >
                 取消
-              </button>
-              <button
+              </AppButton>
+              <AppButton
                 type="button"
                 onClick={onConfirmDelete}
                 className="flex-1 rounded-[var(--radius-control)] border border-rose-100 bg-rose-50/70 px-4 py-3 text-sm font-semibold text-rose-500 transition active:scale-[0.99]"
               >
                 确认删除
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
       ) : null}
 
       {toast ? (
-        <div
+        <AppToast
           role="status"
-          className="ui-dialog pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[80] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
+          className="app-dialog pointer-events-none fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-[80] w-[min(92vw,20rem)] -translate-x-1/2 px-4 py-3 text-center text-xs font-semibold ui-text-main"
         >
           {toast}
-        </div>
+        </AppToast>
       ) : null}
     </>
   );
