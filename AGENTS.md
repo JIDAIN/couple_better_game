@@ -14,7 +14,7 @@
 
 当前不是纯前端项目：
 
-- 浏览器 `localStorage` 是运行缓存和离线兜底；
+- 浏览器 `localStorage` 是游戏运行缓存和离线兜底；
 - Supabase 是生产云端主数据源；
 - Next.js API Route 是浏览器与 Supabase 的服务端边界；
 - Supabase secret key 只允许服务端使用。
@@ -97,7 +97,7 @@
 
 ### `components/home/`
 
-负责业务 UI、表单、弹窗、页面组合和调用 action。
+负责游戏业务 UI、表单、弹窗、页面组合和调用 action。
 
 禁止：
 
@@ -105,6 +105,22 @@
 - 直接使用 Supabase secret 或服务端 SDK；
 - 自己计算钱包最终余额；
 - 为小功能大规模重构 Provider。
+
+### `components/nutrition/`
+
+负责饮食业务 UI。
+
+当前主要组件：
+
+- `DailyMealsPanel.tsx`：今日公告板中的按日/角色餐食列表；
+- `MealEditorModal.tsx`：手动新增 / 编辑餐食。
+
+规则：
+
+- 只通过 `lib/nutrition/meal-client.ts` 调用同源 Next.js meal API；
+- 不通过 `HomeResourcesProvider` 写 intake；
+- 不因餐食变化自动修改 deficit / wallet / heatmap；
+- 不在浏览器直接访问 Supabase service role。
 
 ### `components/ui/`
 
@@ -128,6 +144,8 @@
 
 当前同步元数据 / 同步密码仍有 Provider / DataManagement 直接访问 localStorage/sessionStorage 的兼容代码，这是**现存技术债**，不是新代码可以继续扩散的模式。
 
+饮食当前直接以 Supabase 为真相源，不要为了“统一”把餐食再复制进游戏 localStorage snapshot。
+
 ## 6. 游戏领域代码
 
 优先位置：
@@ -146,9 +164,20 @@
 ## 7. 营养领域代码
 
 - 参数 / 类型 / 校验：`lib/nutrition/meal-service.ts`
+- 浏览器 API client：`lib/nutrition/meal-client.ts`
+- Web UI：`components/nutrition/**`
 - 服务端 Supabase 调用：`lib/server/supabase-nutrition.ts`
 - API：`app/api/meals/**`
 - 测试：`tests/nutrition/**`
+
+### Web 餐食原则
+
+- 手动 Web 新增使用 `source = "manual"`；
+- 编辑 ChatGPT/import 来源餐食时保留其原 source，除非业务明确改变来源语义；
+- 完整更新复用现有 PUT 语义，不另造 PATCH 行为；
+- 删除使用现有 soft delete；
+- `food_id = null` 时仍允许基于 `raw_name` 保存；
+- 浏览器只调用同源 meal API 和 HttpOnly cloud session。
 
 ### ChatGPT 餐食原则
 
@@ -160,6 +189,7 @@
 - 只改 `meals / meal_items`（以及明确需要的 food/alias 引用）
 - 不直接改 deficit、钱包、金币、宝石、热力图
 - 使用 `idempotency_key` 防止重复提交
+- 必须复用现有 meal schema/API 语义，不建立 AI 专用第二套表
 
 ## 8. API 与服务端规则
 
@@ -184,14 +214,24 @@ Browser -> Next.js API -> lib/server -> Supabase
 
 DDL 必须通过 migration 执行，不要用临时 SQL 手改完就结束。
 
-当前生产 schema 已存在，但早期 migration SQL 尚未完整回填到仓库，这是 roadmap 的 P0 技术债。新增数据库改动必须从现在开始做到：
+当前 production 已执行的 12 条历史 migration 已按原 version / name / SQL 回填到：
 
-1. migration 可追踪；
-2. 权限 / RLS 一并审查；
-3. service_role 能力最小化；
-4. anon / authenticated 不应意外获得 server-only RPC；
-5. 多表写入验证事务性；
-6. 文档同步 `docs/03-data-model.md` / `04-api-and-sync.md`。
+```text
+supabase/migrations/
+```
+
+因此现在的规则是：
+
+1. 已执行历史 migration **不可回头修改**；
+2. 新 DDL / function / view / grant / RLS 变化必须新增 migration；
+3. 权限 / RLS 一并审查；
+4. service_role 能力最小化；
+5. anon / authenticated 不应意外获得 server-only RPC；
+6. 多表写入验证事务性；
+7. 文档同步 `docs/03-data-model.md` / `04-api-and-sync.md`；
+8. migration 负责结构和规则，不替代 production 数据备份。
+
+详见 `supabase/README.md`。
 
 ## 10. 云端同步安全规则
 
@@ -212,8 +252,13 @@ DDL 必须通过 migration 执行，不要用临时 SQL 手改完就结束。
 - wrapper 不够时先确认 `animal-island-ui` 当前安装版本真实 API；
 - 不凭想象臆造组件 props；
 - 业务页面不应散落第二套按钮 / 卡片 / 弹窗视觉；
+- 当前底部主导航仍是“今日 / 地图 / 兑换 / 小窝”四个 Tab；
+- 饮食 UI 当前固定作为 `#today` notice-board 的 `AppSectionPanel` 扩展，不因营养功能存在就擅自新增第五个 Tab；
+- 新增/编辑餐食沿用当前 `AppModal + Title + AppInput + AppCard + AppButton` 体系；
 - 热力图日期仍按周六到周五完整周展示，跨月日期可读但弱化；
 - UI 迁移已经完成，当前任务是维护，不再执行旧“全量迁移 phase”流程。
+
+如果未来要改变主导航或整体视觉体系，先更新产品/UI 文档并明确是“信息架构/视觉改版”，不要在单个业务功能里顺手重设计。
 
 ## 12. 测试规则
 
@@ -232,10 +277,12 @@ npm run build
 - 导入导出和 legacy migration；
 - 热力图日期；
 - 同步 guard；
-- meal payload / API 语义；
+- meal payload / API / browser client 语义；
 - 数据库事务和权限发生变化时，应至少做 DB smoke test。
 
 只改 Markdown / Skill 时可以不运行 build，但完成时必须明确说明。
+
+注意：Test/Lint/Build 通过只代表代码级验证，不代表手机端视觉已经人工检查。
 
 ## 13. 文档规则
 
@@ -245,7 +292,7 @@ npm run build
 
 - `CHANGELOG.md`
 - `docs/09-status-roadmap.md`
-- 如果接口 / 数据 / 规则 / 架构变化，再更新对应主文档
+- 如果接口 / 数据 / 规则 / 架构 / UI 变化，再更新对应主文档
 
 不要再创建“xxx-after-refactor”“xxx-migration-report”“临时 audit”作为长期主文档。临时分析应放 PR / issue / 对话；稳定结论合并到主文档。
 
@@ -258,6 +305,4 @@ npm run build
 5. 不删除兼容逻辑、用户数据或生产安全保护，除非任务明确要求且有迁移方案。
 6. 不在输出或代码中暴露 secret。
 7. 如果现状与文档冲突，以已验证的运行代码 / schema 为准，并同步修正文档。
-8. 重大改动先给影响范围和回退路径。
-9. 完成后说明：修改摘要、文件、验证、风险、未完成项。
-10. git commit / push 由用户工作流决定；除非用户明确授权，不主动做不可逆仓库操作。
+8. 涉及 UI 时，优先延续现有动森感场景和 `App*` 组合，不把“新增功能”等同于“重新设计界面”。
