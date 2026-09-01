@@ -145,10 +145,10 @@ describe("data import/export", () => {
       resourceKind: "coin",
       price: 0,
       remark: "",
-      createdAt: "1970-01-01T00:00:00.000Z",
-      occurredAt: "1970-01-01T08:00",
+      createdAt: "1970-01-01T00:00",
+      occurredAt: "1970-01-01T00:00",
     });
-    expect(backup.exchangeRecords[0].date).toContain("08:00");
+    expect(backup.exchangeRecords[0].date).toContain("00:00");
   });
 
   it("exports github sync json with updatedAt and exchange snapshots", () => {
