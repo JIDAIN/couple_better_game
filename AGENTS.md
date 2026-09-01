@@ -17,7 +17,8 @@
 - 浏览器 `localStorage` 是游戏运行缓存和离线兜底；
 - Supabase 是生产云端主数据源；
 - Next.js API Route 是浏览器与 Supabase 的服务端边界；
-- Supabase secret key 只允许服务端使用。
+- Supabase secret key 只允许服务端或用户已授权连接层使用；
+- ChatGPT P2 已可在明确确认后通过 service-only Supabase meal RPC 持久化餐食。
 
 ## 2. 开始任务前的阅读顺序
 
@@ -140,7 +141,7 @@
 
 ### localStorage 规则
 
-业务快照只能通过 `AppDataStore` 访问。
+业务游戏快照只能通过 `AppDataStore` 访问。
 
 当前同步元数据 / 同步密码仍有 Provider / DataManagement 直接访问 localStorage/sessionStorage 的兼容代码，这是**现存技术债**，不是新代码可以继续扩散的模式。
 
@@ -165,9 +166,11 @@
 
 - 参数 / 类型 / 校验：`lib/nutrition/meal-service.ts`
 - 浏览器 API client：`lib/nutrition/meal-client.ts`
+- ChatGPT payload protocol：`lib/nutrition/chatgpt-meal-protocol.ts`
 - Web UI：`components/nutrition/**`
 - 服务端 Supabase 调用：`lib/server/supabase-nutrition.ts`
 - API：`app/api/meals/**`
+- ChatGPT RPC migration：`supabase/migrations/20260901162337_add_chatgpt_meal_persistence_rpc.sql`
 - 测试：`tests/nutrition/**`
 
 ### Web 餐食原则
@@ -179,17 +182,47 @@
 - `food_id = null` 时仍允许基于 `raw_name` 保存；
 - 浏览器只调用同源 meal API 和 HttpOnly cloud session。
 
-### ChatGPT 餐食原则
+### ChatGPT “记上”原则
 
-“讨论 / 估算”不等于保存。
+**讨论 / 估算 / 修正不等于保存。**
 
-只有用户明确确认 **“记上”** 后，ChatGPT 工作流才应持久化餐食；写入时：
+只有用户明确确认“记上”“把这餐记下来”或语义等价的保存意图后，才允许持久化。
 
-- `source = "chatgpt"`
-- 只改 `meals / meal_items`（以及明确需要的 food/alias 引用）
-- 不直接改 deficit、钱包、金币、宝石、热力图
-- 使用 `idempotency_key` 防止重复提交
-- 必须复用现有 meal schema/API 语义，不建立 AI 专用第二套表
+当前正式路径：
+
+```text
+ChatGPT explicit confirmation
+-> 已授权 Supabase 连接能力
+-> create_chatgpt_meal_record
+-> existing create_meal_record
+-> meals / meal_items
+-> get_chatgpt_meal_record read-back
+```
+
+写入必须：
+
+- `source = "chatgpt"`（RPC 强制）；
+- `status = "confirmed"`（RPC 强制）；
+- 至少一个 food item；
+- 保留 `rawName`；
+- 使用 `chatgpt:` 前缀 idempotency key；
+- 一次确认只生成一个 key；
+- 工具超时/结果不确定时先按同 key 查询，再用同 key 重试；
+- 不因为重试生成新 key；
+- 成功读回确认后才告诉用户“已记上”。
+
+当前角色映射：
+
+```text
+用户自己的饮食聊天 -> fish
+伴侣专用饮食聊天   -> cat
+```
+
+上下文不明确时不得猜角色后写入。
+
+写入只影响 `meals / meal_items`（以及未来明确需要的 food/alias 引用），不得直接改 deficit、运动、体重、wallet、金币、宝石或 heatmap。
+
+已经成功保存后，如果用户只是补充事实，不自动覆盖数据库；需要明确更新意图。P2 首版自动持久化入口负责新增，已有餐食仍可通过 Web UI 编辑/删除。
 
 ## 8. API 与服务端规则
 
@@ -199,14 +232,23 @@
 Browser -> Next.js API -> lib/server -> Supabase
 ```
 
+ChatGPT P2 是独立的受授权非浏览器路径：
+
+```text
+ChatGPT -> authorized connector -> service-only meal RPC -> Supabase
+```
+
 禁止：
 
 - 在前端暴露 `SUPABASE_SECRET_KEY` / service role key；
 - 使用 `NEXT_PUBLIC_SUPABASE_SECRET_KEY`；
+- 把 Supabase secret、service role key 或同步密码复制进普通聊天作为持久化凭证；
+- 为 ChatGPT 新增匿名写 API；
 - 恢复公开 GitHub JSON 作为用户数据源；
-- 让匿名浏览器直接获得当前 server-only 数据权限。
+- 让匿名浏览器直接获得当前 server-only 数据权限；
+- 把 ChatGPT connector 当作日常通用 SQL 写入口去改游戏/钱包表。
 
-当前鉴权是“共享同步密码 + HttpOnly cloud session”，不是完整用户账号系统。不要把它描述成用户级身份认证。
+当前鉴权是“共享同步密码 + HttpOnly cloud session”用于 Web；ChatGPT P2 使用用户已授权连接能力。二者都不是完整用户账号系统。
 
 多表写入必须考虑原子性；餐食等多表写入优先使用事务 RPC。
 
@@ -214,13 +256,13 @@ Browser -> Next.js API -> lib/server -> Supabase
 
 DDL 必须通过 migration 执行，不要用临时 SQL 手改完就结束。
 
-当前 production 已执行的 12 条历史 migration 已按原 version / name / SQL 回填到：
+production 已执行 migration 持续按 version / name / SQL 纳入：
 
 ```text
 supabase/migrations/
 ```
 
-因此现在的规则是：
+规则：
 
 1. 已执行历史 migration **不可回头修改**；
 2. 新 DDL / function / view / grant / RLS 变化必须新增 migration；
@@ -228,8 +270,9 @@ supabase/migrations/
 4. service_role 能力最小化；
 5. anon / authenticated 不应意外获得 server-only RPC；
 6. 多表写入验证事务性；
-7. 文档同步 `docs/03-data-model.md` / `04-api-and-sync.md`；
-8. migration 负责结构和规则，不替代 production 数据备份。
+7. production smoke test 后清理测试数据；
+8. 文档同步 `docs/03-data-model.md` / `04-api-and-sync.md`；
+9. migration 负责结构和规则，不替代 production 数据备份。
 
 详见 `supabase/README.md`。
 
@@ -277,8 +320,8 @@ npm run build
 - 导入导出和 legacy migration；
 - 热力图日期；
 - 同步 guard；
-- meal payload / API / browser client 语义；
-- 数据库事务和权限发生变化时，应至少做 DB smoke test。
+- meal payload / API / browser client / ChatGPT protocol 语义；
+- 数据库事务和权限发生变化时，应至少做 DB smoke + grant check + cleanup。
 
 只改 Markdown / Skill 时可以不运行 build，但完成时必须明确说明。
 
@@ -292,7 +335,7 @@ npm run build
 
 - `CHANGELOG.md`
 - `docs/09-status-roadmap.md`
-- 如果接口 / 数据 / 规则 / 架构 / UI 变化，再更新对应主文档
+- 如果接口 / 数据 / 规则 / 架构 / UI / 安全变化，再更新对应主文档
 
 不要再创建“xxx-after-refactor”“xxx-migration-report”“临时 audit”作为长期主文档。临时分析应放 PR / issue / 对话；稳定结论合并到主文档。
 
@@ -306,3 +349,4 @@ npm run build
 6. 不在输出或代码中暴露 secret。
 7. 如果现状与文档冲突，以已验证的运行代码 / schema 为准，并同步修正文档。
 8. 涉及 UI 时，优先延续现有动森感场景和 `App*` 组合，不把“新增功能”等同于“重新设计界面”。
+9. 涉及 ChatGPT 餐食时，未经用户明确保存确认不得调用写 RPC；一次确认的重试必须复用同一幂等键。
