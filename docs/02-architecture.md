@@ -2,7 +2,7 @@
 
 ## 1. 一句话架构
 
-项目是一个 **Next.js 一体化 Web 应用**：浏览器负责游戏 UI、饮食 UI 和本地游戏运行状态，Vercel API 负责安全边界，Supabase 负责云端持久化。
+项目是一个 **Next.js 一体化 Web 应用**：浏览器负责游戏 UI、饮食 UI 和本地游戏运行状态，Vercel API 负责浏览器安全边界，Supabase 负责云端持久化；ChatGPT 在用户明确确认后可通过已授权连接能力调用 service-only meal RPC。
 
 ```text
 Browser
@@ -16,6 +16,13 @@ Next.js / Vercel
   └─ Supabase RPC client
        ↓
 Supabase PostgreSQL
+
+ChatGPT（明确确认后）
+  └─ authorized Supabase connector
+       ↓
+service-only ChatGPT meal RPC
+       ↓
+同一 Supabase meals / meal_items
 ```
 
 ## 2. 目录职责
@@ -35,6 +42,8 @@ app/api/save-data/route.ts
 app/api/meals/route.ts
 app/api/meals/[id]/route.ts
 ```
+
+ChatGPT P2 没有新增公开 HTTP 写 API。
 
 ### `components/home/`
 
@@ -86,11 +95,14 @@ sync-state-service 同步 guard / retry decision
 营养领域：
 
 ```text
-meal-service.ts    类型、写入 payload 校验、查询参数校验
-meal-client.ts     浏览器到同源 `/api/meals` 的轻量 client
+meal-service.ts              类型、写入 payload 校验、查询参数校验
+meal-client.ts               浏览器到同源 `/api/meals` 的轻量 client
+chatgpt-meal-protocol.ts     P2 confirmed payload / idempotency 代码约束
 ```
 
 `meal-client.ts` 只走 Next.js API 和 HttpOnly cloud session，不直接访问 Supabase。
+
+`chatgpt-meal-protocol.ts` 不负责“猜用户是否确认”，只负责在上层已经判定明确保存后，把 payload 固化为 `source=chatgpt / status=confirmed / chatgpt: idempotency key` 语义。
 
 ### `lib/server/`
 
@@ -98,7 +110,24 @@ meal-client.ts     浏览器到同源 `/api/meals` 的轻量 client
 
 - `cloud-request-auth.ts`：cloud session / password 请求鉴权。
 - `supabase-home-sync.ts`：游戏兼容快照 RPC。
-- `supabase-nutrition.ts`：饮食 RPC。
+- `supabase-nutrition.ts`：Web 饮食 RPC。
+
+### `supabase/migrations/`
+
+数据库结构、函数、权限历史。
+
+P2 关键 migration：
+
+```text
+20260901162337_add_chatgpt_meal_persistence_rpc.sql
+```
+
+新增 service-only：
+
+```text
+create_chatgpt_meal_record
+get_chatgpt_meal_record
+```
 
 ## 3. 游戏本地数据流
 
@@ -192,18 +221,47 @@ Today notice-board / DailyMealsPanel
 
 写入使用 RPC 的原因是保证“餐 + 多个明细”原子提交。
 
-### ChatGPT（P2）
+### ChatGPT “记上”
 
-未来 ChatGPT “记上”也复用同一 meal domain / RPC，不创建第二套餐食结构：
+P2 已上线，仍复用同一 meal domain / facts：
 
 ```text
-用户明确确认“记上”
--> source=chatgpt canonical payload
--> meal API / server path
--> meals + meal_items
+图片 / 描述 / 估算 / 修正
+-> 不写数据库
+-> 用户明确保存意图
+-> 生成一次 confirmation idempotency key
+-> authorized Supabase connector
+-> create_chatgpt_meal_record
+   -> validation
+   -> force source=chatgpt
+   -> force status=confirmed
+   -> advisory lock on same key
+   -> create_meal_record
+   -> meals + meal_items
+-> get_chatgpt_meal_record(same key)
+-> 成功后向用户确认
 ```
 
-讨论和估算本身不写数据库。
+`create_chatgpt_meal_record` 不创建 AI 专用表；它最终调用现有 `create_meal_record`。
+
+一次确认只允许一个：
+
+```text
+chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
+```
+
+如果调用结果不确定，先按同 key 读回；只有确实不存在时才用**同 key**重试，不能生成新 key 盲目重写。
+
+### ChatGPT 角色映射
+
+当前产品约定：
+
+```text
+用户自己的饮食聊天 -> fish
+伴侣专用饮食聊天   -> cat
+```
+
+上下文不明确时不允许猜测后写入。
 
 ## 8. UI 场景边界
 
@@ -216,13 +274,15 @@ Today notice-board / DailyMealsPanel
 小窝 nook-phone
 ```
 
-P1 饮食功能作为“今日”公告板中的独立 `AppSectionPanel` 扩展，不新增第五个底部 Tab，也不新建独立视觉体系。
+饮食功能作为“今日”公告板中的独立 `AppSectionPanel` 扩展，不新增第五个底部 Tab，也不新建独立视觉体系。
 
 新增/编辑餐食沿用当前 `AppModal + Title + AppInput + AppCard + AppButton` 模式。
 
+P2 没有新增 UI，因此不改变当前动森感场景或主导航。
+
 ## 9. 数据库访问边界
 
-当前模式是 server-only：
+Web 当前模式：
 
 ```text
 Browser                  不持有 Supabase secret
@@ -232,11 +292,23 @@ anon/authenticated       无当前业务 policy
 service role             经 API/RPC 使用
 ```
 
+ChatGPT P2 模式：
+
+```text
+ChatGPT                  不读取浏览器 HttpOnly cookie
+普通聊天文本             不包含数据库 secret
+authorized connector     用户授权的连接能力
+ChatGPT meal RPC         service-only
+anon/authenticated       无 execute
+```
+
+日常“记上”不能把 connector 当成任意 SQL 写入口去修改游戏、钱包、体重等域。
+
 这不是 Supabase Auth 架构。未来如果加入真实账号，需要重新设计 auth_user_id、RLS policy 和 membership。
 
 ## 10. Supabase migration 版本管理
 
-production 已执行的 12 条历史 migration 已按原 version / name / SQL 回填到：
+production 已执行 migration 持续按 version / name / SQL 纳入：
 
 ```text
 supabase/migrations/
@@ -258,7 +330,8 @@ supabase/migrations/
 
 - local AppDataStore 继续作为游戏运行缓存；
 - 游戏云端同步通过独立 Provider/API 流程完成；
-- 饮食 UI 直接经 meal API 使用 Supabase，不进入游戏 AppDataStore。
+- 饮食 UI 直接经 meal API 使用 Supabase，不进入游戏 AppDataStore；
+- ChatGPT 写入同一 Supabase meal facts，Web UI 下一次查询即可看到。
 
 因此以后不要再写“替换 AppDataStore 就完成云同步”这种过时描述。
 
@@ -268,6 +341,7 @@ supabase/migrations/
 - cloud-session token 生成逻辑在部分旧 route / proxy 中仍有重复，可后续统一。
 - 同步 metadata/password 仍有组件/Provider 直接 localStorage 访问。
 - 游戏最终结算仍不是 server-authoritative。
-- 当前共享 password/session 不是完整用户身份和 membership 模型。
+- 当前共享 password/session 与 ChatGPT connector 都不是完整用户身份和 membership 模型。
+- P2 首版自动持久化只负责新增；ChatGPT 内直接修改/删除已保存餐食尚未做专用受限 RPC，当前通过 Web UI 完成。
 
-这些是明确的 roadmap 项，不应在无关功能中顺手重构。
+这些是明确边界，不应在无关功能中顺手重构。
