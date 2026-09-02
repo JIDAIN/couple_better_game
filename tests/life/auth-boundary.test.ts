@@ -9,8 +9,8 @@ function source(path: string) {
 describe("V2-R1B auth boundary", () => {
   it("keeps service secrets out of the login page", () => {
     const login = source("components/life/LifeLoginPage.tsx");
-    expect(login).toContain("/api/auth/login");
-    expect(login).toContain("/api/auth/signup");
+    expect(login).toContain("/api/auth/${mode}");
+    expect(login).toContain('"login", "signup"');
     expect(login).not.toContain("SUPABASE_SECRET_KEY");
     expect(login).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
