@@ -323,11 +323,11 @@ ChatGPT 只有用户明确“记上”后才应提交 `source=chatgpt`。
 当前约定：
 
 ```text
-用户自己的饮食聊天 -> fish
-伴侣专用饮食聊天   -> cat
+用户自己的饮食聊天 -> cat（猫猫）
+鱼鱼的饮食聊天     -> fish（鱼鱼）
 ```
 
-如果上下文无法可靠判断角色，不允许猜测后写入。
+如果上下文无法可靠判断角色，不允许猜测后写入。用户在当前对话中明确说明角色时，以当前明确说明为最高优先级。
 
 ### 10.3 创建步骤
 
@@ -353,7 +353,7 @@ chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
 例如：
 
 ```text
-chatgpt:fish:2026-09-02:20260902T122030-a1b2c3
+chatgpt:cat:2026-09-02:20260902T122030-a1b2c3
 ```
 
 要求：
@@ -399,7 +399,32 @@ wallet_ledger
 金币 / 宝石 / heatmap
 ```
 
-## 11. RPC 映射
+## 11. 同日关联规则
+
+P2.5 将通过同一个业务键关联不同事实域：
+
+```text
+partnerKey + date
+```
+
+关联对象：
+
+```text
+meals / daily_nutrition_summary
++
+daily_records + daily_record_sides
++
+未来 daily_weight_summary
+```
+
+这是一层读取/展示关联，不是跨域写入：
+
+- meals 存在、daily record 不存在：显示当天饮食，但 deficit/运动/体重快照显示“未记录”；
+- daily record 存在、meals 不存在：显示游戏记录，但饮食显示“未记录”；
+- 不用 meal total 自动覆盖 `deficit_kcal`；
+- 若未来增加“实际能量缺口”，应新增独立定义，而不是重用现有游戏 deficit。
+
+## 12. RPC 映射
 
 | 调用方 / service | RPC |
 |---|---|
@@ -414,7 +439,7 @@ wallet_ledger
 
 `create_chatgpt_meal_record` 最终仍调用现有 `create_meal_record`，因此没有第二套餐食事实表。
 
-## 12. 当前 API / RPC 安全边界
+## 13. 当前 API / RPC 安全边界
 
 - 所有浏览器数据 API 必须验证共享 password/session；
 - Supabase secret 只存在服务端或连接器授权层，不进入聊天文本和浏览器；
