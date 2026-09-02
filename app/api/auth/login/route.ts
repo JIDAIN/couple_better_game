@@ -21,12 +21,12 @@ export async function POST(request: Request) {
     password?: unknown;
   } | null;
 
-  const partnerKey = authenticateFixedLifeAccount(body?.username, body?.password);
-  if (!partnerKey) {
-    return NextResponse.json({ ok: false, error: "账号或密码不正确" }, { status: 401 });
-  }
-
   try {
+    const partnerKey = await authenticateFixedLifeAccount(body?.username, body?.password);
+    if (!partnerKey) {
+      return NextResponse.json({ ok: false, error: "账号或密码不正确" }, { status: 401 });
+    }
+
     const session = createFixedLifeSession(partnerKey);
     const response = NextResponse.json({
       ok: true,
@@ -41,6 +41,6 @@ export async function POST(request: Request) {
     });
     return response;
   } catch {
-    return NextResponse.json({ ok: false, error: "登录服务尚未配置完整" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "登录服务暂时不可用" }, { status: 500 });
   }
 }
