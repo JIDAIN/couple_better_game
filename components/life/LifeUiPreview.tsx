@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
-import { AppCard } from "@/components/ui/AppCard";
-import { AppIcon } from "@/components/ui/AppIcon";
+import { AppFeatureTile } from "@/components/ui/AppFeatureTile";
 import { AppInput } from "@/components/ui/AppInput";
-import { AppRoleAvatar } from "@/components/ui/AppRoleAvatar";
+import { AppNutritionBar } from "@/components/ui/AppNutritionBar";
+import { AppRecordRow } from "@/components/ui/AppRecordRow";
+import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
 
 const moods = [
   { key: "happy", emoji: "😄", label: "开心" },
@@ -17,94 +18,89 @@ const moods = [
   { key: "tired", emoji: "😴", label: "疲惫" },
 ] as const;
 
+export function RoleSwitchPreview() {
+  const [value, setValue] = useState<AppRoleSwitchValue>("me");
+  return <AppRoleSwitch value={value} onChange={setValue} />;
+}
+
 export function MoodPickerPreview() {
-  const [fishMood, setFishMood] = useState<(typeof moods)[number]["key"]>("calm");
-  const [catMood, setCatMood] = useState<(typeof moods)[number]["key"]>("neutral");
+  const [fishMood, setFishMood] = useState<(typeof moods)[number]["key"]>("happy");
+  const [catMood, setCatMood] = useState<(typeof moods)[number]["key"]>("calm");
 
   return (
-    <div className="grid gap-4">
-      <MoodRoleRow role="fish" value={fishMood} onChange={setFishMood} />
-      <MoodRoleRow role="cat" value={catMood} onChange={setCatMood} />
+    <div className="grid gap-3 sm:grid-cols-2">
+      <MoodRoleRow label="我" value={fishMood} onChange={setFishMood} />
+      <MoodRoleRow label="Ta" value={catMood} onChange={setCatMood} />
     </div>
   );
 }
 
 function MoodRoleRow({
-  role,
+  label,
   value,
   onChange,
 }: {
-  role: "fish" | "cat";
+  label: string;
   value: (typeof moods)[number]["key"];
   onChange: (value: (typeof moods)[number]["key"]) => void;
 }) {
   return (
-    <AppCard variant="soft" className="!p-3">
-      <div className="mb-3 flex items-center gap-2">
-        <AppRoleAvatar role={role} size={30} />
+    <section className="life-surface life-section-card">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <div>
-          <p className="font-semibold text-[var(--text-main)]">{role === "fish" ? "鱼鱼" : "猫猫"}</p>
-          <p className="text-xs text-[var(--text-muted)]">今天感觉怎么样？</p>
+          <strong className="text-sm text-[var(--life-text)]">{label}</strong>
+          <p className="mt-0.5 text-xs text-[var(--life-text-body)]">今天感觉怎么样？</p>
         </div>
+        <span className="text-2xl" aria-hidden>{moods.find((mood) => mood.key === value)?.emoji}</span>
       </div>
-      <div className="grid grid-cols-7 gap-1.5" role="radiogroup" aria-label={`${role} 今日心情`}>
-        {moods.map((mood) => {
-          const selected = mood.key === value;
-          return (
-            <button
-              key={mood.key}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              aria-label={mood.label}
-              onClick={() => onChange(mood.key)}
-              className={`flex min-h-14 flex-col items-center justify-center rounded-[var(--radius-control)] border px-1 py-2 transition duration-150 active:translate-y-0.5 ${
-                selected
-                  ? "border-[var(--animal-accent)] bg-[var(--animal-accent-soft)] shadow-[var(--shadow-soft)]"
-                  : "border-[var(--card-border-soft)] bg-[var(--card-bg-strong)] hover:bg-[var(--bg-soft)]"
-              }`}
-            >
-              <span className={`text-xl transition-transform ${selected ? "scale-110" : ""}`} aria-hidden>
-                {mood.emoji}
-              </span>
-              <span className="mt-1 hidden text-[10px] text-[var(--text-body)] sm:block">{mood.label}</span>
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-7 gap-1.5" role="radiogroup" aria-label={`${label}今日心情`}>
+        {moods.map((mood) => (
+          <button
+            key={mood.key}
+            type="button"
+            role="radio"
+            aria-checked={mood.key === value}
+            aria-label={mood.label}
+            className="life-mood-chip"
+            onClick={() => onChange(mood.key)}
+          >
+            <span className="text-lg" aria-hidden>{mood.emoji}</span>
+          </button>
+        ))}
       </div>
-    </AppCard>
+    </section>
   );
 }
 
 export function SleepRecordPreview() {
-  const [sleepAt, setSleepAt] = useState("00:35");
-  const [wakeAt, setWakeAt] = useState("08:10");
+  const [sleepAt, setSleepAt] = useState("23:35");
+  const [wakeAt, setWakeAt] = useState("07:45");
   const duration = useMemo(() => getSleepDuration(sleepAt, wakeAt), [sleepAt, wakeAt]);
 
   return (
-    <AppCard variant="soft" className="!p-4">
-      <div className="mb-3 flex items-center gap-2 text-[var(--text-main)]">
-        <span aria-hidden>🌙</span>
-        <strong>睡眠</strong>
-        <span className="ml-auto text-xs text-[var(--text-muted)]">只记入睡和起床</span>
+    <section className="life-surface life-section-card">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <strong className="text-sm text-[var(--life-text)]">🌙 睡眠</strong>
+          <p className="mt-0.5 text-xs text-[var(--life-text-body)]">只记录入睡和起床时间</p>
+        </div>
+        <AppButton variant="ghost">记录</AppButton>
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-        <label className="grid gap-1.5 text-xs text-[var(--text-body)]">
-          <span>🌙 入睡</span>
+        <label className="grid gap-1 text-xs text-[var(--life-text-body)]">
+          <span>入睡</span>
           <AppInput type="time" value={sleepAt} onChange={(event) => setSleepAt(event.target.value)} />
         </label>
-        <span className="pb-3 text-lg text-[var(--text-placeholder)]" aria-hidden>
-          →
-        </span>
-        <label className="grid gap-1.5 text-xs text-[var(--text-body)]">
-          <span>☀️ 起床</span>
+        <span className="pb-3 text-[var(--life-text-muted)]">→</span>
+        <label className="grid gap-1 text-xs text-[var(--life-text-body)]">
+          <span>起床</span>
           <AppInput type="time" value={wakeAt} onChange={(event) => setWakeAt(event.target.value)} />
         </label>
       </div>
-      <p className="mt-3 rounded-full bg-[var(--bg-warm)] px-3 py-2 text-center text-sm text-[var(--text-body)]">
-        {duration ? `约 ${duration}` : "选择时间后自动计算时长"}
+      <p className="mt-3 rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-center text-sm text-[var(--life-text-body)]">
+        {duration ? `约 ${duration}` : "选择时间后自动计算"}
       </p>
-    </AppCard>
+    </section>
   );
 }
 
@@ -121,7 +117,7 @@ function getSleepDuration(sleepAt: string, wakeAt: string) {
 
 export function ActivityNotePreview() {
   const [draft, setDraft] = useState("");
-  const [items, setItems] = useState(["一起看资料分析视频", "晚饭后散步30分钟"]);
+  const [items, setItems] = useState(["一起散步 35 分钟", "晚上一起看资料分析"]);
 
   function addItem() {
     const value = draft.trim();
@@ -131,62 +127,51 @@ export function ActivityNotePreview() {
   }
 
   return (
-    <AppCard variant="soft" className="!p-4">
-      <div className="mb-3 flex items-center gap-2 text-[var(--text-main)]">
-        <AppIcon name="icon-design" size={18} />
-        <strong>今天做了什么</strong>
+    <section className="life-surface life-section-card">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <strong className="text-sm text-[var(--life-text)]">👟 活动</strong>
+          <p className="mt-0.5 text-xs text-[var(--life-text-body)]">学习、散步、运动和游玩都统一记在这里</p>
+        </div>
+        <AppButton variant="ghost" onClick={addItem}>记录</AppButton>
       </div>
-      <div className="grid gap-2">
+      <div>
         {items.map((item, index) => (
-          <div
-            key={`${item}-${index}`}
-            className="flex items-start gap-2 rounded-[var(--radius-control)] border border-[var(--card-border-soft)] bg-[var(--card-bg-strong)] px-3 py-2.5 text-sm text-[var(--text-body)]"
-          >
-            <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--animal-accent)]" aria-hidden />
-            <span>{item}</span>
-          </div>
+          <AppRecordRow key={`${item}-${index}`} icon="🌱" title={item} />
         ))}
       </div>
-      <div className="mt-3 flex gap-2">
-        <div className="min-w-0 flex-1">
-          <AppInput
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="记录一件今天做过的事…"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") addItem();
-            }}
-          />
-        </div>
-        <AppButton variant="primary" onClick={addItem}>
-          添加
-        </AppButton>
+      <div className="mt-3">
+        <AppInput
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="记录一件今天做过的事…"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") addItem();
+          }}
+        />
       </div>
-    </AppCard>
+    </section>
   );
 }
 
-export function FeatureTilePreview({
-  icon,
-  title,
-  description,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-}) {
+export function NutritionPreview() {
   return (
-    <button
-      type="button"
-      className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-[var(--card-border-soft)] bg-[var(--card-bg-strong)] p-3 text-left shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 active:translate-y-0"
-    >
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-[var(--animal-accent-soft)] text-xl" aria-hidden>
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <strong className="block text-sm text-[var(--text-main)]">{title}</strong>
-        <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">{description}</span>
-      </span>
-    </button>
+    <section className="life-surface life-section-card grid gap-2.5">
+      <AppNutritionBar label="碳水" value={62} unit="g" percent={64} tone="coral" />
+      <AppNutritionBar label="蛋白质" value={18} unit="g" percent={52} tone="teal" />
+      <AppNutritionBar label="脂肪" value={14} unit="g" percent={38} tone="yellow" />
+      <AppNutritionBar label="总热量" value={456} unit="kcal" percent={58} tone="blue" />
+    </section>
+  );
+}
+
+export function FeatureTilesPreview() {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <AppFeatureTile icon="⚖️" title="体重" description="我 / Ta 切换、趋势和最近记录" />
+      <AppFeatureTile icon="💌" title="小信箱" description="纸张式信件卡片，不用头像列表" />
+      <AppFeatureTile icon="💊" title="家庭药箱" description="库存、位置和保质期" />
+      <AppFeatureTile icon="🎮" title="游戏机" description="游戏列表入口；当前只有宝石金币游戏" />
+    </div>
   );
 }
