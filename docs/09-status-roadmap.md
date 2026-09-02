@@ -33,15 +33,18 @@ P2 ChatGPT “记上”                   ✅
 P2.5 同日饮食 + 游戏记录            ✅
 V2-P0 新旧系统边界                  ✅
 V2-P1 Life facts + API + AI 基础    ✅
+V2-UI0 视觉语言设计与人工确认        ✅
 ```
 
 ## 2. V2 当前阶段
 
-当前里程碑不是直接进入完整首页，而是插入一个短阶段：
+统一视觉语言已经定稿：
 
 ```text
-V2-UI0 — 岛屿生活视觉基础 / UI reuse foundation
+docs/12-island-life-design-system.md
 ```
+
+这是 V2 后续可见 UI 的唯一主视觉规范。
 
 开发分支：
 
@@ -49,32 +52,31 @@ V2-UI0 — 岛屿生活视觉基础 / UI reuse foundation
 v2/ui-foundation
 ```
 
-原因：V2 后续会覆盖首页、饮食、日历、体重、药箱、信箱等多种信息密度。仅依赖当前 lockfile 中的 `animal-island-ui 1.0.1` 不足以支撑完整产品，但从不同 GitHub 项目直接搬 UI 又会导致视觉割裂。
+人工确认的核心方向：
 
-因此先建立统一 Design System、复用规则和 `/ui-lab`，再接 Life API。
+- 采用「方案 B」暖白 + 薄荷/青绿 + 柔黄/珊瑚/浅蓝；
+- 不再使用大面积棕色；
+- 首页保持心情 / 睡眠 / 活动，并为三者都提供记录入口；
+- 心情使用彩色情绪圆脸，不使用人物头像；
+- 活动人物当前只允许临时女性动森风角色，后续由用户提供双方真实动森角色替换；
+- 饮食独立页面，顶部 `我 / Ta` 切换，不做双人同屏对照；
+- 饮食每餐左侧真实照片、右侧碳水/蛋白质/脂肪/总热量；
+- 日历保持已确认的双人心情月历；
+- 小窝保持体重 / 小信箱 / 家庭药箱 / 游戏机四入口；
+- 体重页也使用 `我 / Ta`；
+- 小信箱不使用头像列表；
+- 游戏机只做到游戏列表，本轮不做游戏详情页；
+- 当前唯一游戏是旧版「宝石金币游戏」，未来预留更多游戏接口。
 
-详细规则见 `docs/12-island-life-design-system.md`。
+## 3. V2 信息架构（定稿）
 
-## 3. V2-UI0 当前实施内容
+主导航：
 
-目标：
+```text
+今日 / 饮食 / 日历 / 小窝 / 我的
+```
 
-- [x] 建立 `docs/12-island-life-design-system.md`；
-- [x] 建立 `/ui-lab`，明确只用于视觉实验，不读写真实数据；
-- [x] 首页三种核心 Pattern 的交互预览：Mood / Sleep / Activity；
-- [x] 小窝功能入口的主题浓度预览；
-- [x] 明确开源 UI 复用优先级和视觉适配边界；
-- [x] 确认当前 lockfile 实际仍为 `animal-island-ui 1.0.1`；
-- [x] 确认上游 1.8.x 已扩展到 DatePicker / TimePicker / Drawer / Tabs / Table / Tag / Notification / Progress / Skeleton / Image / Carousel 等更完整组件；
-- [ ] 对当前 App* wrapper 做 1.8.x 兼容性矩阵；
-- [ ] 决定哪些 1.8.x 新组件值得增加项目 wrapper；
-- [ ] Test / Lint / Build；
-- [ ] Vercel Preview 打开 `/ui-lab` 做真实视觉检查；
-- [ ] 人工确认主题浓度后，才决定依赖升级并进入 V2-P2。
-
-本阶段不改 Supabase schema，不改旧游戏规则，不把实验页作为正式导航。
-
-## 4. V2 目标信息架构
+页面结构：
 
 ```text
 今日
@@ -83,23 +85,27 @@ v2/ui-foundation
 └─ 活动
 
 饮食
+└─ 编辑一餐
 
 日历
+└─ 日历详情
 
 小窝
 ├─ 体重
-├─ 日记 / 小信箱
+├─ 小信箱
 ├─ 家庭药箱
-├─ 心情月度回顾（Later）
-├─ 游戏机
-│  ├─ 变美变瘦大作战
-│  └─ Future Mini Games
-└─ 数据管理
+│  └─ 添加 / 编辑药品
+└─ 游戏机
+   ├─ 宝石金币游戏 -> Legacy Game
+   └─ Future Games
+
+我的
+└─ 账号/设置/数据等后续入口
 ```
 
-首页不放饮食、体重、给对方的话或家庭药箱；高频首页只保留心情、睡眠和活动。
+游戏机本轮只开发游戏列表，不开发新的游戏详情 UI。
 
-## 5. 数据边界
+## 4. 数据边界
 
 已有事实域继续保持：
 
@@ -121,7 +127,7 @@ record_write_receipts
 
 生活系统中的“活动”是统一用户概念，不在首页拆成学习 / 运动 / 散步等多个任务；数据库保留 `activity_type / duration_minutes` 作为可选结构化字段，手动 UI 不强迫填写，未来 AI 可以在明确事实基础上填充。
 
-## 6. AI 写入架构原则
+## 5. AI 写入架构原则
 
 以后不是“饮食单独接一个 AI、药箱再单独造一个 AI”。统一遵循：
 
@@ -151,7 +157,7 @@ meal / mood / sleep / activity / weight / medicine
 
 AI 不获得任意 SQL 权限。未来每个领域继续拥有自己的字段校验、权限和审计规则。
 
-## 7. 旧游戏边界
+## 6. 旧游戏边界
 
 旧游戏继续完整保留：
 
@@ -181,9 +187,9 @@ DailyMealsPanel            旧游戏适配层；读取 HomeResourcesProvider
 └─ DailyMealsPanelCore     纯饮食 UI；不读取 HomeResourcesProvider
 ```
 
-因此饮食已经从旧游戏 Provider 中拆出来，但产品层目前仍在旧游戏今日页展示；未来独立饮食页直接复用 `DailyMealsPanelCore`。
+因此饮食已经从旧游戏 Provider 中拆出来；V2 独立饮食页应复用/重构 `DailyMealsPanelCore`，而不是重建第二套 Meal CRUD。
 
-## 8. UI 复用规则
+## 7. UI 复用规则
 
 新增可见 UI 的默认顺序：
 
@@ -211,7 +217,22 @@ guowenju/portal-os
 CheapNightbot/our-days
 ```
 
-## 9. 饮食后续
+后续实现必须以 `docs/12-island-life-design-system.md` 为视觉规范源；`/ui-lab` 只是实验工具。
+
+## 8. 饮食后续
+
+独立饮食页定稿结构：
+
+```text
+顶部：我 / Ta
+早餐：左真实照片，右营养统计 + 编辑
+午餐：左真实照片，右营养统计 + 编辑
+晚餐：左真实照片，右营养统计 + 编辑
+加餐：左真实照片，右营养统计 + 编辑
+底部：今日碳水 / 蛋白质 / 脂肪 / 总热量
+```
+
+编辑按钮进入「编辑一餐」子页面；新增和编辑复用同一数据/表单逻辑。
 
 现有 Meal CRUD / ChatGPT “记上”继续有效。
 
@@ -231,36 +252,90 @@ NULL = 没有估算
 0    = 确实为 0 kcal
 ```
 
-## 10. 家庭药箱后续
+## 9. 体重、日历、小信箱与药箱
 
-家庭药箱作为独立数据域；收到真实 Excel 后再确定最终 schema 和导入字段。
+### 日历
 
-未来目标包括：药名 / 规格 / 数量 / 存放位置、保质期 / 开封后有效期、状态与软删除、source / idempotency、AI 受限查询与确认后修改、change log / audit。
+- 主月历显示双方心情圆脸；
+- 点击日期进入日历详情；
+- 日历详情回顾心情、睡眠、活动、饮食概览；
+- 不做成功率/连续打卡评价。
+
+### 体重
+
+- 顶部 `我 / Ta`；
+- 当前体重；
+- 周/月/年趋势；
+- 折线图；
+- 近期记录；
+- 记录体重。
+
+### 小信箱
+
+- 收到的 / 我写的；
+- 信纸卡片；
+- 不用人物头像做列表主体；
+- 不做写信次数和连续记录。
+
+### 家庭药箱
+
+作为独立数据域；收到真实 Excel 后再最终确定 schema 和导入字段。
+
+目标包括：药名 / 规格 / 数量 / 存放位置、保质期 / 开封后有效期、状态与软删除、source / idempotency、AI 受限查询与确认后修改、change log / audit。
 
 真实 Excel 和真实家庭库存数据不得提交到 GitHub migration。
+
+## 10. 游戏机扩展接口
+
+游戏机不是旧游戏详情页，而是**游戏目录**。
+
+本轮：
+
+```text
+宝石金币游戏
+更多游戏（敬请期待）
+```
+
+后续游戏入口建议统一拥有：
+
+```text
+gameKey
+title
+cover
+status
+route
+```
+
+当前「宝石金币游戏」route 指向现有 Legacy Game；不在 V2 本轮重写其详情页。
+
+未来小游戏可以新增，但不得自动把生活记录主数据变成全局排行榜。
 
 ## 11. 后续顺序
 
 ```text
-V2-P0  新旧边界 + /game + 解耦             ✅
+V2-P0  新旧边界 + /game + 解耦                    ✅
 ↓
-V2-P1  心情 / 睡眠 / 活动 schema + API      ✅
+V2-P1  心情 / 睡眠 / 活动 schema + API             ✅
 ↓
-V2-UI0 岛屿生活 Design System + /ui-lab     🚧
+V2-UI0 统一视觉语言设计 + 人工确认                   ✅
 ↓
-V2-P2  新生活主框架 + 今日首页
+V2-UI1 视觉 token / App* / Pattern 基础实现          ← 当前下一步
 ↓
-V2-P3  饮食独立页 + kcal optional
+V2-P2  新生活 App Shell + 今日首页
 ↓
-V2-P4  生活日历
+V2-P3  独立饮食页 + 编辑一餐 + kcal optional
 ↓
-V2-P5  真实体重页
+V2-P4  月度日历 + 日历详情
 ↓
-V2-P6  家庭药箱
+V2-P5  小窝 + 体重页
 ↓
-V2-P7  日记 / 小信箱
+V2-P6  家庭药箱 + 添加/编辑药品
 ↓
-Later   月度双人心情图 / Mini Games / 动物岛生活可视化
+V2-P7  小信箱
+↓
+V2-P8  游戏机列表 -> Legacy Game 入口
+↓
+Later   更多小游戏 / 双方正式动森角色替换 / 岛屿生活可视化
 ```
 
 AI 不单独作为一个“最后阶段”；每个事实域具备稳定 canonical API 后，可按需要逐步增加 AI adapter。
@@ -283,13 +358,16 @@ Browser -> Next.js API -> server-only Supabase -> PostgreSQL
 
 ## 13. 下一步是什么
 
-当前下一步是完成 V2-UI0：
+当前下一步不是继续改视觉方向，而是**按已确认视觉语言做实现基础**：
 
 ```text
-App* -> animal-island-ui 1.8.x 兼容矩阵
-+ 新官方组件包装候选
-+ CI / Preview
-+ /ui-lab 人工视觉确认
+V2-UI1
+├─ 把定稿色板/圆角/阴影落成全局 token
+├─ 审查/补齐 App* wrapper
+├─ 建立 AppRoleSwitch（我 / Ta）
+├─ 建立主 Page/Section/Record/FeatureTile Pattern
+├─ 将 /ui-lab 调整为与定稿视觉一致的回归页
+└─ Test / Lint / Build + Vercel Preview
 ```
 
-确认后再进入 V2-P2，把已经存在的 Life API 接到正式「今日」页面。
+完成后再开始正式 V2-P2 首页接 Life API。
