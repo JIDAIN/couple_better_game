@@ -1,200 +1,176 @@
-# 账户、双人绑定与迁移边界
+# 固定双账号登录与权限边界
 
-> V2-R1B。本文描述生活系统从“共享同步密码”迁移到“两个真实账号 + 一个双人空间”的目标与当前实现。
+> V2-R1B 最终方案。项目只有两位固定使用者，不做开放注册，也不做邀请码配对。
 
-## 1. 身份模型
+## 1. 产品约束
+
+账号永远只有两个：
 
 ```text
-Supabase Auth user
-        │
-        ├─ life_user_profiles
-        │
-        └─ couple_space_members
-              │
-              ├─ couple_space_id
-              └─ partner_key = cat | fish
+我  -> partnerKey = cat
+Ta  -> partnerKey = fish
 ```
 
-一个 Auth user 是一个真实登录身份；`partner_key` 是该用户在双人空间里的业务身份。一个空间最多只有一个 `cat` 和一个 `fish`。
+两个人继续复用旧程序同一个 `DATA_EDIT_PASSWORD`。区分身份的关键不是密码，而是“选择哪个固定账号登录”。
 
-这意味着以后不允许“同一个浏览器凭一个共享密码同时假装我和 Ta”。个人记录的写权限必须由登录账号对应的 `partner_key` 决定。
+不提供：
 
-## 2. 浏览器与 Supabase 边界
+- 用户自由注册；
+- 第三个账号；
+- 邮箱验证；
+- 24 小时邀请码；
+- CoupleSpace 配对流程。
 
-当前链路：
-
-```text
-Browser
-  -> same-origin /api/auth/*
-  -> Next.js server auth adapter
-  -> Supabase Auth
-
-Browser
-  -> same-origin life/domain API
-  -> account membership authorization
-  -> service-side domain adapter / RPC
-  -> Supabase PostgreSQL
-```
-
-安全规则：
-
-- 浏览器不接触 `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY`。
-- Auth access token / refresh token 使用 HttpOnly、SameSite=Lax Cookie。
-- `/api/auth/session` 用 Auth user endpoint重新验证当前账号，不把客户端缓存的 user object 当授权事实。
-- 业务表目前仍然保持 server-only；本阶段没有为了登录功能开放浏览器直连生活表。
-
-## 3. Auth 实现说明
-
-Supabase 官方推荐 Next.js SSR 使用 `@supabase/supabase-js` + `@supabase/ssr`、Cookie session 与 Proxy 刷新机制。
-
-R1B 当前为了不在连接器环境中手工重写 `package-lock.json`，先使用**服务端薄 HTTP 适配器**调用 Supabase 官方 Auth API：
-
-- signup
-- password login
-- refresh token
-- user validation
-- logout
-
-它不是自建认证协议：密码校验、token 发行与刷新全部仍由 Supabase Auth 完成。
-
-后续若正式引入 npm 依赖，应直接迁移到 Supabase 官方 SSR client/proxy 模式，不再平行维护另一套 token 生命周期实现。
-
-参考：
-
-- https://supabase.com/docs/guides/auth/server-side/creating-a-client
-- https://supabase.com/docs/guides/auth/passwords
-- https://supabase.com/docs/guides/getting-started/tutorials/with-nextjs
-
-## 4. 注册与登录
-
-入口：`/login`
+## 2. 登录流程
 
 ```text
-注册
--> POST /api/auth/signup
--> Supabase Auth
--> auth.users
--> trigger 自动创建 life_user_profiles
--> 如果项目要求邮箱确认：等待确认后再登录
-
-登录
+/login
+-> 选择“我”或“Ta”
+-> 输入旧程序共享密码
 -> POST /api/auth/login
--> Supabase Auth password grant
--> HttpOnly access/refresh cookies
--> /me
+-> server 校验 DATA_EDIT_PASSWORD
+-> server 生成带 partnerKey 的签名 HttpOnly Cookie
+-> 后续 API 从 Cookie 解析当前身份
 ```
 
-退出：
+Cookie：
+
+- HttpOnly；
+- SameSite=Lax；
+- Production 下 Secure；
+- 30 天有效；
+- payload 包含 `partnerKey` 和到期时间；
+- HMAC-SHA256 签名密钥由 `DATA_EDIT_PASSWORD + Supabase server secret + 固定域分隔符` 派生；
+- 浏览器无法伪造从 `cat` 切换为 `fish`。
+
+退出登录只清除该 Cookie。
+
+## 3. 为什么不用 Supabase Auth
+
+本项目不是开放 SaaS，也不存在“系统不知道谁和谁是一对”的问题。
+
+Supabase Auth + 注册 + invitation membership 对只有两个人的固定应用造成不必要复杂度。R1B 曾短暂实现过该方案，但在产品复核后已经撤销。
+
+生产数据库中当时新建的 Auth profile / membership / invite 表均为空，因此通过后续 cleanup migration 安全移除，没有迁移或删除任何真实生活数据。
+
+## 4. 数据权限
+
+所有生活数据仍然通过：
 
 ```text
-POST /api/auth/logout
--> Supabase Auth logout
--> 清除两枚 Auth Cookie
+Browser
+-> Next.js same-origin API
+-> fixed account session authorization
+-> service-side Supabase adapter / RPC
+-> PostgreSQL
 ```
 
-## 5. 第一个账号迁移
-
-生产数据库在 R1A 时 `auth.users = 0`，而原有生活数据已经存在于 `couple-better-game` 空间。因此不能自动猜测历史数据属于哪个新邮箱账号。
-
-第一次迁移采用明确的一次性桥接：
-
-1. 用户先注册并登录真实账号；
-2. 在“我的”选择自己是 `cat` 或 `fish`；
-3. 输入旧系统同步密码；
-4. server 验证旧密码；
-5. 仅当整个 membership 表仍为空时，把该 Auth user 写成现有空间的 owner。
-
-一旦第一个 member 建立，bootstrap 会永久拒绝后续账号再走这条路径。
-
-因此旧共享密码不能被第二个人拿来创建另一个身份。
-
-## 6. Ta 如何加入
-
-第一个成员在“我的”生成邀请码：
+个人记录写权限：
 
 ```text
-POST /api/auth/pairing/invite
--> create_couple_space_invite
--> 生成随机 12 位十六进制邀请码
--> 数据库只保存 SHA-256(code)
--> 24 小时过期
-```
+当前登录 partnerKey == payload.partnerKey
+  -> 允许
 
-Ta 注册自己的 Auth 账号后输入邀请码：
-
-```text
-POST /api/auth/pairing/accept
--> accept_couple_space_invite
--> 校验 hash / 未使用 / 未过期 / 目标身份槽为空
--> 插入 couple_space_members
--> 标记邀请码已使用
-```
-
-邀请码使用后不能重复使用。
-
-## 7. 个人记录写权限
-
-R1B 新增服务端规则：
-
-```text
-登录用户 partner_key == payload.partnerKey
-    -> 允许个人记录写入
-
-登录用户 partner_key != payload.partnerKey
-    -> 403 OWN_RECORD_ONLY
+当前登录 partnerKey != payload.partnerKey
+  -> 403 OWN_RECORD_ONLY
 ```
 
 当前已接入：
 
-- mood
-- sleep
-- weight 新增
+- 心情；
+- 睡眠；
+- 体重新增。
 
-这为 R2 的“我只能修改自己的心情，Ta 的心情只读”提供真正的服务器权限基础。
+R2 首页心情必须直接消费这个身份：只能修改当前登录账号自己的心情，另一方只读。
 
-仍需逐域迁移：
+后续还要逐域收紧：
 
-- meals：创建、修改、删除都要校验记录归属；
-- mailbox：sender 必须由当前账号确定；
-- activity：创建人与参与人语义需要明确。
+- Meal 创建/修改/删除；
+- Mailbox sender；
+- Activity 创建人与参与人语义。
 
-在这些迁移完成前，不应删除旧兼容路径。
+## 5. 共享数据
 
-## 8. 旧 cloud-session 的状态
+固定账号只是写权限身份，不代表两个人的数据彼此隔离不可见。
 
-`DATA_EDIT_PASSWORD` / `couple-cloud-session` 现在是**迁移期兼容层**，不是目标登录系统。
+两个人继续共享同一个 `couple-better-game` 生活空间，因此：
 
-保留原因：当前 Production 还没有真实 Auth 用户，立即删除会让现有两人数据在下一次部署前后失去可操作入口。
+- 日历可以同时看双方记录；
+- 家庭药箱共同可见；
+- 小信箱共同可见；
+- 游戏数据共同可见；
+- 饮食页仍可以切换查看我 / Ta；
+- 个人敏感写操作由当前账号限制。
 
-删除条件：
+## 6. 与旧程序的关系
 
-1. 两个真实账号均已注册；
-2. 两个账号均已绑定到原有 couple space；
-3. 所有个人/共享写 API 已完成账号权限迁移；
-4. 旧游戏同步路径验证不依赖共享登录身份。
+旧程序长期使用的是 `cat / fish` 两个业务身份和同一套共享密码。R1B 不再把它们升级成两个新注册用户，而是直接把这两个既有身份变成真正的登录会话身份。
 
-满足后单独做 migration/cleanup，删除共享密码认证。
+这样保持：
 
-## 9. 运行环境变量
+```text
+旧身份语义不变
+旧密码不变
+历史数据 partnerKey 不变
+```
 
-现有 server secret 继续使用：
+同时新增：
 
-- `SUPABASE_SECRET_KEY`，或兼容 `SUPABASE_SERVICE_ROLE_KEY`
-- `SUPABASE_URL`
+```text
+服务端知道当前是谁
+不能通过前端切换按钮冒充另一方写个人记录
+```
 
-Auth 还需要一个**可发布 key**，server adapter 支持以下任一名称：
+## 7. 数据库迁移历史
 
-- `SUPABASE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- 兼容旧 `SUPABASE_ANON_KEY`
-- 兼容旧 `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+由于前一版 R1B migration 已经实际应用到 Production，migration 文件不能从 Git 历史中假装不存在。
 
-即使变量名含 `NEXT_PUBLIC_`，当前实现也仍只从服务端 adapter 使用；service/secret key 永远不能下发浏览器。
+因此仓库保留：
 
-在下一次获得 Vercel 部署授权前，应先确认 Production 已配置可发布 key，否则登录 API 会返回 `SUPABASE_AUTH_CONFIG_MISSING`。
+1. 创建 Auth/membership/invite schema 的已执行 migration；
+2. 权限 hardening migration；
+3. `remove_unused_auth_pairing` cleanup migration。
 
-## 10. 部署规则
+最终 Production 状态不再存在：
 
-R1B 的 GitHub/Supabase 开发不等于 Vercel 部署。
+- `life_user_profiles`；
+- `couple_space_members`；
+- `couple_space_invites`；
+- Auth profile trigger；
+- pairing/bootstrap RPC。
 
-`vercel.json` 必须默认保持 `git.deploymentEnabled: false`。任何 Preview 或 Production 仍须用户针对该次部署明确授权。
+这保证数据库 migration 历史与 Production 实际执行记录一致。
+
+## 8. 环境变量
+
+固定双账号方案不需要 Supabase publishable/anon key。
+
+继续需要服务端已有配置：
+
+```text
+DATA_EDIT_PASSWORD
+SUPABASE_URL
+SUPABASE_SECRET_KEY
+```
+
+兼容：
+
+```text
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+这些 secret 不允许进入客户端 bundle。
+
+## 9. 部署规则
+
+`vercel.json` 默认保持：
+
+```json
+{
+  "git": {
+    "deploymentEnabled": false
+  }
+}
+```
+
+任何 Preview / Production 仍必须取得用户针对该次部署的明确授权。
