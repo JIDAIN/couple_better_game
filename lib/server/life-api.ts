@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { isAuthorizedCloudRequest } from "./cloud-request-auth";
 import { LifeCloudError } from "./supabase-life";
 import { hasCloudSyncConfig } from "./supabase-home-sync";
+import { resolveLifeIdentity, type LifeIdentity } from "./life-auth";
 
 export function lifeJsonError(message: string, status: number, errorCode: string) {
   return NextResponse.json({ ok: false, error: message, errorCode }, { status });
@@ -17,18 +17,25 @@ export function lifeCloudErrorResponse(error: LifeCloudError) {
   return lifeJsonError(error.message, status, error.errorCode);
 }
 
-export async function authorizeLifeRequest(request: Request) {
+export async function requireLifeIdentity(request: Request): Promise<{ identity: LifeIdentity; response: null } | { identity: null; response: NextResponse }> {
   if (!hasCloudSyncConfig()) {
-    return lifeJsonError(
-      "Supabase 服务端环境变量未配置完整",
-      500,
-      "SERVER_CONFIG",
-    );
+    return { identity: null, response: lifeJsonError("Supabase 服务端环境变量未配置完整", 500, "SERVER_CONFIG") };
   }
-  if (!(await isAuthorizedCloudRequest(request))) {
-    return lifeJsonError("同步密码不正确或云端会话无效", 401, "UNAUTHORIZED");
+  try {
+    const identity = await resolveLifeIdentity(request);
+    if (!identity) return { identity: null, response: lifeJsonError("请先登录", 401, "UNAUTHORIZED") };
+    if (!identity.coupleSpaceId || !identity.partnerKey) {
+      return { identity: null, response: lifeJsonError("请先完成双人空间绑定", 403, "PAIRING_REQUIRED") };
+    }
+    return { identity, response: null };
+  } catch {
+    return { identity: null, response: lifeJsonError("登录状态无效，请重新登录", 401, "UNAUTHORIZED") };
   }
-  return null;
+}
+
+export async function authorizeLifeRequest(request: Request) {
+  const result = await requireLifeIdentity(request);
+  return result.response;
 }
 
 export async function readJsonBody(request: Request) {
