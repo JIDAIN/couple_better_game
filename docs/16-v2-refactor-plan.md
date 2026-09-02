@@ -30,28 +30,33 @@
 - 详见 `docs/20-r3-meal-model.md`。
 
 ## R4：情绪日历 ✅
-- 无心情日期下方完全留空；
-- 今天使用小太阳特殊标识；
-- 一人有记录显示一枚情绪图，双方都有显示两枚轻微错位的情绪图；
-- 显示顺序按当前 `mePartnerKey / taPartnerKey`；
-- 月历接入 `life-month:{YYYY-MM}` cache；
-- 日期排布和 mood-under-date 模式参考 MIT `GitHub-Xzhi/obsidian-mood-calendar`，只复用产品/布局思路，不复制视觉资产或插件代码；
+- 无心情日期下方完全留空；今天使用小太阳。
+- 一人有记录显示一枚情绪图，双方都有显示两枚轻微错位图标。
+- 显示顺序按 `mePartnerKey / taPartnerKey`。
+- 月历接入 `life-month:{YYYY-MM}` cache。
+- 产品模式参考 MIT `GitHub-Xzhi/obsidian-mood-calendar`，不复制其视觉资产或插件代码。
 - 详见 `docs/21-r4-mood-calendar.md`。
 
-## R5：小窝 / 我的职责重分 ▶ 下一阶段
-- 小窝：两人共同拥有的内容（体重、信箱、药箱、游戏机）。
-- 我的：当前账号、同步状态、数据管理、设置、退出登录。
-- 删除重复产品说明。
-- 信箱 sender 固定为当前登录身份；收到的信只读，自己寄出的信才可编辑/删除。
+## R5：小窝 / 我的职责重分 ✅
+- 小窝只负责共同生活四入口：体重 / 小信箱 / 家庭药箱 / 游戏机。
+- 我的只负责当前账号、相对身份、同步、写入边界、数据管理与退出。
+- 删除“我的”里重复的小窝/日历/游戏快捷入口。
+- 小信箱新信固定 `我 -> Ta`；收到的只读；自己寄出的可编辑/删除。
+- Mailbox POST/PUT/DELETE 增加服务端 sender ownership 校验。
+- 详见 `docs/22-r5-nest-me-boundary.md`。
 
-## R6：全站视觉还原
-- 以“岛屿生活视觉语言 V2 · 方案B”为验收基线。
-- 减少标准 SaaS 卡片堆叠。
-- 场景页加强插画和空间构图；数据密集页保持克制。
-- 第三方库只复用逻辑/结构，统一通过视觉适配层。
+## R6：全站视觉还原 ✅ 代码/文档完成
+- 以“岛屿生活视觉语言 V2 · 方案B”为基线。
+- 新增 `app/island-life-refactor.css` 统一页面级 visual adapter。
+- 统一背景、标题、底部导航、sheet、surface 材质。
+- 日历从 SaaS 日期卡改成稀疏纸质月历。
+- 小窝使用房间场景 + 2×2 四入口。
+- 我的使用账号 Hero + 设置列表。
+- 数据密集页保持克制；Legacy Game 不改视觉/机制。
+- 更新 `docs/12-island-life-design-system.md`；详见 `docs/23-r6-visual-polish.md`。
 
-## 最终统一验收
-R6 与文档完成后统一执行 Test / Lint / Build；发现问题先修复，再重新执行，并回写状态文档。
+## 最终统一验收 ▶ 当前阶段
+按用户要求：R6 与文档完成后统一执行 Test / Lint / Build；发现问题先修复，再重新执行，并把最终 run / 修复情况回写状态文档后才结束本轮。
 
 ## 部署约束
 `vercel.json` 默认保持 `git.deploymentEnabled: false`。任何 Preview / Production 必须再次获得明确授权。
