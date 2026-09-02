@@ -86,3 +86,17 @@ Browser
 R1-R6 已于本日完成一次明确授权的 Production 部署，随后 Git 自动部署已经重新关闭。
 
 当前 `vercel.json` 必须继续保持 `git.deploymentEnabled: false`。本次 Supabase 账号修复尚未获得新的部署授权，因此只能提交、测试、合并，不能触发 Vercel Preview / Production。
+
+## 7. R7 实机视觉校准（进行中）
+
+2026-09-03 再次对照 Production 手机截图与“岛屿生活 V2 · 方案 B”定稿后，确认 R6 只完成了页面级 visual adapter，实际组件仍存在移动端密度过低、卡片膨胀、系统 emoji 风格不统一等偏差。
+
+R7 第一批已完成：
+
+- 主内容宽度从平板尺度收回到移动端 `30rem`；
+- 统一压缩卡片圆角、阴影、内边距与日历格高；
+- 五项底部导航改为同一套线性 SVG 图标，移除系统 emoji；
+- 首页标题改为“月日 + 星期”的生活化日期层级；
+- Test 149/149、Lint（无 error）、Build 通过。
+
+后续仍需在获得可用的手机视觉预览环境后，对首页内容构图、餐食真实数据长文本、各子页面弹层逐页校准。任何 Vercel Preview / Production 仍须单次明确授权。
