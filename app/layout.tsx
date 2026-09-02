@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cursor } from "animal-island-ui";
+import { LifeAuthProvider } from "@/components/auth/LifeAuthProvider";
 import "animal-island-ui/style";
 import "./globals.css";
 import "./island-life-tokens.css";
@@ -28,15 +29,13 @@ export const viewport: Viewport = {
   themeColor: "#aedcc8",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
-        <Cursor className="app-cursor-root">{children}</Cursor>
+        <LifeAuthProvider>
+          <Cursor className="app-cursor-root">{children}</Cursor>
+        </LifeAuthProvider>
       </body>
     </html>
   );
