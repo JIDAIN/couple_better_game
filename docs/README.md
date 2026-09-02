@@ -17,7 +17,25 @@
 | [`09-status-roadmap.md`](09-status-roadmap.md) | 已完成、进行中、下一步、技术债是什么？ |
 | [`10-v2-life-redesign.md`](10-v2-life-redesign.md) | V2 为什么把生活系统设为主产品、旧游戏如何隐藏保留？ |
 | [`11-ai-write-architecture.md`](11-ai-write-architecture.md) | ChatGPT 如何跨饮食、生活、体重、药箱复用安全写入架构？ |
-| [`12-island-life-design-system.md`](12-island-life-design-system.md) | V2 岛屿生活视觉语言、开源 UI 复用和 `/ui-lab` 应遵守什么规则？ |
+| [`12-island-life-design-system.md`](12-island-life-design-system.md) | **V2 所有可见 UI 的唯一主视觉规范** |
+
+## V2 UI 当前代码基础
+
+视觉语言已经人工定稿，当前实现基础位于：
+
+```text
+app/island-life-tokens.css
+components/ui/AppPageShell.tsx
+components/ui/AppRoleSwitch.tsx
+components/ui/AppRecordRow.tsx
+components/ui/AppFeatureTile.tsx
+components/ui/AppNutritionBar.tsx
+app/ui-lab/page.tsx
+```
+
+`/ui-lab` 只用于假数据视觉回归，不能读写 Supabase / Life facts，也不能触发 Legacy Game settlement。
+
+以后新增任何 V2 可见页面，必须先阅读 `12-island-life-design-system.md`，不得在单个业务 PR 中自行改变色板、主导航或已经确认的页面结构。
 
 根目录另外有：
 
