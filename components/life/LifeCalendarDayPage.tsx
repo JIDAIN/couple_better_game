@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { fetchLifeDay, LifeApiError } from "@/lib/life/life-client";
@@ -10,6 +10,10 @@ import type { LifeDayRecord, LifePartnerKey, MoodRecord, SleepRecord } from "@/l
 import type { MealRecord, NutritionPartnerKey } from "@/lib/nutrition/meal-service";
 import { displayDate, durationText, formatTime, moodVisual } from "@/components/life/today/today-life-model";
 import { MoodIcon } from "@/components/ui/MoodIcon";
+import { useStaleQuery } from "@/lib/client/use-stale-query";
+
+type CalendarDayBundle = { day: LifeDayRecord; meMeals: MealRecord[]; taMeals: MealRecord[] };
+const EMPTY_MEALS: MealRecord[] = [];
 
 function personMood(moods: MoodRecord[], key: LifePartnerKey) {
   return moods.find((item) => item.partnerKey === key);
@@ -41,35 +45,20 @@ function PersonMood({ label, mood }: { label: string; mood?: MoodRecord }) {
 
 export function LifeCalendarDayPage({ date }: { date: string }) {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
-  const [day, setDay] = useState<LifeDayRecord | null>(null);
-  const [meMeals, setMeMeals] = useState<MealRecord[]>([]);
-  const [taMeals, setTaMeals] = useState<MealRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!mePartnerKey || !taPartnerKey) return;
-    let cancelled = false;
-    Promise.all([
+  const fetcher = useCallback(async (): Promise<CalendarDayBundle> => {
+    if (!mePartnerKey || !taPartnerKey) throw new Error("正在确认当前账号");
+    const [day, meMeals, taMeals] = await Promise.all([
       fetchLifeDay(date),
       fetchMeals({ mealDate: date, partnerKey: mePartnerKey as NutritionPartnerKey }),
       fetchMeals({ mealDate: date, partnerKey: taPartnerKey as NutritionPartnerKey }),
-    ])
-      .then(([lifeDay, currentMeals, partnerMeals]) => {
-        if (cancelled) return;
-        setDay(lifeDay);
-        setMeMeals(currentMeals.filter((meal) => meal.deletedAt == null));
-        setTaMeals(partnerMeals.filter((meal) => meal.deletedAt == null));
-        setError(null);
-      })
-      .catch((cause: unknown) => {
-        if (cancelled) return;
-        if (cause instanceof LifeApiError || cause instanceof MealApiError) setError(cause.message);
-        else setError("这一天的生活记录暂时没有加载出来");
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    ]);
+    return { day, meMeals: meMeals.filter((meal) => meal.deletedAt == null), taMeals: taMeals.filter((meal) => meal.deletedAt == null) };
   }, [date, mePartnerKey, taPartnerKey]);
+  const query = useStaleQuery<CalendarDayBundle>({ key: `calendar-day:${date}:${mePartnerKey ?? "pending"}`, fetcher, staleMs: 30_000 });
+  const day = query.data?.day ?? null;
+  const meMeals = query.data?.meMeals ?? EMPTY_MEALS;
+  const taMeals = query.data?.taMeals ?? EMPTY_MEALS;
+  const error = query.error instanceof LifeApiError || query.error instanceof MealApiError ? query.error.message : query.error ? "这一天的生活记录暂时没有加载出来" : null;
 
   const people = useMemo(() => {
     if (!mePartnerKey || !taPartnerKey) return [] as Array<{ key: LifePartnerKey; label: "我" | "Ta" }>;
@@ -86,7 +75,6 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
 
   return (
     <AppPageShell title={displayDate(date)} subtitle="回看这一天的小日常。" actions={<Link href="/calendar" className="life-back-link">返回月历</Link>}>
-      {loading ? <div className="life-surface life-section-card text-sm font-bold text-[var(--life-text-muted)]">正在翻这一天的记录…</div> : null}
       {error ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
 
       {day ? <div className="grid gap-3">

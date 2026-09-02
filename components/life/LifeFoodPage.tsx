@@ -131,8 +131,6 @@ export function LifeFoodPage() {
         </div>
 
         {error ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_16%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{error}</div> : null}
-        {query.refreshing ? <div className="life-sync-pill mb-3">正在同步这一天的饮食…</div> : null}
-
         <div className="grid gap-3">
           {FIXED_MEALS.map(({ type, label, icon }) => {
             const records = fixed.get(type) ?? [];

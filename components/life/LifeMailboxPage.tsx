@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { createMailboxItem, deleteMailboxItem, fetchMailboxLetters, updateMailboxItem } from "@/lib/life/mailbox-client";
 import type { MailboxLetter, MailboxPartnerKey, MailboxWritePayload } from "@/lib/life/mailbox-service";
+import { useStaleQuery } from "@/lib/client/use-stale-query";
 
 type Tab = "received" | "sent";
+const EMPTY_LETTERS: MailboxLetter[] = [];
 
 function dateText(value: string) {
   const d = new Date(value);
@@ -16,19 +18,16 @@ function dateText(value: string) {
 
 export function LifeMailboxPage() {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
-  const [letters, setLetters] = useState<MailboxLetter[]>([]);
   const [tab, setTab] = useState<Tab>("received");
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<MailboxLetter | null | undefined>(undefined);
   const [form, setForm] = useState<MailboxWritePayload | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    fetchMailboxLetters().then((items) => { if (active) { setLetters(items); setError(null); } }).catch((cause: unknown) => { if (active) setError(cause instanceof Error ? cause.message : "小信箱暂时没有打开"); }).finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, []);
+  const fetcher = useCallback(() => fetchMailboxLetters(), []);
+  const lettersQuery = useStaleQuery<MailboxLetter[]>({ key: "mailbox", fetcher, staleMs: 30_000 });
+  const letters = lettersQuery.data ?? EMPTY_LETTERS;
+  const visibleError = error ?? lettersQuery.error?.message ?? null;
 
   const visible = useMemo(() => {
     if (!mePartnerKey) return [];
@@ -39,7 +38,6 @@ export function LifeMailboxPage() {
     return key === mePartnerKey ? "我" : "Ta";
   }
 
-  async function reload() { setLetters(await fetchMailboxLetters()); }
   function openCreate() {
     if (!mePartnerKey || !taPartnerKey) return;
     setEditing(null);
@@ -55,15 +53,16 @@ export function LifeMailboxPage() {
     const ownedForm = { ...form, senderKey: mePartnerKey, recipientKey: taPartnerKey };
     setSaving(true);
     try {
-      if (editing) await updateMailboxItem(editing.id, ownedForm); else await createMailboxItem(ownedForm);
-      await reload(); setEditing(undefined); setForm(null); setError(null);
+      const saved = editing ? await updateMailboxItem(editing.id, ownedForm) : await createMailboxItem(ownedForm);
+      lettersQuery.update((current) => [saved, ...(current ?? []).filter((letter) => letter.id !== saved.id)]);
+      setEditing(undefined); setForm(null); setError(null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "保存信件失败"); }
     finally { setSaving(false); }
   }
   async function remove(letter: MailboxLetter) {
     if (!mePartnerKey || letter.senderKey !== mePartnerKey) return;
     if (!window.confirm("把这封信从小信箱里移除吗？")) return;
-    try { await deleteMailboxItem(letter.id); await reload(); } catch (cause) { setError(cause instanceof Error ? cause.message : "删除信件失败"); }
+    try { await deleteMailboxItem(letter.id); lettersQuery.update((current) => (current ?? []).filter((item) => item.id !== letter.id)); } catch (cause) { setError(cause instanceof Error ? cause.message : "删除信件失败"); }
   }
 
   if (!mePartnerKey || !taPartnerKey) {
@@ -81,10 +80,9 @@ export function LifeMailboxPage() {
       </div>
     </section>
 
-    {error ? <div className="mt-3 rounded-2xl bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
+    {visibleError ? <div className="mt-3 rounded-2xl bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{visibleError}</div> : null}
     <div className="mt-3 grid gap-3">
-      {loading ? <div className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在翻信箱…</div> : null}
-      {!loading && visible.length === 0 ? <div className="life-surface life-section-card text-center"><div className="text-3xl">💌</div><p className="mt-2 text-sm font-bold text-[var(--life-text-body)]">这里还没有信</p><p className="mt-1 text-xs text-[var(--life-text-muted)]">想说的话可以慢慢写下来。</p></div> : null}
+      {!lettersQuery.loading && visible.length === 0 ? <div className="life-surface life-section-card text-center"><div className="text-3xl">💌</div><p className="mt-2 text-sm font-bold text-[var(--life-text-body)]">这里还没有信</p><p className="mt-1 text-xs text-[var(--life-text-muted)]">想说的话可以慢慢写下来。</p></div> : null}
       {visible.map((letter, index) => <article key={letter.id} className={`life-letter-card relative overflow-hidden rounded-[var(--life-radius-card)] border border-[var(--life-border-soft)] p-4 ${letter.format === "postcard" ? "bg-[color:color-mix(in_srgb,var(--life-blue)_18%,white)]" : index % 2 ? "bg-[color:color-mix(in_srgb,var(--life-yellow)_15%,white)]" : "bg-[var(--life-surface)]"}`}>
         <div className="absolute right-4 top-4 rotate-6 rounded-md border border-[var(--life-border)] bg-white/70 px-2 py-1 text-[10px]">{letter.format === "postcard" ? "POSTCARD" : "LETTER"}</div>
         <p className="pr-20 text-[11px] font-extrabold text-[var(--life-text-muted)]">{roleLabel(letter.senderKey)} → {roleLabel(letter.recipientKey)} · {dateText(letter.sentAt)}</p>

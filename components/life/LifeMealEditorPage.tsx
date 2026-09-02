@@ -9,7 +9,7 @@ import { AppButton } from "@/components/ui/AppButton";
 import { AppInput } from "@/components/ui/AppInput";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppTextarea } from "@/components/ui/AppTextarea";
-import { invalidateStaleQuery } from "@/lib/client/use-stale-query";
+import { invalidateStaleQuery, peekStaleQuery } from "@/lib/client/use-stale-query";
 import {
   createMealRecord,
   deleteMealPhoto,
@@ -105,23 +105,23 @@ export function LifeMealEditorPage() {
   const requestedPartner = params.get("person") === "fish" ? "fish" : "cat";
   const requestedType = validMealType(params.get("type"));
   const requestedSnackPeriod = validSnackPeriod(params.get("snackPeriod"));
+  const partnerKey = requestedPartner as NutritionPartnerKey;
+  const canEdit = mePartnerKey === partnerKey;
+  const cachedMeal = mealId ? peekStaleQuery<MealRecord[]>(`meals:${partnerKey}:${initialDate}`)?.find((record) => record.id === mealId) ?? null : null;
 
-  const [meal, setMeal] = useState<MealRecord | null>(null);
-  const [date, setDate] = useState(initialDate);
-  const [mealType, setMealType] = useState<MealType>(requestedType);
-  const [snackPeriod, setSnackPeriod] = useState<SnackPeriod | null>(requestedType === "snack" ? requestedSnackPeriod ?? "afternoon" : null);
-  const [time, setTime] = useState("");
-  const [note, setNote] = useState("");
-  const [items, setItems] = useState<ItemDraft[]>([emptyItem()]);
+  const [meal, setMeal] = useState<MealRecord | null>(cachedMeal);
+  const [date, setDate] = useState(cachedMeal?.mealDate ?? initialDate);
+  const [mealType, setMealType] = useState<MealType>(cachedMeal?.mealType ?? requestedType);
+  const [snackPeriod, setSnackPeriod] = useState<SnackPeriod | null>(cachedMeal?.mealType === "snack" ? cachedMeal.snackPeriod : requestedType === "snack" ? requestedSnackPeriod ?? "afternoon" : null);
+  const [time, setTime] = useState(cachedMeal?.eatenAt ? new Date(cachedMeal.eatenAt).toTimeString().slice(0, 5) : "");
+  const [note, setNote] = useState(cachedMeal?.note ?? "");
+  const [items, setItems] = useState<ItemDraft[]>(cachedMeal?.items.length ? cachedMeal.items.map(fromItem) : [emptyItem()]);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
-  const [loading, setLoading] = useState(Boolean(mealId));
+  const [loading, setLoading] = useState(Boolean(mealId && !cachedMeal));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const partnerKey = requestedPartner as NutritionPartnerKey;
-  const canEdit = mePartnerKey === partnerKey;
 
   useEffect(() => () => { if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); }, [photoPreviewUrl]);
 
@@ -144,7 +144,7 @@ export function LifeMealEditorPage() {
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "读取这餐失败"))
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [canEdit, initialDate, mealId, partnerKey]);
+  }, [cachedMeal, canEdit, initialDate, mealId, partnerKey]);
 
   const caloriePreview = useMemo(() => {
     const parsed = items.map((item) => numberOrNull(item.caloriesKcal));

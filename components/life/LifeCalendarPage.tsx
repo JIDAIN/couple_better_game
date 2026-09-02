@@ -79,7 +79,6 @@ export function LifeCalendarPage() {
           <button type="button" aria-label="下个月" onClick={() => setMonth((value) => shiftMonth(value, 1))} className="life-round-button">›</button>
         </div>
 
-        {query.refreshing ? <div className="life-sync-pill mx-auto mt-3 w-fit">正在同步这个月…</div> : null}
         <div className="mt-4 grid grid-cols-7 text-center text-[10px] font-extrabold text-[var(--life-text-muted)]">
           {WEEKDAYS.map((day) => <div key={day} className="py-1">{day}</div>)}
         </div>
