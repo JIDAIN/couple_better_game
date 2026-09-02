@@ -9,9 +9,9 @@ import { AppSceneBoard, AppSceneTitle, AppSectionPanel } from "@/components/ui/A
 export default function UiLabPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-3 pb-16 pt-5 sm:px-5">
-      <div className="mb-4 rounded-[24px] border border-[#d9cfbc] bg-[#fffdf7]/90 px-4 py-3 text-sm leading-6 text-[#715d45] shadow-[0_4px_0_rgba(198,184,159,0.3)]">
+      <div className="mb-4 rounded-[var(--radius-card)] border border-[var(--card-border-soft)] bg-[var(--card-bg-strong)]/90 px-4 py-3 text-sm leading-6 text-[var(--text-body)] shadow-[var(--shadow-soft)]">
         <strong>V2 UI Lab</strong>
-        <p className="mt-1 text-xs text-[#96836d]">
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
           这里仅用于视觉与交互实验，不读取或修改真实生活数据，也不参与旧游戏结算。
         </p>
       </div>
@@ -33,22 +33,22 @@ export default function UiLabPage() {
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <AppCard variant="soft" className="!p-3">
-                  <p className="text-xs text-[#99856d]">soft</p>
-                  <strong className="mt-1 block text-sm text-[#6f5a42]">柔和信息卡</strong>
+                  <p className="text-xs text-[var(--text-muted)]">soft</p>
+                  <strong className="mt-1 block text-sm text-[var(--text-main)]">柔和信息卡</strong>
                 </AppCard>
                 <AppCard variant="compact" className="!p-3">
-                  <p className="text-xs text-[#99856d]">compact</p>
-                  <strong className="mt-1 block text-sm text-[#6f5a42]">紧凑记录卡</strong>
+                  <p className="text-xs text-[var(--text-muted)]">compact</p>
+                  <strong className="mt-1 block text-sm text-[var(--text-main)]">紧凑记录卡</strong>
                 </AppCard>
                 <AppCard variant="panel" className="!p-3">
-                  <p className="text-xs text-[#99856d]">panel</p>
-                  <strong className="mt-1 block text-sm text-[#6f5a42]">功能面板</strong>
+                  <p className="text-xs text-[var(--text-muted)]">panel</p>
+                  <strong className="mt-1 block text-sm text-[var(--text-main)]">功能面板</strong>
                 </AppCard>
               </div>
-              <div className="flex items-center gap-3 rounded-[20px] bg-[#f5efe2] px-3 py-2">
+              <div className="flex items-center gap-3 rounded-[var(--radius-panel)] bg-[var(--bg-warm)] px-3 py-2">
                 <AppRoleAvatar role="fish" size={34} />
                 <AppRoleAvatar role="cat" size={34} />
-                <p className="text-xs leading-5 text-[#806b53]">
+                <p className="text-xs leading-5 text-[var(--text-body)]">
                   角色只用于标识“谁记录了什么”，生活系统不把角色视觉自动转成排名或输赢。
                 </p>
               </div>
@@ -69,15 +69,15 @@ export default function UiLabPage() {
 
           <AppSectionPanel title="小窝入口浓度测试">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <FeatureTilePreview icon="data" title="家庭药箱" description="库存、位置、保质期；后续支持 AI 查询与确认后修改。" />
-              <FeatureTilePreview icon="notebook" title="体重记录" description="低频事实独立查看，不放在今日首页。" />
-              <FeatureTilePreview icon="gift" title="小信箱" description="想写时再写，不做每日任务。" />
-              <FeatureTilePreview icon="nest" title="游戏机" description="原变美变瘦大作战完整保留，但退出生活主流程。" />
+              <FeatureTilePreview icon="💊" title="家庭药箱" description="库存、位置、保质期；后续支持 AI 查询与确认后修改。" />
+              <FeatureTilePreview icon="⚖️" title="体重记录" description="低频事实独立查看，不放在今日首页。" />
+              <FeatureTilePreview icon="💌" title="小信箱" description="想写时再写，不做每日任务。" />
+              <FeatureTilePreview icon="🎮" title="游戏机" description="原变美变瘦大作战完整保留，但退出生活主流程。" />
             </div>
           </AppSectionPanel>
 
           <AppSectionPanel title="本轮设计检查">
-            <div className="grid gap-2 text-sm leading-6 text-[#745f47]">
+            <div className="grid gap-2 text-sm leading-6 text-[var(--text-body)]">
               <p>① 低密度首页可以更有岛屿感，高密度数据页要更克制。</p>
               <p>② 日期、时间、输入等成熟交互不为了主题重新发明。</p>
               <p>③ 外部 GitHub UI 只能经过 App* / Pattern 适配后进入业务层。</p>
