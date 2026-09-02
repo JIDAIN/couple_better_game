@@ -7,12 +7,12 @@ import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 
 export function LifeMePage() {
   const router = useRouter();
-  const { currentPartnerKey, mePartnerKey, taPartnerKey, authenticated, loading } = useLifeIdentity();
+  const { currentPartnerKey, mePartnerKey, taPartnerKey, authenticated, loading, refreshIdentity } = useLifeIdentity();
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
+    await refreshIdentity();
+    router.replace("/login");
   }
 
   const accountName = currentPartnerKey === "cat" ? "猫猫（cat）" : currentPartnerKey === "fish" ? "鱼鱼（fish）" : "未登录";
