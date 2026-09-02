@@ -2,15 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Title } from "animal-island-ui";
-import {
-  AppButton,
-  AppCard,
-  AppInput,
-  AppModal,
-  AppRoleAvatar,
-  AppSectionPanel,
-  AppToast,
-} from "../ui";
+import { selectDailyGameOverview, type DailyGameOverview } from "../../lib/home/daily-overview-service";
 import {
   deleteMealRecord,
   fetchMeals,
@@ -22,6 +14,16 @@ import type {
   NutritionPartnerKey,
   SnackPeriod,
 } from "../../lib/nutrition/meal-service";
+import { useHomeResources } from "../home/HomeResourcesProvider";
+import {
+  AppButton,
+  AppCard,
+  AppInput,
+  AppModal,
+  AppRoleAvatar,
+  AppSectionPanel,
+  AppToast,
+} from "../ui";
 import { MealEditorModal } from "./MealEditorModal";
 
 const MEAL_ORDER: Record<MealType, number> = {
@@ -95,6 +97,23 @@ function sortMeals(meals: MealRecord[]) {
   });
 }
 
+function totalCalorieRange(meals: MealRecord[]) {
+  if (
+    meals.length === 0 ||
+    meals.some((meal) => meal.calorieMinKcal == null || meal.calorieMaxKcal == null)
+  ) {
+    return null;
+  }
+
+  return meals.reduce(
+    (range, meal) => ({
+      min: range.min + (meal.calorieMinKcal ?? 0),
+      max: range.max + (meal.calorieMaxKcal ?? 0),
+    }),
+    { min: 0, max: 0 },
+  );
+}
+
 function mealLoadError(caught: unknown) {
   if (caught instanceof MealApiError && caught.status === 401) {
     return "还没有连接云端，请先到「小窝 → 数据管理」连接云端后再记录饮食";
@@ -102,6 +121,91 @@ function mealLoadError(caught: unknown) {
   return caught instanceof MealApiError
     ? caught.message
     : "饮食记录暂时没有加载出来，请稍后再试";
+}
+
+function LinkedDailySummary({
+  selectedPartner,
+  meals,
+  totalCalories,
+  totalRange,
+  gameOverview,
+  loading,
+  error,
+}: {
+  selectedPartner: NutritionPartnerKey;
+  meals: MealRecord[];
+  totalCalories: number;
+  totalRange: { min: number; max: number } | null;
+  gameOverview: DailyGameOverview;
+  loading: boolean;
+  error: string | null;
+}) {
+  const intakeText = loading
+    ? "加载中…"
+    : error
+      ? "暂未加载"
+      : meals.length === 0
+        ? "未记录"
+        : `${totalCalories} kcal`;
+  const intakeDetail =
+    !loading && !error && meals.length > 0 && totalRange
+      ? `估算区间 ${totalRange.min}–${totalRange.max}`
+      : !loading && !error && meals.length > 0
+        ? `${meals.length} 餐已记录`
+        : null;
+
+  return (
+    <AppCard variant="soft" className="px-3 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold ui-text-main">当天合在一起看</p>
+          <p className="mt-0.5 text-[10px] font-medium ui-text-soft">
+            按同一角色和日期关联，不会互相自动改值
+          </p>
+        </div>
+        <AppRoleAvatar role={selectedPartner} size={24} />
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
+        <div className="rounded-2xl bg-white/55 px-3 py-2.5">
+          <p className="text-[10px] font-semibold ui-text-soft">实际摄入</p>
+          <p className="mt-0.5 text-sm font-bold tabular-nums ui-text-reward">
+            {intakeText}
+          </p>
+          {intakeDetail ? (
+            <p className="mt-0.5 text-[10px] font-medium tabular-nums ui-text-muted">
+              {intakeDetail}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl bg-white/55 px-3 py-2.5">
+          <p className="text-[10px] font-semibold ui-text-soft">游戏热量缺口</p>
+          <p className="mt-0.5 text-sm font-bold tabular-nums ui-text-primary">
+            {gameOverview.hasRecord ? `${gameOverview.deficitKcal ?? 0} kcal` : "未记录"}
+          </p>
+          {gameOverview.hasRecord ? (
+            <p className="mt-0.5 text-[10px] font-medium ui-text-muted">游戏打卡字段</p>
+          ) : null}
+        </div>
+      </div>
+
+      {gameOverview.hasRecord ? (
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold ui-text-muted">
+          <span className="tabular-nums">
+            运动 {gameOverview.exerciseMinutes ?? 0} 分钟
+          </span>
+          <span className="tabular-nums">
+            体重 {gameOverview.weightKg == null ? "未填" : `${gameOverview.weightKg} kg`}
+          </span>
+        </div>
+      ) : (
+        <p className="mt-2 text-[10px] font-semibold ui-text-muted">
+          当天游戏记录未填写；饮食会保留，不会自动补写游戏记录。
+        </p>
+      )}
+    </AppCard>
+  );
 }
 
 function MealCard({ meal, onEdit }: { meal: MealRecord; onEdit: () => void }) {
@@ -213,6 +317,7 @@ function MealCard({ meal, onEdit }: { meal: MealRecord; onEdit: () => void }) {
 }
 
 export function DailyMealsPanel() {
+  const { dailyRecords } = useHomeResources();
   const today = useMemo(() => localIsoDate(), []);
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedPartner, setSelectedPartner] =
@@ -289,6 +394,11 @@ export function DailyMealsPanel() {
     () => meals.reduce((sum, meal) => sum + meal.totalCaloriesKcal, 0),
     [meals],
   );
+  const totalRange = useMemo(() => totalCalorieRange(meals), [meals]);
+  const gameOverview = useMemo(
+    () => selectDailyGameOverview(dailyRecords, selectedDate, selectedPartner),
+    [dailyRecords, selectedDate, selectedPartner],
+  );
 
   function selectDate(date: string) {
     setLoading(true);
@@ -333,7 +443,7 @@ export function DailyMealsPanel() {
     <>
       <AppSectionPanel title="饮食小记" icon="notebook" className="space-y-3">
         <p className="text-[11px] font-medium leading-relaxed ui-text-muted">
-          这里记的是实际摄入，只做饮食记录，不会自动修改游戏里的热量缺口、金币或宝石。
+          这里记的是实际摄入；下面会把同一天的游戏记录一起展示，但不会用饮食自动修改游戏热量缺口。
         </p>
 
         <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-2.5">
@@ -386,6 +496,16 @@ export function DailyMealsPanel() {
             记一餐
           </AppButton>
         </div>
+
+        <LinkedDailySummary
+          selectedPartner={selectedPartner}
+          meals={meals}
+          totalCalories={totalCalories}
+          totalRange={totalRange}
+          gameOverview={gameOverview}
+          loading={loading}
+          error={error}
+        />
 
         {error ? (
           <AppCard variant="soft" className="px-3 py-3" role="alert">
