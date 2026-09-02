@@ -2,7 +2,7 @@
 
 **状态日期：2026-09-02**
 
-这份文件是“现在做到哪一步、下一步做什么”的主状态页。详细重构计划见 `docs/16-v2-refactor-plan.md`，账户与配对安全边界见 `docs/17-auth-and-pairing.md`。
+详细重构计划见 `docs/16-v2-refactor-plan.md`；固定双账号与权限边界见 `docs/17-auth-and-pairing.md`。
 
 ## 1. 已完成的 V2 主功能
 
@@ -20,13 +20,9 @@ V2-P8  游戏机列表 -> /game                     ✅
 V2-P11 全站代码边界联调                         ✅
 ```
 
-旧“变美变瘦大作战”保持在 `/game`，只从「小窝 → 游戏机」进入；旧游戏不再展示新版 Meal 明细，金币、宝石、兑换、钱包和结算规则保持独立。
+旧“变美变瘦大作战”保持在 `/game`，只从「小窝 → 游戏机」进入；旧游戏不再展示新版 Meal 明细。
 
 ## 2. Production 实机验收后的重构
-
-2026-09-02 Production 手机实机验收确认：现有 V2 功能虽已贯通，但账户隔离、页面缓存、心情交互、加餐模型、情绪日历以及视觉还原度都需要系统性重构，因此后续不再继续堆叠零散页面功能。
-
-执行顺序：
 
 ```text
 R1 账户 / 权限 / 导航 / 缓存
@@ -41,92 +37,82 @@ R6 全站视觉还原
 
 ### R1A ✅
 
-- `life_user_profiles`
-- `couple_space_members`
-- Supabase Auth 用户到 `cat / fish` 的真实成员映射
-- 每空间每身份唯一
-- RLS 基础
-- 当前底部 Tab 再次点击不再触发同路由导航
+- 当前底部 Tab 再次点击自身不触发同路由导航。
+- 曾加入通用 Supabase Auth membership 基础；产品复核后确定本项目只有两个固定账号，相关空表已在 R1B cleanup migration 中移除。
 
-### R1B ✅ 主链路完成
+### R1B ✅ 固定双账号
 
-- `/login` 注册 / 登录。
-- Supabase Auth 负责密码验证、token 发行与刷新。
-- access / refresh token 使用 HttpOnly Cookie。
-- `/me` 变为账号、双人绑定与同步状态页。
-- 第一个真实账号可使用旧同步密码执行一次性迁移绑定。
-- 第二个账号只能通过 24 小时单次邀请码加入。
-- 邀请码数据库只存 SHA-256 摘要。
-- Life API 优先使用 Auth user + membership；旧 cloud-session 暂时作为迁移兼容。
-- mood / sleep / weight 新增写入已开始强制“只能写自己”。
+```text
+我 -> cat
+Ta -> fish
+共享旧 DATA_EDIT_PASSWORD
+```
 
-生产库当前没有人为创建假 Auth 用户；真实账号必须由两位使用者自己注册。
+已完成：
 
-### R1B 后续收紧项
+- `/login` 只允许选择“我 / Ta”并输入旧密码；
+- 不开放注册、邮箱验证、邀请码、第三账号；
+- 登录后签发 HMAC 签名 HttpOnly 身份 Cookie；
+- `/me` 展示当前账号和同步边界；
+- mood / sleep / weight 新增写入强制 `OWN_RECORD_ONLY`；
+- 临时 Supabase Auth / membership / invite schema 已安全清理，当时生产表均为空；
+- 历史生活数据不迁移、不重写，继续使用原 `cat / fish` partnerKey。
+
+后续继续收紧：
 
 ```text
 Meal create/update/delete -> 当前账号归属
 Mailbox sender            -> 当前账号身份
 Activity ownership        -> 明确创建人与参与人
-双账号迁移完成            -> 删除旧 cloud-session
 ```
 
 ### R1C 下一步
 
-使用成熟缓存方案，优先 **TanStack Query**：
+优先引入 **TanStack Query**：
 
-- `LifeAppShell` 持久 query client；
+- `LifeAppShell` 持久 QueryClient；
 - 今日、饮食、日历、小窝使用稳定 query key；
 - mutation 后局部更新/失效；
 - 页面切换优先展示缓存，后台 revalidate；
-- 解决实机中切 Tab / 回首页出现明显 loading 闪烁的问题。
+- 解决实机切 Tab / 回首页 loading 闪烁。
 
-## 4. 后续页面重构要求
+## 4. 后续页面重构
 
 ### R2 心情
-
-- 首页只展示双方状态；
-- 记录按钮只编辑当前账号；
-- Ta 只读；
+- 只允许当前登录账号记录/修改自己的心情；
+- 另一方只读；
 - 弹出独立毛绒情绪选择层；
-- 删除文字字符模拟脸。
+- 删除字符模拟脸。
 
 ### R3 饮食
-
-- 早餐 / 午餐 / 晚餐固定槽，进入后不能改餐次；
+- 早餐 / 午餐 / 晚餐固定槽；
 - 加餐为 0..N；
 - 新增加餐先选上午 / 下午 / 晚上；
 - 每条加餐独立编辑。
 
 ### R4 日历
-
 - 无心情留空；
-- 今天有单独小太阳视觉；
+- 今天使用小太阳特殊视觉；
 - 有记录时情绪图直接出现在月历中；
-- 日期布局 / mood mapping 优先复用成熟 MIT 项目逻辑，再统一视觉。
+- 日期布局优先复用成熟 MIT 项目逻辑后统一视觉。
 
 ### R5 小窝 / 我的
 
 ```text
-小窝 = 两人共同内容
-体重 / 小信箱 / 家庭药箱 / 游戏机
-
-我的 = 当前账户
-登录身份 / Ta 绑定 / 同步状态 / 数据管理 / 设置 / 退出
+小窝 = 体重 / 小信箱 / 家庭药箱 / 游戏机
+我的 = 当前账号 / 同步 / 数据管理 / 设置 / 退出
 ```
 
 ### R6 视觉
 
-以 `docs/12-island-life-design-system.md` 为唯一视觉基线，减少标准 SaaS 卡片堆叠。成熟 GitHub 项目和组件库优先复用逻辑/结构，但必须通过 App* / 岛屿视觉层适配。
+以 `docs/12-island-life-design-system.md` 为唯一视觉基线；成熟 GitHub 项目和组件库优先复用逻辑/结构，但必须经过 App* / 岛屿视觉适配。
 
 ## 5. 数据与安全边界
-
-目标架构：
 
 ```text
 Browser
   -> same-origin Next.js API
-  -> Supabase Auth identity + couple-space membership
+  -> fixed account signed session
   -> server-only domain service / RPC
   -> Supabase PostgreSQL
 ```
@@ -134,19 +120,8 @@ Browser
 - service secret 永不进入浏览器；
 - 业务数据继续以 Supabase 为准；
 - DDL 只新增 migration，不修改已执行 migration；
-- 真实家庭药箱数据等用户数据不提交公开 GitHub；
-- Web / AI / import 最终复用同一领域事实与写入服务。
+- 真实用户数据不提交公开 GitHub。
 
 ## 6. 部署状态
 
-`vercel.json` 默认必须保持：
-
-```json
-{
-  "git": {
-    "deploymentEnabled": false
-  }
-}
-```
-
-此前一次 Production 部署已获得单次授权并完成，该授权已经结束。当前重构代码不得自动触发 Preview / Production；任何下一次部署必须再次获得明确授权。
+`vercel.json` 默认保持 `git.deploymentEnabled: false`。此前 Production 单次授权已经结束；下一次 Preview / Production 必须重新取得明确授权。
