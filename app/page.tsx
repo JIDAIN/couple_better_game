@@ -1,5 +1,10 @@
-import { HomeScreen } from "@/components/home/HomeScreen";
+import { LifeAppShell } from "@/components/life/LifeAppShell";
+import { TodayLifePage } from "@/components/life/TodayLifePage";
 
 export default function Home() {
-  return <HomeScreen />;
+  return (
+    <LifeAppShell>
+      <TodayLifePage />
+    </LifeAppShell>
+  );
 }

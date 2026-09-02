@@ -5,9 +5,9 @@ import "./globals.css";
 import "./island-life-tokens.css";
 
 export const metadata: Metadata = {
-  applicationName: "🐟和🐱变美变瘦大作战",
-  title: "🐟和🐱变美变瘦大作战",
-  description: "双人同行的温柔成长小页游：金币、宝石与五月成就地图。",
+  applicationName: "岛屿生活",
+  title: "岛屿生活",
+  description: "属于两个人的轻量生活记录：心情、睡眠、活动、饮食与小窝。",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -19,13 +19,13 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "变美变瘦",
+    title: "岛屿生活",
     statusBarStyle: "default",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffb6cb",
+  themeColor: "#aedcc8",
 };
 
 export default function RootLayout({
