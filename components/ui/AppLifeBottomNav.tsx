@@ -11,6 +11,9 @@ const items = [
   { href: "/me", icon: "⚙️", label: "我的" },
 ] as const;
 
+const baseClass =
+  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[var(--life-radius-control)] px-1 text-[11px] font-bold transition duration-[var(--life-motion-fast)]";
+
 export function AppLifeBottomNav() {
   const pathname = usePathname();
 
@@ -22,19 +25,33 @@ export function AppLifeBottomNav() {
       <div className="mx-auto grid w-full max-w-[46rem] grid-cols-5 gap-1">
         {items.map((item) => {
           const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const content = (
+            <>
+              <span className="text-lg leading-none" aria-hidden>{item.icon}</span>
+              <span>{item.label}</span>
+            </>
+          );
+
+          if (active) {
+            return (
+              <span
+                key={item.href}
+                aria-current="page"
+                className={`${baseClass} cursor-default bg-[var(--life-surface-soft)] text-[var(--life-teal-strong)]`}
+              >
+                {content}
+              </span>
+            );
+          }
+
           return (
             <Link
               key={item.href}
               href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[var(--life-radius-control)] px-1 text-[11px] font-bold transition duration-[var(--life-motion-fast)] ${
-                active
-                  ? "bg-[var(--life-surface-soft)] text-[var(--life-teal-strong)]"
-                  : "text-[var(--life-text-muted)] hover:bg-[var(--life-surface-soft)] hover:text-[var(--life-text-body)]"
-              }`}
+              prefetch
+              className={`${baseClass} text-[var(--life-text-muted)] hover:bg-[var(--life-surface-soft)] hover:text-[var(--life-text-body)]`}
             >
-              <span className="text-lg leading-none" aria-hidden>{item.icon}</span>
-              <span>{item.label}</span>
+              {content}
             </Link>
           );
         })}
