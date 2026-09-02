@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
-import { clearLifeSessionCookies } from "@/lib/server/life-auth-response";
-import { LIFE_ACCESS_COOKIE, signOutLifeUser } from "@/lib/server/supabase-auth-http";
+import { LIFE_ACCOUNT_COOKIE } from "@/lib/server/fixed-life-auth";
 
-function readCookie(request: Request, name: string) {
-  const raw = request.headers.get("cookie") ?? "";
-  for (const part of raw.split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-    if (key === name) return decodeURIComponent(rest.join("="));
-  }
-  return "";
-}
-
-export async function POST(request: Request) {
-  await signOutLifeUser(readCookie(request, LIFE_ACCESS_COOKIE));
-  return clearLifeSessionCookies(NextResponse.json({ ok: true }));
+export async function POST() {
+  const response = NextResponse.json({ ok: true });
+  response.cookies.set(LIFE_ACCOUNT_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
 }
