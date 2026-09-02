@@ -56,7 +56,6 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     Promise.all([
       fetchLifeDay(date),
       fetchMeals({ mealDate: date, partnerKey: "cat" }),
@@ -122,7 +121,7 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
           </section>
 
           <section className="life-surface life-section-card">
-            <div className="flex items-center justify-between gap-3"><p className="text-sm font-extrabold text-[var(--life-text)]">饮食</p><Link href={`/food`} className="text-xs font-extrabold text-[var(--life-teal-strong)]">打开饮食页</Link></div>
+            <div className="flex items-center justify-between gap-3"><p className="text-sm font-extrabold text-[var(--life-text)]">饮食</p><Link href="/food" className="text-xs font-extrabold text-[var(--life-teal-strong)]">打开饮食页</Link></div>
             <div className="mt-3 grid gap-2.5">
               {PEOPLE.map((person) => {
                 const meals = mealsByPerson.get(person.key) ?? [];
