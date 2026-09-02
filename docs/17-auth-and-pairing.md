@@ -4,14 +4,28 @@
 
 ## 1. 产品约束
 
-账号永远只有两个：
+底层账号永远只有两个：
 
 ```text
-我  -> partnerKey = cat
-Ta  -> partnerKey = fish
+cat
+fish
 ```
 
 两个人继续复用旧程序同一个 `DATA_EDIT_PASSWORD`。区分身份的关键不是密码，而是“选择哪个固定账号登录”。
+
+**前端的“我 / Ta”不是固定映射到 cat / fish，而是相对当前登录账号动态解释：**
+
+```text
+cat 登录：
+我 = cat
+Ta = fish
+
+fish 登录：
+我 = fish
+Ta = cat
+```
+
+因此数据库继续保存稳定的 `cat / fish`，而所有生活页面只把当前会话的 `partnerKey` 称为“我”，把另一方称为“Ta”。
 
 不提供：
 
@@ -25,13 +39,15 @@ Ta  -> partnerKey = fish
 
 ```text
 /login
--> 选择“我”或“Ta”
+-> 选择固定账号“猫猫（cat）”或“鱼鱼（fish）”
 -> 输入旧程序共享密码
 -> POST /api/auth/login
 -> server 校验 DATA_EDIT_PASSWORD
 -> server 生成带 partnerKey 的签名 HttpOnly Cookie
 -> 后续 API 从 Cookie 解析当前身份
 ```
+
+登录页不能在身份尚未确定前把 cat 写成“我”、fish 写成“Ta”；登录页使用稳定账号名。进入应用以后再根据当前 session 动态生成 `mePartnerKey / taPartnerKey`。
 
 Cookie：
 
@@ -45,13 +61,33 @@ Cookie：
 
 退出登录只清除该 Cookie。
 
-## 3. 为什么不用 Supabase Auth
+## 3. 相对身份解析层
 
-本项目不是开放 SaaS，也不存在“系统不知道谁和谁是一对”的问题。
+`LifeAppShell` 提供统一身份 Context：
 
-Supabase Auth + 注册 + invitation membership 对只有两个人的固定应用造成不必要复杂度。R1B 曾短暂实现过该方案，但在产品复核后已经撤销。
+```text
+currentPartnerKey = 当前登录账号
+mePartnerKey      = currentPartnerKey
+taPartnerKey      = opposite(currentPartnerKey)
+```
 
-生产数据库中当时新建的 Auth profile / membership / invite 表均为空，因此通过后续 cleanup migration 安全移除，没有迁移或删除任何真实生活数据。
+所有出现“我 / Ta”的页面必须消费这一层，禁止再出现：
+
+```text
+const SELF_KEY = "cat"
+const TA_KEY = "fish"
+```
+
+当前已接入：
+
+- 今日心情；
+- 饮食；
+- 日历月页；
+- 日历详情；
+- 体重；
+- 小信箱。
+
+后续新增页面也必须使用相同规则。
 
 ## 4. 数据权限
 
@@ -75,19 +111,18 @@ Browser
   -> 403 OWN_RECORD_ONLY
 ```
 
-当前已接入：
+这和前端相对身份配合后意味着：
+
+```text
+当前登录的人 = 我 = 可编辑自己的个人记录
+另一方       = Ta = 查看为主
+```
+
+当前已接入服务端个人写权限的有：
 
 - 心情；
 - 睡眠；
 - 体重新增。
-
-R2 首页心情必须直接消费这个身份：只能修改当前登录账号自己的心情，另一方只读。
-
-后续还要逐域收紧：
-
-- Meal 创建/修改/删除；
-- Mailbox sender；
-- Activity 创建人与参与人语义。
 
 ## 5. 共享数据
 
@@ -99,12 +134,12 @@ R2 首页心情必须直接消费这个身份：只能修改当前登录账号�
 - 家庭药箱共同可见；
 - 小信箱共同可见；
 - 游戏数据共同可见；
-- 饮食页仍可以切换查看我 / Ta；
+- 饮食页可以切换查看我 / Ta；
 - 个人敏感写操作由当前账号限制。
 
 ## 6. 与旧程序的关系
 
-旧程序长期使用的是 `cat / fish` 两个业务身份和同一套共享密码。R1B 不再把它们升级成两个新注册用户，而是直接把这两个既有身份变成真正的登录会话身份。
+旧程序长期使用的是 `cat / fish` 两个业务身份和同一套共享密码。R1B 直接把这两个既有身份变成真正的登录会话身份。
 
 这样保持：
 
@@ -118,6 +153,7 @@ R2 首页心情必须直接消费这个身份：只能修改当前登录账号�
 
 ```text
 服务端知道当前是谁
+UI 中“我 / Ta”随当前账号切换
 不能通过前端切换按钮冒充另一方写个人记录
 ```
 
@@ -138,8 +174,6 @@ R2 首页心情必须直接消费这个身份：只能修改当前登录账号�
 - `couple_space_invites`；
 - Auth profile trigger；
 - pairing/bootstrap RPC。
-
-这保证数据库 migration 历史与 Production 实际执行记录一致。
 
 ## 8. 环境变量
 
