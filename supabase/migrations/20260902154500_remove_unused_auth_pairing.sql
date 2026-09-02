@@ -8,9 +8,12 @@ DROP FUNCTION IF EXISTS public.accept_couple_space_invite(text);
 DROP FUNCTION IF EXISTS public.create_couple_space_invite(text);
 DROP FUNCTION IF EXISTS public.bootstrap_couple_space_membership(text);
 DROP FUNCTION IF EXISTS public.current_life_identity();
-DROP FUNCTION IF EXISTS private.is_couple_space_member(uuid);
 DROP FUNCTION IF EXISTS public.handle_new_life_user();
 
+-- Dropping the tables also removes their RLS policies, including the policy that
+-- depends on private.is_couple_space_member(uuid).
 DROP TABLE IF EXISTS public.couple_space_invites;
 DROP TABLE IF EXISTS public.couple_space_members;
 DROP TABLE IF EXISTS public.life_user_profiles;
+
+DROP FUNCTION IF EXISTS private.is_couple_space_member(uuid);
