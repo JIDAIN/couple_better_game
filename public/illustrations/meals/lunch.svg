@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-labelledby="title desc">
+  <title id="title">午餐卡通插图</title><desc id="desc">暖色餐桌上的米饭、蔬菜和汤</desc>
+  <rect width="480" height="360" rx="36" fill="#FFF8EF"/>
+  <path d="M22 292c66-45 126-42 187 4s130 43 249-16v80H22v-68z" fill="#CFE8F4"/>
+  <ellipse cx="229" cy="225" rx="145" ry="65" fill="#F4E2C9"/>
+  <ellipse cx="229" cy="218" rx="129" ry="53" fill="#FFFDF8"/>
+  <path d="M112 191h93l-12 69h-69z" fill="#8FD3E6"/>
+  <path d="M125 188c8-35 58-35 67 0z" fill="#FFFFFF"/>
+  <path d="M224 183c26-30 81-23 97 8s-8 63-44 67-73-25-53-75z" fill="#A8DDBA"/>
+  <circle cx="257" cy="210" r="13" fill="#FFB56A"/><circle cx="286" cy="226" r="12" fill="#FFD866"/><circle cx="271" cy="190" r="10" fill="#7CBF91"/>
+  <path d="M332 181h79l-9 70h-61z" fill="#F3B7A2"/>
+  <ellipse cx="371" cy="183" rx="40" ry="14" fill="#FFD6C9"/><ellipse cx="371" cy="184" rx="31" ry="9" fill="#D99763"/>
+  <path d="M342 149c9-13 8-25-1-35m28 32c9-13 8-25-1-35m28 35c9-13 8-25-1-35" fill="none" stroke="#B3A08E" stroke-width="6" stroke-linecap="round" opacity=".5"/>
+  <path d="M74 78c18-17 35-22 50-14 8 4 14 11 18 20 5-13 14-22 27-27 20-7 37 0 50 19-8 27-31 44-66 49-38-3-64-19-79-47z" fill="#FFE082"/>
+</svg>
