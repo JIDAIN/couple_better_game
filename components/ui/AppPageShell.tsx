@@ -15,10 +15,10 @@ export function AppPageShell({
     <main className="island-life-v2 min-h-screen">
       <div className="life-page-shell">
         {(title || subtitle || actions) && (
-          <header className="mb-4 flex items-start justify-between gap-3">
+          <header className="life-page-header mb-4 flex items-start justify-between gap-3">
             <div className="min-w-0">
-              {title ? <h1 className="text-xl font-extrabold text-[var(--life-text)]">{title}</h1> : null}
-              {subtitle ? <p className="mt-1 text-sm leading-6 text-[var(--life-text-body)]">{subtitle}</p> : null}
+              {title ? <h1 className="life-page-title text-xl font-extrabold text-[var(--life-text)]">{title}</h1> : null}
+              {subtitle ? <p className="life-page-subtitle mt-1 text-sm leading-6 text-[var(--life-text-body)]">{subtitle}</p> : null}
             </div>
             {actions ? <div className="shrink-0">{actions}</div> : null}
           </header>
