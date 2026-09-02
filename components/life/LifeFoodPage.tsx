@@ -5,11 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
 import { AppNutritionBar } from "@/components/ui/AppNutritionBar";
+import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { fetchMeals, mealPhotoUrl, MealApiError } from "@/lib/nutrition/meal-client";
 import type { MealRecord, MealType, NutritionPartnerKey } from "@/lib/nutrition/meal-service";
 
-const SELF_KEY: NutritionPartnerKey = "cat";
-const TA_KEY: NutritionPartnerKey = "fish";
 const MEAL_TYPES: Array<{ type: MealType; label: string; icon: string }> = [
   { type: "breakfast", label: "早餐", icon: "☀️" },
   { type: "lunch", label: "午餐", icon: "🍚" },
@@ -61,17 +60,8 @@ function MealPhotoSlot({ meal, label, mealType }: { meal?: MealRecord; label: st
   const src = customPhoto && meal ? mealPhotoUrl(meal) : (DEFAULT_MEAL_ART[mealType] ?? DEFAULT_MEAL_ART.lunch);
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)]">
-      <img
-        src={src}
-        alt={customPhoto && meal ? `${label}实物照片：${mealNames(meal)}` : `${label}默认卡通插图`}
-        className="h-full w-full object-cover"
-        onError={() => { if (customPhoto) setPhotoFailed(true); }}
-      />
-      {!customPhoto ? (
-        <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(transparent,rgba(74,65,57,0.55))] px-2.5 pb-2 pt-7 text-white">
-          <p className="line-clamp-1 text-[10px] font-bold">{meal ? mealNames(meal) : `${label}还没有记录`}</p>
-        </div>
-      ) : null}
+      <img src={src} alt={customPhoto && meal ? `${label}实物照片：${mealNames(meal)}` : `${label}默认卡通插图`} className="h-full w-full object-cover" onError={() => { if (customPhoto) setPhotoFailed(true); }} />
+      {!customPhoto ? <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(transparent,rgba(74,65,57,0.55))] px-2.5 pb-2 pt-7 text-white"><p className="line-clamp-1 text-[10px] font-bold">{meal ? mealNames(meal) : `${label}还没有记录`}</p></div> : null}
     </div>
   );
 }
@@ -84,24 +74,24 @@ function MealNutrition({ meal }: { meal?: MealRecord }) {
       <AppNutritionBar label="碳水" value={empty || !totals.hasCarbs ? null : Number(totals.carbs.toFixed(1))} unit="g" max={100} />
       <AppNutritionBar label="蛋白质" value={empty || !totals.hasProtein ? null : Number(totals.protein.toFixed(1))} unit="g" max={60} />
       <AppNutritionBar label="脂肪" value={empty || !totals.hasFat ? null : Number(totals.fat.toFixed(1))} unit="g" max={50} />
-      <div className="flex items-baseline justify-between border-t border-[var(--life-border-soft)] pt-2">
-        <span className="text-xs font-bold text-[var(--life-text-body)]">总热量</span>
-        <span className="text-base font-extrabold tabular-nums text-[var(--life-text)]">{meal?.totalCaloriesKcal == null ? "未估算" : `${meal.totalCaloriesKcal} kcal`}</span>
-      </div>
+      <div className="flex items-baseline justify-between border-t border-[var(--life-border-soft)] pt-2"><span className="text-xs font-bold text-[var(--life-text-body)]">总热量</span><span className="text-base font-extrabold tabular-nums text-[var(--life-text)]">{meal?.totalCaloriesKcal == null ? "未估算" : `${meal.totalCaloriesKcal} kcal`}</span></div>
     </div>
   );
 }
 
 export function LifeFoodPage() {
+  const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [role, setRole] = useState<AppRoleSwitchValue>("me");
   const [date, setDate] = useState(() => localIsoDate());
   const [meals, setMeals] = useState<MealRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
-  const partnerKey = role === "me" ? SELF_KEY : TA_KEY;
+  const partnerKey = (role === "me" ? mePartnerKey : taPartnerKey) as NutritionPartnerKey | null;
+  const canEdit = role === "me";
 
   useEffect(() => {
+    if (!partnerKey) return;
     const id = requestId.current + 1;
     requestId.current = id;
     let cancelled = false;
@@ -132,14 +122,15 @@ export function LifeFoodPage() {
   function changeRole(next: AppRoleSwitchValue) { if (next !== role) { setLoading(true); setRole(next); } }
   function changeDate(next: string) { if (next && next !== date) { setLoading(true); setDate(next); } }
 
+  if (!partnerKey) {
+    return <AppPageShell title="饮食" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;
+  }
+
   return (
-    <AppPageShell title="饮食" subtitle="一天吃了什么，单独查看我或 Ta。">
+    <AppPageShell title="饮食" subtitle="“我”是当前登录的人，Ta 是另一方。">
       <div className="mb-4 grid gap-3">
         <AppRoleSwitch value={role} onChange={changeRole} />
-        <label className="life-surface flex items-center justify-between gap-3 px-3 py-2.5">
-          <span className="text-xs font-bold text-[var(--life-text-body)]">查看日期</span>
-          <input type="date" value={date} onChange={(event) => changeDate(event.target.value)} className="rounded-xl border border-[var(--life-border-soft)] bg-[var(--life-surface)] px-2.5 py-1.5 text-sm font-bold text-[var(--life-text)]" />
-        </label>
+        <label className="life-surface flex items-center justify-between gap-3 px-3 py-2.5"><span className="text-xs font-bold text-[var(--life-text-body)]">查看日期</span><input type="date" value={date} onChange={(event) => changeDate(event.target.value)} className="rounded-xl border border-[var(--life-border-soft)] bg-[var(--life-surface)] px-2.5 py-1.5 text-sm font-bold text-[var(--life-text)]" /></label>
       </div>
 
       {error ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_16%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{error}</div> : null}
@@ -151,16 +142,10 @@ export function LifeFoodPage() {
           return (
             <section key={type} className="life-surface life-section-card">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-extrabold text-[var(--life-text)]">{icon} {label}</p>
-                  {records.length > 1 ? <p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">当天共记录 {records.length} 餐</p> : null}
-                </div>
-                <Link href={mealHref(date, partnerKey, type, primary?.id)} className="rounded-full bg-[var(--life-mint)] px-3 py-1.5 text-xs font-extrabold text-[#255f4d] shadow-[var(--life-shadow-press)]">{primary ? "编辑" : "+ 添加"}</Link>
+                <div><p className="text-sm font-extrabold text-[var(--life-text)]">{icon} {label}</p>{records.length > 1 ? <p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">当天共记录 {records.length} 餐</p> : null}</div>
+                {canEdit ? <Link href={mealHref(date, partnerKey, type, primary?.id)} className="rounded-full bg-[var(--life-mint)] px-3 py-1.5 text-xs font-extrabold text-[#255f4d] shadow-[var(--life-shadow-press)]">{primary ? "编辑" : "+ 添加"}</Link> : <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--life-text-muted)]">只读</span>}
               </div>
-              <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)] gap-3">
-                <MealPhotoSlot meal={primary} label={label} mealType={type} />
-                <MealNutrition meal={primary} />
-              </div>
+              <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)] gap-3"><MealPhotoSlot meal={primary} label={label} mealType={type} /><MealNutrition meal={primary} /></div>
               {records.length > 1 ? <div className="mt-3 border-t border-[var(--life-border-soft)] pt-2 text-xs text-[var(--life-text-body)]">其他记录：{records.slice(1).map(mealNames).join("；")}</div> : null}
             </section>
           );
@@ -168,18 +153,12 @@ export function LifeFoodPage() {
       </div>
 
       <section className="life-surface life-section-card mt-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div><p className="text-sm font-extrabold text-[var(--life-text)]">今日摄入统计</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">只反映当天实际记录，不用于排名。</p></div>
-          {loading ? <span className="text-xs text-[var(--life-text-muted)]">加载中…</span> : null}
-        </div>
+        <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-extrabold text-[var(--life-text)]">今日摄入统计</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">只反映当天实际记录，不用于排名。</p></div>{loading ? <span className="text-xs text-[var(--life-text-muted)]">加载中…</span> : null}</div>
         <div className="grid gap-2.5">
           <AppNutritionBar label="碳水" value={daily.hasCarbs ? Number(daily.carbs.toFixed(1)) : null} unit="g" max={300} />
           <AppNutritionBar label="蛋白质" value={daily.hasProtein ? Number(daily.protein.toFixed(1)) : null} unit="g" max={120} />
           <AppNutritionBar label="脂肪" value={daily.hasFat ? Number(daily.fat.toFixed(1)) : null} unit="g" max={100} />
-          <div className="mt-1 flex items-center justify-between rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)] px-3 py-2.5">
-            <span className="text-sm font-bold text-[var(--life-text-body)]">总热量</span>
-            <span className="text-lg font-extrabold tabular-nums text-[var(--life-text)]">{meals.length === 0 ? "未记录" : allCaloriesKnown ? `${daily.calories} kcal` : "未完整估算"}</span>
-          </div>
+          <div className="mt-1 flex items-center justify-between rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)] px-3 py-2.5"><span className="text-sm font-bold text-[var(--life-text-body)]">总热量</span><span className="text-lg font-extrabold tabular-nums text-[var(--life-text)]">{meals.length === 0 ? "未记录" : allCaloriesKnown ? `${daily.calories} kcal` : "未完整估算"}</span></div>
         </div>
       </section>
     </AppPageShell>
