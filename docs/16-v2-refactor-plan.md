@@ -45,7 +45,7 @@
 - Mailbox POST/PUT/DELETE 增加服务端 sender ownership 校验。
 - 详见 `docs/22-r5-nest-me-boundary.md`。
 
-## R6：全站视觉还原 ✅ 代码/文档完成
+## R6：全站视觉还原 ✅
 - 以“岛屿生活视觉语言 V2 · 方案B”为基线。
 - 新增 `app/island-life-refactor.css` 统一页面级 visual adapter。
 - 统一背景、标题、底部导航、sheet、surface 材质。
@@ -55,8 +55,33 @@
 - 数据密集页保持克制；Legacy Game 不改视觉/机制。
 - 更新 `docs/12-island-life-design-system.md`；详见 `docs/23-r6-visual-polish.md`。
 
-## 最终统一验收 ▶ 当前阶段
-按用户要求：R6 与文档完成后统一执行 Test / Lint / Build；发现问题先修复，再重新执行，并把最终 run / 修复情况回写状态文档后才结束本轮。
+## 最终统一验收 ✅
+
+按用户要求，在 R6 与分阶段文档全部完成后统一执行 Test / Lint / Build。
+
+首轮：
+
+```text
+Test   ✅
+Build  ✅
+Lint   ❌
+```
+
+Lint 定位到两处 React effect 同步 setState：`TodayLifePage.tsx` 与 `use-stale-query.ts`。已分别改为 query error 派生状态，以及 microtask 恢复缓存/后台 refresh。
+
+修复后 CI run `33656830449`：
+
+```text
+Test   ✅
+Lint   ✅
+Build  ✅
+```
+
+完整修复与已知 npm audit 提示记录见 `docs/09-status-roadmap.md`。
+
+## 本轮结论
+
+R1-R6 重构及代码级统一验证已完成。下一次产品验收应在获得单次 Vercel 部署授权后，通过真实移动端 / 浏览器检查视觉、导航、空态、长文本、真实数据与旧游戏回归。
 
 ## 部署约束
 `vercel.json` 默认保持 `git.deploymentEnabled: false`。任何 Preview / Production 必须再次获得明确授权。
