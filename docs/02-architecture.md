@@ -257,13 +257,40 @@ chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
 当前产品约定：
 
 ```text
-用户自己的饮食聊天 -> fish
-伴侣专用饮食聊天   -> cat
+用户自己的饮食聊天 -> cat（猫猫）
+鱼鱼的饮食聊天     -> fish（鱼鱼）
 ```
 
-上下文不明确时不允许猜测后写入。
+上下文不明确时不允许猜测后写入；当前对话中用户明确声明角色时，以当前声明优先。
 
-## 8. UI 场景边界
+## 8. 同日数据关联
+
+当前 meals 与游戏 daily record 属于不同事实域，但产品层需要按同一键关联：
+
+```text
+partnerKey + date
+```
+
+P2.5 目标数据流：
+
+```text
+同一天、同一角色
+├─ meals / daily_nutrition_summary
+├─ daily_records + daily_record_sides
+└─ 后续 daily_weight_summary
+        ↓
+统一的日视图 / section
+```
+
+规则：
+
+- 只关联展示，不自动互相写回；
+- meals 存在但 daily record 不存在时，deficit/运动/体重快照显示“未记录”；
+- daily record 存在但 meals 不存在时，摄入显示“未记录”；
+- 不用 meal total 自动覆盖现有游戏 deficit；
+- 如果未来新增“实际能量缺口”，必须独立定义计算规则和字段语义。
+
+## 9. UI 场景边界
 
 当前底部仍只有四个主 Tab：
 
@@ -278,9 +305,9 @@ chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
 
 新增/编辑餐食沿用当前 `AppModal + Title + AppInput + AppCard + AppButton` 模式。
 
-P2 没有新增 UI，因此不改变当前动森感场景或主导航。
+P2 没有新增 UI；P2.5 也必须延续当前动森感场景，不因“关联更多数据”重做主导航。
 
-## 9. 数据库访问边界
+## 10. 数据库访问边界
 
 Web 当前模式：
 
@@ -306,7 +333,7 @@ anon/authenticated       无 execute
 
 这不是 Supabase Auth 架构。未来如果加入真实账号，需要重新设计 auth_user_id、RLS policy 和 membership。
 
-## 10. Supabase migration 版本管理
+## 11. Supabase migration 版本管理
 
 production 已执行 migration 持续按 version / name / SQL 纳入：
 
@@ -322,7 +349,7 @@ supabase/migrations/
 
 详细规则见 `supabase/README.md`。
 
-## 11. AppDataStore 的现实定位
+## 12. AppDataStore 的现实定位
 
 最初设计中 `AppDataStore` 被设想为将来直接替换成 remote store。
 
@@ -335,7 +362,7 @@ supabase/migrations/
 
 因此以后不要再写“替换 AppDataStore 就完成云同步”这种过时描述。
 
-## 12. 当前技术债
+## 13. 当前技术债
 
 - Provider 内部仍有 GitHub 命名和兼容 URL。
 - cloud-session token 生成逻辑在部分旧 route / proxy 中仍有重复，可后续统一。
@@ -343,5 +370,6 @@ supabase/migrations/
 - 游戏最终结算仍不是 server-authoritative。
 - 当前共享 password/session 与 ChatGPT connector 都不是完整用户身份和 membership 模型。
 - P2 首版自动持久化只负责新增；ChatGPT 内直接修改/删除已保存餐食尚未做专用受限 RPC，当前通过 Web UI 完成。
+- P2.5 同日关联展示尚未实现，当前 meals 与 daily record 仍可能在产品上割裂。
 
 这些是明确边界，不应在无关功能中顺手重构。
