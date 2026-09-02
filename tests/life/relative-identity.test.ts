@@ -22,6 +22,32 @@ describe("relative me / Ta identity", () => {
     expect(login).not.toContain("选择账号");
   });
 
+  it("refreshes identity in place and warms shared page data before login navigation", () => {
+    const identity = source("components/life/LifeIdentityContext.tsx");
+    const login = source("components/life/LifeLoginPage.tsx");
+    const me = source("components/life/LifeMePage.tsx");
+    expect(identity).toContain("clearStaleQueries()");
+    expect(identity).toContain("await warmLifeData(next)");
+    expect(identity).toContain('key: "medicines"');
+    expect(identity).toContain('key: "mailbox"');
+    expect(login).toContain("await refreshIdentity()");
+    expect(me).toContain("await refreshIdentity()");
+    expect(login).not.toContain("router.refresh()");
+    expect(me).not.toContain("router.refresh()");
+  });
+
+  it("uses larger unframed moods and month-filtered mailbox cards", () => {
+    const today = source("components/life/today/TodayMoodCard.tsx");
+    const mailbox = source("components/life/LifeMailboxPage.tsx");
+    const css = source("app/island-life-refactor.css");
+    expect(today).toContain('className="life-person-state-orb"');
+    expect(css).toContain(".life-person-state-orb { width: 5.4rem; height: 5.4rem;");
+    expect(css).toContain(".life-calendar-mood { width: 2.35rem; height: 2.35rem;");
+    expect(mailbox).toContain("全部信件");
+    expect(mailbox).toContain("life-letter-date");
+    expect(mailbox).toContain("monthKey(letter.sentAt) === month");
+  });
+
   it("uses relative identity on key life pages", () => {
     for (const path of [
       "components/life/today/TodayMoodCard.tsx",
