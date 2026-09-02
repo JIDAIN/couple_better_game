@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { fetchLifeDay, LifeApiError } from "@/lib/life/life-client";
 import type { LifeDayRecord } from "@/lib/life/life-service";
@@ -22,14 +22,11 @@ export function TodayLifePage() {
     staleMs: 20_000,
   });
 
-  useEffect(() => {
-    if (!query.error) return;
-    if (query.error instanceof LifeApiError && query.error.status === 401) {
-      setNeedsLogin(true);
-      return;
-    }
-    setActionError(query.error.message || "读取今天的生活记录失败");
-  }, [query.error]);
+  const queryNeedsLogin = query.error instanceof LifeApiError && query.error.status === 401;
+  const queryError = query.error && !queryNeedsLogin
+    ? query.error.message || "读取今天的生活记录失败"
+    : null;
+  const visibleError = actionError ?? queryError;
 
   const reload = useCallback(async () => {
     setActionError(null);
@@ -45,11 +42,11 @@ export function TodayLifePage() {
     }
   }, [query]);
 
-  if (needsLogin) return <LifeCloudGate onConnected={reload} />;
+  if (needsLogin || queryNeedsLogin) return <LifeCloudGate onConnected={reload} />;
 
   return (
     <AppPageShell title={displayDate(date)} subtitle="只记重要的小日常，照顾好彼此。">
-      {actionError ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_18%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{actionError}</div> : null}
+      {visibleError ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_18%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{visibleError}</div> : null}
       {query.data ? (
         <div className="grid gap-3">
           {query.refreshing ? <div className="life-sync-pill" aria-live="polite">正在同步最新记录…</div> : null}
