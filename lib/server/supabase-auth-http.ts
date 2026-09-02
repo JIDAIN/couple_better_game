@@ -19,6 +19,8 @@ type SupabaseSession = {
   user?: { id?: string; email?: string | null };
 };
 
+type LifeMembershipIdentity = Omit<LifeAuthIdentity, "email">;
+
 function env(name: string) {
   return process.env[name]?.trim() ?? "";
 }
@@ -127,7 +129,7 @@ async function fetchAuthUser(accessToken: string) {
   return (await response.json()) as { id?: string; email?: string | null };
 }
 
-async function fetchIdentity(accessToken: string) {
+async function fetchIdentity(accessToken: string): Promise<LifeMembershipIdentity | null> {
   const { url, key } = requireAuthConfig();
   const response = await fetch(`${url}/rest/v1/rpc/current_life_identity`, {
     method: "POST",
@@ -142,8 +144,10 @@ async function fetchIdentity(accessToken: string) {
   if (!response.ok) return null;
   const raw = (await response.json()) as Record<string, unknown> | null;
   if (!raw || typeof raw !== "object") return null;
-  const partnerKey = raw.partnerKey === "cat" || raw.partnerKey === "fish" ? raw.partnerKey : null;
-  const memberRole = raw.memberRole === "owner" || raw.memberRole === "member" ? raw.memberRole : null;
+  const partnerKey: LifePartnerKey | null =
+    raw.partnerKey === "cat" || raw.partnerKey === "fish" ? raw.partnerKey : null;
+  const memberRole: "owner" | "member" | null =
+    raw.memberRole === "owner" || raw.memberRole === "member" ? raw.memberRole : null;
   return {
     userId: typeof raw.userId === "string" ? raw.userId : "",
     displayName: typeof raw.displayName === "string" ? raw.displayName : null,
