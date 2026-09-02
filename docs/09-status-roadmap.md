@@ -18,7 +18,9 @@
 + ChatGPT 明确确认后的餐食持久化
 ```
 
-P0 工程治理、P1 饮食 Web 首版和 **P2 ChatGPT “记上”持久化流程**已经完成。当前下一阶段是 **P3：体重趋势**。
+P0 工程治理、P1 饮食 Web 首版和 **P2 ChatGPT “记上”持久化流程**已经完成。
+
+根据真实使用反馈，当前优先插入 **P2.5：同日饮食与游戏日记录关联展示**，解决“同一天三餐已经完整记录，但当天 deficit / 运动 / 体重快照仍与餐食明细割裂”的问题。P2.5 完成后再进入 **P3：体重趋势**。
 
 ## 2. 功能进度
 
@@ -42,8 +44,9 @@ P0 工程治理、P1 饮食 Web 首版和 **P2 ChatGPT “记上”持久化流�
 | Meal CRUD API | ✅ 完成 | transaction RPC，已 smoke test |
 | Meal Web UI | ✅ 完成 | 今日公告板内按日期/角色 CRUD + 明细 |
 | ChatGPT “记上”持久化流程 | ✅ 完成 | explicit confirm + service-only RPC + idempotency + read-back |
+| 同日饮食 + daily record 关联展示 | ⏳ 当前下一步 | P2.5，按 partnerKey + date 关联，不自动覆盖 deficit |
 | Weight schema | ✅ 完成 | `weight_measurements` 已存在 |
-| Weight API / trend UI | ⏳ 当前下一步 | P3 |
+| Weight API / trend UI | ⏳ 后续 | P3 |
 | Goal period schema | ✅ 完成 | UI 未实现 |
 | 完整用户账号 / membership | ⏳ Later | 当前只共享密码/session |
 | Server-authoritative 游戏结算 | ⏳ Later | 当前服务端保存兼容快照，不独立重算规则 |
@@ -218,11 +221,11 @@ get_chatgpt_meal_record
 当前约定：
 
 ```text
-用户自己的饮食聊天 -> fish
-伴侣专用饮食聊天   -> cat
+用户自己的饮食聊天 -> cat（猫猫）
+鱼鱼的饮食聊天     -> fish（鱼鱼）
 ```
 
-上下文不明确时禁止猜测后写入。
+上下文不明确时禁止猜测后写入；用户在当前对话中明确说明角色时，以当前明确说明为最高优先级。
 
 ### 5.6 数据域边界
 
@@ -268,7 +271,49 @@ tests/nutrition/chatgpt-meal-protocol.test.ts
 
 用于固化 payload、`chatgpt:` key 和 item-total 约束。
 
-## 6. P3 — 体重趋势（当前下一步）
+## 6. P2.5 — 同日饮食与游戏记录关联（当前下一步）
+
+### 6.1 问题
+
+真实使用已经验证：一个角色某天可以有完整早餐/午餐/晚餐，但同一天的 `daily_record_sides` 可能尚未存在。这会造成：
+
+```text
+餐食明细完整
+但 deficit / exercise / weight snapshot 看不到或无法对应
+```
+
+这不是要把 intake 和 deficit 合并成同一个字段，而是要让同一角色同一天的事实能在产品上看成“同一天”。
+
+### 6.2 关联键
+
+统一使用：
+
+```text
+partnerKey + date
+```
+
+关联：
+
+```text
+meals / daily_nutrition_summary
++
+daily_records + daily_record_sides
++
+未来 weight daily summary
+```
+
+### 6.3 产品规则
+
+- [ ] 同一天显示餐数、总摄入 kcal、区间和餐食明细；
+- [ ] 同一视图显示当天游戏 deficit、运动、体重快照（如存在）；
+- [ ] meals 有数据但 daily record 没有时明确显示“当天游戏记录未填写”；
+- [ ] daily record 有数据但 meals 没有时明确显示“当天饮食未记录”；
+- [ ] 不根据 meals 自动覆盖 deficit；
+- [ ] 不为了补齐 UI 自动伪造 daily record；
+- [ ] 后续如果要增加“实际能量缺口”，必须建立独立字段/计算规则，不能复用现有游戏 deficit 含义；
+- [ ] UI 继续放在现有动森感体系内，不新增第五个主 Tab。
+
+## 7. P3 — 体重趋势
 
 目标：
 
@@ -276,10 +321,10 @@ tests/nutrition/chatgpt-meal-protocol.test.ts
 - 当前体重和趋势折线；
 - 同日多次测量策略；
 - 旧每日打卡 weight snapshot 与 measurement 的事务性关联；
-- 后续 daily overview 使用真实 measurement summary；
+- daily overview 使用真实 measurement summary；
 - UI 继续复用现有动森感 App* 体系，不因新增趋势图重做主导航。
 
-## 7. P4 — 统一每日总览
+## 8. P4 — 统一每日总览
 
 基于已有 views：
 
@@ -297,9 +342,9 @@ partner_daily_overview
 - 运动；
 - 当日游戏奖励。
 
-四个域并列展示，但不互相偷偷改值。
+四个域并列展示，但不互相偷偷改值。P2.5 先解决饮食与 daily record 的最小关联，P4 再做完整总览。
 
-## 8. P5 / Later — 架构强化
+## 9. P5 / Later — 架构强化
 
 ### 游戏结算服务端权威化
 
@@ -327,7 +372,7 @@ partner_daily_overview
 
 不要在业务功能中顺手做这些迁移。
 
-## 9. 外部事项
+## 10. 外部事项
 
 ### GitHub cached views
 
@@ -338,16 +383,18 @@ GitHub Support `Clear Cached Views` 工单已创建。等待平台完成后：
 3. 记录完成时间到 CHANGELOG；
 4. 再评估是否还有 Vercel 历史 deployment 残留。
 
-## 10. “下一步是什么”的简单答案
+## 11. “下一步是什么”的简单答案
 
 当前：
 
 ```text
-P0 工程治理        ✅
-P1 今日饮食 UI     ✅
-P2 ChatGPT “记上”  ✅
+P0 工程治理                ✅
+P1 今日饮食 UI             ✅
+P2 ChatGPT “记上”          ✅
 ↓
-P3 体重趋势        当前下一步
+P2.5 同日饮食 + daily record  当前下一步
+↓
+P3 体重趋势
 ↓
 P4 统一每日总览
 ```
