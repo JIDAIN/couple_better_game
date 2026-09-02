@@ -40,9 +40,10 @@ function coupleSpaceSlug() {
 }
 
 export function hasCloudSyncConfig() {
-  return Boolean(supabaseUrl() && supabaseSecretKey() && env("DATA_EDIT_PASSWORD"));
+  return Boolean(supabaseUrl() && supabaseSecretKey());
 }
 
+// Legacy /game compatibility only. The V2 life app no longer asks the user for a sync password.
 export function isValidSyncPassword(value: unknown) {
   const expected = env("DATA_EDIT_PASSWORD");
   if (!expected || typeof value !== "string") return false;
