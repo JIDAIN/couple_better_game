@@ -174,6 +174,27 @@ npm run build
 
 可见 UI 还需 Vercel Preview 人工检查。未做视觉检查，不写“视觉已验证”。
 
-## 12. 当前下一步
+## 12. Vercel 部署审批（强制）
 
-`docs/09-status-roadmap.md` 为唯一当前状态页。当前 V2-UI1 正在把已确认视觉语言落成 token / App* / Pattern；通过 CI/Preview 后，才进入 V2-P2 正式首页接 Life API。
+仓库使用 `vercel.json` 关闭 Git 自动部署：
+
+```json
+{
+  "git": {
+    "deploymentEnabled": false
+  }
+}
+```
+
+必须遵守：
+
+- Git push、PR、merge 不得自动触发 Vercel Preview 或 Production；
+- 任何 Vercel Preview / Production 部署都必须先向用户申请；
+- 只有用户明确回复“允许部署”或语义等价确认后，才可以手动触发部署；
+- 未获批准时，可以继续提交代码、文档、运行 GitHub CI，但不得调用 Vercel 部署动作；
+- 不得为了“顺便看看效果”自行部署；
+- 部署审批是逐次授权，不视为永久授权。
+
+## 13. 当前下一步
+
+`docs/09-status-roadmap.md` 为唯一当前状态页。按该文档继续推进；任何需要 Vercel Preview / Production 的节点都必须先执行第 12 节审批流程。
