@@ -8,13 +8,15 @@
 |---|---|
 | [`01-product.md`](01-product.md) | 这个产品给谁用？有哪些功能和用户流程？ |
 | [`02-architecture.md`](02-architecture.md) | 浏览器、Provider、API、Supabase 如何连接？ |
-| [`03-data-model.md`](03-data-model.md) | 哪些是事实数据？表怎么分？四个健康数据域如何隔离？ |
+| [`03-data-model.md`](03-data-model.md) | 哪些是事实数据？当前各数据域如何隔离？ |
 | [`04-api-and-sync.md`](04-api-and-sync.md) | 当前真实 API、cloud session、同步保护怎么工作？ |
-| [`05-business-rules.md`](05-business-rules.md) | 金币、宝石、热力图、周规则到底是什么？ |
+| [`05-business-rules.md`](05-business-rules.md) | Legacy game 的金币、宝石、热力图、周规则是什么？ |
 | [`06-ui-guidelines.md`](06-ui-guidelines.md) | animal-island-ui 和项目 wrapper 应该怎么用？ |
 | [`07-development-testing.md`](07-development-testing.md) | 新功能放哪里、怎么测试、怎么更新文档？ |
 | [`08-deployment-security.md`](08-deployment-security.md) | Vercel/Supabase 怎么部署，密钥和隐私如何保护？ |
 | [`09-status-roadmap.md`](09-status-roadmap.md) | 已完成、进行中、下一步、技术债是什么？ |
+| [`10-v2-life-redesign.md`](10-v2-life-redesign.md) | V2 为什么把生活系统设为主产品、旧游戏如何隐藏保留？ |
+| [`11-ai-write-architecture.md`](11-ai-write-architecture.md) | ChatGPT 如何跨饮食、生活、体重、药箱复用安全写入架构？ |
 
 根目录另外有：
 
@@ -33,6 +35,8 @@
 3. 本目录主文档；
 4. Git 历史中的旧文档 / 旧聊天记录。
 
+正在 PR 中、尚未合并/部署的 V2 内容必须明确写成“开发中”，不能冒充 production 已上线。
+
 发现主文档与真实实现不一致时，修代码或修文档，但不能保持“两个版本都算对”。
 
 ## 文档维护原则
@@ -41,6 +45,7 @@
 - 重构 / 迁移过程报告不作为长期事实源；稳定结论合并进主文档。
 - `CHANGELOG` 记录“发生了什么”，roadmap 记录“现在在哪、下一步是什么”。
 - API、schema、规则变化必须同步对应文档。
+- V2 的产品边界与 AI 写入架构属于长期设计约束，因此保留 `10` / `11` 两份专项主文档。
 - 临时 audit、调研和迁移 checklist 优先放 issue / PR / 对话，不继续堆在 `docs/`。
 
 ## 历史文档
