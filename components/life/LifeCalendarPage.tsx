@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
+import { useStaleQuery } from "@/lib/client/use-stale-query";
 import { fetchLifeMonth, LifeApiError } from "@/lib/life/life-client";
 import type { LifeMonthMoodRecord } from "@/lib/life/calendar-service";
-import type { LifePartnerKey, MoodKey } from "@/lib/life/life-service";
+import type { MoodKey } from "@/lib/life/life-service";
 import { moodVisual } from "@/components/life/today/today-life-model";
 
 const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -14,18 +15,18 @@ const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
 function localMonth(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
-
+function localDate(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 function monthTitle(month: string) {
   const [year, value] = month.split("-").map(Number);
   return `${year}年 ${value}月`;
 }
-
 function shiftMonth(month: string, amount: number) {
   const [year, value] = month.split("-").map(Number);
   const date = new Date(year, value - 1 + amount, 1);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
-
 function monthCells(month: string) {
   const [year, value] = month.split("-").map(Number);
   const days = new Date(year, value, 0).getDate();
@@ -37,81 +38,69 @@ function monthCells(month: string) {
   return cells;
 }
 
-function MoodDot({ moodKey, label }: { moodKey?: MoodKey; label: "我" | "Ta" }) {
+function MoodStamp({ moodKey, label, offset = false }: { moodKey?: MoodKey; label: "我" | "Ta"; offset?: boolean }) {
   const visual = moodVisual(moodKey);
-  if (!visual) {
-    return <span className="grid h-5 w-5 place-items-center rounded-full border border-dashed border-[var(--life-border-soft)] text-[8px] text-[var(--life-text-muted)]">{label}</span>;
-  }
-  return <span title={`${label} · ${visual.label}`} className={`grid h-5 w-5 place-items-center rounded-full text-[8px] font-black text-[var(--life-text)] shadow-[var(--life-shadow-press)] ${visual.tone}`}>{visual.emoji}</span>;
+  if (!visual) return null;
+  return (
+    <span
+      title={`${label} · ${visual.label}`}
+      className={`life-calendar-mood ${offset ? "is-offset" : ""}`}
+      style={{ background: visual.softTone }}
+      aria-label={`${label}：${visual.label}`}
+    >
+      {visual.emoji}
+    </span>
+  );
 }
 
 export function LifeCalendarPage() {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [month, setMonth] = useState(() => localMonth());
-  const [data, setData] = useState<LifeMonthMoodRecord | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const requestId = useRef(0);
-  const today = useMemo(() => new Date().toLocaleDateString("sv-SE"), []);
-
-  useEffect(() => {
-    const id = ++requestId.current;
-    let cancelled = false;
-    fetchLifeMonth(month)
-      .then((record) => {
-        if (cancelled || requestId.current !== id) return;
-        setData(record);
-        setError(null);
-      })
-      .catch((cause: unknown) => {
-        if (cancelled || requestId.current !== id) return;
-        setData(null);
-        setError(cause instanceof LifeApiError ? cause.message : "这个月的心情暂时没有加载出来");
-      })
-      .finally(() => {
-        if (!cancelled && requestId.current === id) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [month]);
-
-  const byDate = useMemo(() => new Map((data?.days ?? []).map((day) => [day.date, day.moods])), [data]);
+  const today = useMemo(() => localDate(), []);
+  const fetcher = useCallback(() => fetchLifeMonth(month), [month]);
+  const query = useStaleQuery<LifeMonthMoodRecord>({ key: `life-month:${month}`, fetcher, staleMs: 60_000 });
+  const byDate = useMemo(() => new Map((query.data?.days ?? []).map((day) => [day.date, day.moods])), [query.data]);
   const cells = useMemo(() => monthCells(month), [month]);
-
-  function moveMonth(amount: number) {
-    setLoading(true);
-    setError(null);
-    setMonth((value) => shiftMonth(value, amount));
-  }
+  const error = query.error instanceof LifeApiError ? query.error.message : query.error?.message ?? null;
 
   if (!mePartnerKey || !taPartnerKey) {
     return <AppPageShell title="日历" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;
   }
 
   return (
-    <AppPageShell title="日历" subtitle="我 / Ta 会随当前登录账号自动变化。">
-      <section className="life-surface life-section-card overflow-hidden">
-        <div className="flex items-center justify-between gap-3">
-          <button type="button" aria-label="上个月" onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--life-surface-soft)] text-lg font-black text-[var(--life-text-body)]">‹</button>
+    <AppPageShell title="日历" subtitle="没有心情就留白，有记录时让它自然落在日期下面。">
+      <section className="life-calendar-paper">
+        <div className="flex items-center justify-between gap-3 px-2">
+          <button type="button" aria-label="上个月" onClick={() => setMonth((value) => shiftMonth(value, -1))} className="life-round-button">‹</button>
           <div className="text-center">
-            <p className="text-lg font-extrabold text-[var(--life-text)]">{monthTitle(month)}</p>
-            <div className="mt-1 flex items-center justify-center gap-3 text-[10px] font-bold text-[var(--life-text-muted)]"><span>我</span><span>Ta</span>{loading ? <span>加载中…</span> : null}</div>
+            <p className="text-xl font-black tracking-tight text-[var(--life-text)]">{monthTitle(month)}</p>
+            <p className="mt-1 text-[10px] font-bold text-[var(--life-text-muted)]">我 · Ta</p>
           </div>
-          <button type="button" aria-label="下个月" onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--life-surface-soft)] text-lg font-black text-[var(--life-text-body)]">›</button>
+          <button type="button" aria-label="下个月" onClick={() => setMonth((value) => shiftMonth(value, 1))} className="life-round-button">›</button>
         </div>
 
-        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold text-[var(--life-text-muted)]">{WEEKDAYS.map((day) => <div key={day} className="py-1">{day}</div>)}</div>
+        {query.refreshing ? <div className="life-sync-pill mx-auto mt-3 w-fit">正在同步这个月…</div> : null}
+        <div className="mt-5 grid grid-cols-7 text-center text-[10px] font-extrabold text-[var(--life-text-muted)]">
+          {WEEKDAYS.map((day) => <div key={day} className="py-1">{day}</div>)}
+        </div>
 
-        <div className="mt-1 grid grid-cols-7 gap-1">
+        <div className="mt-2 grid grid-cols-7 gap-y-1">
           {cells.map((date, index) => {
-            if (!date) return <div key={`empty-${index}`} className="aspect-[0.78]" />;
+            if (!date) return <div key={`empty-${index}`} className="h-[5.2rem]" />;
             const moods = byDate.get(date) ?? [];
             const meMood = moods.find((item) => item.partnerKey === mePartnerKey)?.moodKey;
             const taMood = moods.find((item) => item.partnerKey === taPartnerKey)?.moodKey;
             const isToday = date === today;
             return (
-              <Link key={date} href={`/calendar/${date}`} className={`relative flex aspect-[0.78] min-h-[4.4rem] flex-col rounded-2xl px-1.5 py-1.5 transition active:scale-[0.97] ${isToday ? "bg-[color:color-mix(in_srgb,var(--life-yellow)_32%,white)] ring-1 ring-[var(--life-yellow)]" : "bg-[var(--life-surface-soft)]"}`}>
-                <span className={`text-[11px] font-extrabold ${isToday ? "text-[var(--life-text)]" : "text-[var(--life-text-body)]"}`}>{Number(date.slice(-2))}</span>
-                <span className="mt-auto flex flex-wrap items-end justify-center gap-1 pb-0.5"><MoodDot moodKey={meMood} label="我" /><MoodDot moodKey={taMood} label="Ta" /></span>
+              <Link key={date} href={`/calendar/${date}`} className="life-calendar-day" aria-label={`${date}${isToday ? "，今天" : ""}`}>
+                <span className={`life-calendar-date ${isToday ? "is-today" : ""}`}>
+                  {isToday ? <span className="life-today-sun" aria-hidden>☀️</span> : null}
+                  <span>{Number(date.slice(-2))}</span>
+                </span>
+                <span className="life-calendar-moods">
+                  <MoodStamp moodKey={meMood} label="我" />
+                  <MoodStamp moodKey={taMood} label="Ta" offset={Boolean(meMood && taMood)} />
+                </span>
               </Link>
             );
           })}
@@ -119,7 +108,7 @@ export function LifeCalendarPage() {
       </section>
 
       {error ? <div className="mt-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
-      <section className="mt-3 rounded-[var(--life-radius-card)] bg-[var(--life-surface-warm)] px-4 py-3"><p className="text-xs font-bold text-[var(--life-text-body)]">月历只展示事实</p><p className="mt-1 text-[11px] leading-5 text-[var(--life-text-muted)]">当前登录账号的心情显示为“我”，另一方显示为“Ta”；不会因为 cat / fish 固定身份而写死界面称呼。</p></section>
+      <p className="mt-3 px-2 text-center text-[10px] leading-5 text-[var(--life-text-muted)]">没有心情记录的日期保持空白；今天用小太阳标记。月历只展示事实，不计算连续天数或比较谁更积极。</p>
     </AppPageShell>
   );
 }

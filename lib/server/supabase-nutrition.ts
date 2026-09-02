@@ -2,6 +2,7 @@ import type {
   MealQuery,
   MealRecord,
   MealWritePayload,
+  NutritionPartnerKey,
 } from "../nutrition/meal-service";
 
 const DEFAULT_SUPABASE_URL = "https://bfhntnzngozdqsmgfvjk.supabase.co";
@@ -98,8 +99,7 @@ async function callRpc<T>(
 
   if (!response.ok) {
     const result = (await response.json().catch(() => null)) as RpcErrorBody | null;
-    const fallback =
-      operation === "read" ? "读取饮食数据失败" : "写入饮食数据失败";
+    const fallback = operation === "read" ? "读取饮食数据失败" : "写入饮食数据失败";
     throw new NutritionCloudError(
       result?.message ?? fallback,
       operation === "read" ? "NUTRITION_READ_FAILED" : "NUTRITION_WRITE_FAILED",
@@ -119,6 +119,25 @@ export async function listMeals(query: MealQuery) {
     },
     "read",
   );
+}
+
+export async function getMealOwner(mealId: string): Promise<NutritionPartnerKey | null> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${supabaseUrl()}/rest/v1/meals?id=eq.${encodeURIComponent(mealId)}&select=partner_key,deleted_at&limit=1`,
+      { headers: serviceHeaders(), cache: "no-store" },
+    );
+  } catch {
+    throw new NutritionCloudError("读取餐食归属时连接失败", "CLOUD_NETWORK_ERROR");
+  }
+  if (!response.ok) {
+    throw new NutritionCloudError("读取餐食归属失败", "NUTRITION_READ_FAILED");
+  }
+  const rows = (await response.json()) as Array<{ partner_key?: string; deleted_at?: string | null }>;
+  const row = rows[0];
+  if (!row || row.deleted_at) return null;
+  return row.partner_key === "cat" || row.partner_key === "fish" ? row.partner_key : null;
 }
 
 export async function createMeal(payload: MealWritePayload) {

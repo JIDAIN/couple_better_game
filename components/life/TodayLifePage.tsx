@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { fetchLifeDay, LifeApiError } from "@/lib/life/life-client";
 import type { LifeDayRecord } from "@/lib/life/life-service";
+import { useStaleQuery } from "@/lib/client/use-stale-query";
 import { LifeCloudGate } from "./today/LifeCloudGate";
 import { TodayActivityCard } from "./today/TodayActivityCard";
 import { TodayMoodCard } from "./today/TodayMoodCard";
@@ -12,68 +13,49 @@ import { displayDate, localIsoDate } from "./today/today-life-model";
 
 export function TodayLifePage() {
   const [date] = useState(() => localIsoDate());
-  const [day, setDay] = useState<LifeDayRecord | null>(null);
-  const [loading, setLoading] = useState(true);
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const fetcher = useCallback(() => fetchLifeDay(date), [date]);
+  const query = useStaleQuery<LifeDayRecord>({
+    key: `life-day:${date}`,
+    fetcher,
+    staleMs: 20_000,
+  });
+
+  const queryNeedsLogin = query.error instanceof LifeApiError && query.error.status === 401;
+  const queryError = query.error && !queryNeedsLogin
+    ? query.error.message || "读取今天的生活记录失败"
+    : null;
+  const visibleError = actionError ?? queryError;
 
   const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setActionError(null);
     try {
-      const next = await fetchLifeDay(date);
-      setDay(next);
+      await query.refresh(true);
       setNeedsLogin(false);
     } catch (cause) {
       if (cause instanceof LifeApiError && cause.status === 401) {
         setNeedsLogin(true);
-        setDay(null);
-      } else {
-        setError(cause instanceof Error ? cause.message : "读取今天的生活记录失败");
+        return;
       }
-    } finally {
-      setLoading(false);
+      setActionError(cause instanceof Error ? cause.message : "读取今天的生活记录失败");
     }
-  }, [date]);
+  }, [query]);
 
-  useEffect(() => {
-    let active = true;
-    fetchLifeDay(date)
-      .then((next) => {
-        if (!active) return;
-        setDay(next);
-        setNeedsLogin(false);
-      })
-      .catch((cause: unknown) => {
-        if (!active) return;
-        if (cause instanceof LifeApiError && cause.status === 401) {
-          setNeedsLogin(true);
-          setDay(null);
-          return;
-        }
-        setError(cause instanceof Error ? cause.message : "读取今天的生活记录失败");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [date]);
-
-  if (needsLogin) return <LifeCloudGate onConnected={reload} />;
+  if (needsLogin || queryNeedsLogin) return <LifeCloudGate onConnected={reload} />;
 
   return (
     <AppPageShell title={displayDate(date)} subtitle="只记重要的小日常，照顾好彼此。">
-      {error ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_18%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{error}</div> : null}
-      {loading && !day ? (
-        <div className="life-surface life-section-card text-center text-sm text-[var(--life-text-muted)]">正在看看今天留下了什么…</div>
-      ) : day ? (
+      {visibleError ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_18%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{visibleError}</div> : null}
+      {query.data ? (
         <div className="grid gap-3">
-          <TodayMoodCard date={date} day={day} onChanged={reload} onError={setError} />
-          <TodaySleepCard date={date} day={day} onChanged={reload} onError={setError} />
-          <TodayActivityCard date={date} day={day} onChanged={reload} onError={setError} />
+          {query.refreshing ? <div className="life-sync-pill" aria-live="polite">正在同步最新记录…</div> : null}
+          <TodayMoodCard date={date} day={query.data} onChanged={reload} onError={setActionError} />
+          <TodaySleepCard date={date} day={query.data} onChanged={reload} onError={setActionError} />
+          <TodayActivityCard date={date} day={query.data} onChanged={reload} onError={setActionError} />
         </div>
+      ) : query.loading ? (
+        <div className="life-surface life-section-card text-center text-sm text-[var(--life-text-muted)]">第一次读取今天的记录…</div>
       ) : (
         <div className="life-surface life-section-card text-center text-sm text-[var(--life-text-muted)]">今天的记录暂时没有加载出来。</div>
       )}

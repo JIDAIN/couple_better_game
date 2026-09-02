@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { saveMood } from "@/lib/life/life-client";
-import type { LifeDayRecord, LifePartnerKey, MoodKey } from "@/lib/life/life-service";
+import type { LifeDayRecord, MoodKey } from "@/lib/life/life-service";
 import { MOODS, moodVisual } from "./today-life-model";
 
 export function TodayMoodCard({
@@ -19,24 +19,24 @@ export function TodayMoodCard({
   onError: (message: string) => void;
 }) {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState<LifePartnerKey | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const moodByRole = useMemo(() => {
-    const map = new Map<LifePartnerKey, MoodKey>();
-    day.moods.forEach((item) => map.set(item.partnerKey, item.moodKey));
+    const map = new Map(day.moods.map((item) => [item.partnerKey, item.moodKey] as const));
     return map;
   }, [day.moods]);
 
   async function choose(moodKey: MoodKey) {
     if (!mePartnerKey) return;
-    setSaving(mePartnerKey);
+    setSaving(true);
     try {
       await saveMood({ partnerKey: mePartnerKey, moodDate: date, moodKey });
+      setPickerOpen(false);
       await onChanged();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "保存心情失败");
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   }
 
@@ -44,66 +44,74 @@ export function TodayMoodCard({
     return <section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section>;
   }
 
+  const myMood = moodByRole.get(mePartnerKey);
+  const taMood = moodByRole.get(taPartnerKey);
+
   return (
-    <section className="life-surface life-section-card">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-extrabold text-[var(--life-text)]">🍃 心情</p>
-          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">“我”永远是当前登录的人，Ta 是另一方。</p>
+    <>
+      <section className="life-surface life-section-card life-home-feature">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-extrabold text-[var(--life-text)]">🍃 心情</p>
+            <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">今天的感受，各自记录自己的。</p>
+          </div>
+          <AppButton variant="ghost" onClick={() => setPickerOpen(true)}>
+            {myMood ? "修改我的" : "+ 记录我的"}
+          </AppButton>
         </div>
-        <AppButton variant="ghost" onClick={() => setEditing((value) => !value)}>
-          {editing ? "完成" : moodByRole.has(mePartnerKey) ? "修改" : "+ 记录"}
-        </AppButton>
-      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <MoodFace label="我" moodKey={moodByRole.get(mePartnerKey)} />
-        <MoodFace label="Ta" moodKey={moodByRole.get(taPartnerKey)} />
-      </div>
+        <div className="grid grid-cols-2 gap-3">
+          <MoodFace label="我" moodKey={myMood} emphasized />
+          <MoodFace label="Ta" moodKey={taMood} />
+        </div>
+      </section>
 
-      {editing ? (
-        <div className="mt-4 border-t border-[var(--life-border-soft)] pt-4">
-          <MoodEditor label="我的心情" value={moodByRole.get(mePartnerKey)} disabled={saving === mePartnerKey} onChange={(key) => void choose(key)} />
+      {pickerOpen ? (
+        <div className="life-sheet-backdrop" role="presentation" onMouseDown={() => !saving && setPickerOpen(false)}>
+          <section className="life-mood-sheet" role="dialog" aria-modal="true" aria-labelledby="mood-picker-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--life-border)]" />
+            <div className="text-center">
+              <p id="mood-picker-title" className="text-lg font-black text-[var(--life-text)]">现在感觉怎么样？</p>
+              <p className="mt-1 text-xs text-[var(--life-text-muted)]">这里只记录“我”的心情，Ta 由 Ta 自己记录。</p>
+            </div>
+            <div className="mt-5 grid grid-cols-4 gap-x-2 gap-y-4" role="radiogroup" aria-label="选择我的心情">
+              {MOODS.map((mood) => {
+                const active = mood.key === myMood;
+                return (
+                  <button
+                    key={mood.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    disabled={saving}
+                    onClick={() => void choose(mood.key)}
+                    className={`life-mood-choice ${active ? "is-active" : ""}`}
+                  >
+                    <span className="life-mood-orb" style={{ background: mood.softTone }} aria-hidden>{mood.emoji}</span>
+                    <span>{mood.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button type="button" disabled={saving} onClick={() => setPickerOpen(false)} className="mt-5 w-full rounded-full bg-[var(--life-surface-soft)] px-4 py-3 text-sm font-extrabold text-[var(--life-text-body)]">
+              {saving ? "正在保存…" : "取消"}
+            </button>
+          </section>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }
 
-function MoodFace({ label, moodKey }: { label: string; moodKey?: MoodKey }) {
+function MoodFace({ label, moodKey, emphasized = false }: { label: string; moodKey?: MoodKey; emphasized?: boolean }) {
   const visual = moodVisual(moodKey);
   return (
-    <div className="rounded-[var(--life-radius-card)] border border-[var(--life-border-soft)] bg-[var(--life-surface)] p-3 text-center">
-      <div className={`mx-auto grid h-16 w-16 place-items-center rounded-full text-base font-black text-[var(--life-text)] ${visual?.tone ?? "bg-[var(--life-surface-soft)]"}`}>
-        {visual?.emoji ?? "+"}
+    <div className={`life-person-state ${emphasized ? "is-me" : ""}`}>
+      <div className="life-person-state-orb" style={{ background: visual?.softTone ?? "var(--life-surface-soft)" }}>
+        <span aria-hidden>{visual?.emoji ?? "○"}</span>
       </div>
       <p className="mt-2 text-xs font-bold text-[var(--life-text-muted)]">{label}</p>
       <p className="mt-0.5 text-sm font-extrabold text-[var(--life-text)]">{visual?.label ?? "未记录"}</p>
-    </div>
-  );
-}
-
-function MoodEditor({ label, value, disabled, onChange }: { label: string; value?: MoodKey; disabled: boolean; onChange: (key: MoodKey) => void }) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-bold text-[var(--life-text-body)]">{label}</p>
-      <div className="grid grid-cols-7 gap-1.5" role="radiogroup" aria-label={`${label} 心情`}>
-        {MOODS.map((mood) => (
-          <button
-            key={mood.key}
-            type="button"
-            role="radio"
-            aria-checked={mood.key === value}
-            aria-label={mood.label}
-            disabled={disabled}
-            onClick={() => onChange(mood.key)}
-            className={`life-mood-chip px-1 ${mood.key === value ? "ring-2 ring-[var(--life-teal)] ring-offset-1" : ""}`}
-          >
-            <span className={`grid h-8 w-8 place-items-center rounded-full text-[9px] font-black ${mood.tone}`}>{mood.emoji}</span>
-            <span className="hidden text-[9px] sm:block">{mood.label}</span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

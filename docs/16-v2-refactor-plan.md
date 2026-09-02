@@ -3,96 +3,85 @@
 本轮重构源于 Production 实机验收，不再把问题视为零散 UI 修补。
 
 ## 总原则
-
 1. 先修账户、权限、导航和缓存边界，再改具体页面。
-2. 能使用成熟项目/成熟库解决的问题，不重复造轮子；第三方实现必须经过现有 `App*` / 岛屿视觉适配层统一视觉。
-3. 生活层继续坚持：记录，不评价；观察，不排名；数字是事实，不是成绩。
-4. `/game` 旧游戏保持独立，不重新接入新版 Meal 明细。
+2. 成熟项目/成熟库优先；第三方实现必须经过 `App*` / 岛屿视觉适配层。
+3. 生活层：记录，不评价；观察，不排名；数字是事实，不是成绩。
+4. `/game` 旧游戏保持独立。
 5. Vercel Git 部署保持关闭；任何 Preview / Production 仍需单次明确授权。
 
-## R1：账户与导航基础
+## R1：账户、权限、导航、缓存 ✅
+- R1A：当前 Tab 重复点击不再同路由导航。
+- R1B：固定 `cat/fish` 双账号、共享旧密码、相对“我/Ta”、HMAC HttpOnly Cookie。
+- R1C：根身份 Context + stale-while-revalidate 查询缓存；今日页优先展示缓存。
+- 详见 `docs/17-auth-and-pairing.md`、`docs/18-r1c-navigation-cache.md`。
 
-### R1A ✅ 已完成
+## R2：首页心情 / 睡眠 ✅
+- 只编辑当前 `mePartnerKey`；Ta 只读。
+- 心情使用独立 bottom sheet；删除 ASCII 字符脸。
+- 睡眠只编辑“我”的入睡 / 起床。
+- 详见 `docs/19-r2-today-mood-sleep.md`。
 
-- 当前底部 Tab 再次点击自身不再触发同路由导航。
-- 曾为通用 Auth 方案加入 profile/membership 基础；R1B 产品复核后确认本项目只有两位固定使用者，因此这些未使用表已通过 cleanup migration 删除。
+## R3：饮食餐次与多加餐 ✅
+- 早餐 / 午餐 / 晚餐固定槽，编辑页不再改餐次。
+- 加餐 `0..N`，先选上午 / 下午 / 晚上，再进入统一编辑页。
+- 每次加餐按 `mealId` 独立编辑。
+- Meal create/update/delete/photo write 由服务端 owner + 当前 session 校验。
+- 饮食接入 `meals:{partnerKey}:{date}` cache。
+- 详见 `docs/20-r3-meal-model.md`。
 
-### R1B ✅ 固定双账号方案
+## R4：情绪日历 ✅
+- 无心情日期下方完全留空；今天使用小太阳。
+- 一人有记录显示一枚情绪图，双方都有显示两枚轻微错位图标。
+- 显示顺序按 `mePartnerKey / taPartnerKey`。
+- 月历接入 `life-month:{YYYY-MM}` cache。
+- 产品模式参考 MIT `GitHub-Xzhi/obsidian-mood-calendar`，不复制其视觉资产或插件代码。
+- 详见 `docs/21-r4-mood-calendar.md`。
 
-最终采用：
+## R5：小窝 / 我的职责重分 ✅
+- 小窝只负责共同生活四入口：体重 / 小信箱 / 家庭药箱 / 游戏机。
+- 我的只负责当前账号、相对身份、同步、写入边界、数据管理与退出。
+- 删除“我的”里重复的小窝/日历/游戏快捷入口。
+- 小信箱新信固定 `我 -> Ta`；收到的只读；自己寄出的可编辑/删除。
+- Mailbox POST/PUT/DELETE 增加服务端 sender ownership 校验。
+- 详见 `docs/22-r5-nest-me-boundary.md`。
+
+## R6：全站视觉还原 ✅
+- 以“岛屿生活视觉语言 V2 · 方案B”为基线。
+- 新增 `app/island-life-refactor.css` 统一页面级 visual adapter。
+- 统一背景、标题、底部导航、sheet、surface 材质。
+- 日历从 SaaS 日期卡改成稀疏纸质月历。
+- 小窝使用房间场景 + 2×2 四入口。
+- 我的使用账号 Hero + 设置列表。
+- 数据密集页保持克制；Legacy Game 不改视觉/机制。
+- 更新 `docs/12-island-life-design-system.md`；详见 `docs/23-r6-visual-polish.md`。
+
+## 最终统一验收 ✅
+
+按用户要求，在 R6 与分阶段文档全部完成后统一执行 Test / Lint / Build。
+
+首轮：
 
 ```text
-我  -> cat
-Ta  -> fish
+Test   ✅
+Build  ✅
+Lint   ❌
 ```
 
-两个人继续共用旧程序同一个 `DATA_EDIT_PASSWORD`，不开放注册、不做邮箱验证、不做邀请码、不允许第三个账号。
+Lint 定位到两处 React effect 同步 setState：`TodayLifePage.tsx` 与 `use-stale-query.ts`。已分别改为 query error 派生状态，以及 microtask 恢复缓存/后台 refresh。
 
-登录时选择“我 / Ta”并输入共享密码，服务端签发带 `partnerKey` 的 HMAC 签名 HttpOnly Cookie。业务 API 从该 Cookie 获取当前身份。
+修复后 CI run `33656830449`：
 
-已完成：
+```text
+Test   ✅
+Lint   ✅
+Build  ✅
+```
 
-- `/login` 固定双账号登录；
-- `/api/auth/login` / `session` / `logout`；
-- `/me` 改为真正的当前账号与同步页；
-- mood / sleep / weight 新增写入执行 `OWN_RECORD_ONLY`；
-- Supabase Auth 注册、bootstrap、邀请码、membership 流程全部撤销；
-- Production 中对应临时表当时均为空，cleanup migration 已安全删除；
-- 详细说明见 `docs/17-auth-and-pairing.md`。
+完整修复与已知 npm audit 提示记录见 `docs/09-status-roadmap.md`。
 
-仍需继续收紧：
+## 本轮结论
 
-- Meal 创建/修改/删除按当前登录身份限制；
-- 信箱发件人固定为当前登录身份；
-- 活动记录明确创建人/参与人语义；
-- 旧 game 同步继续保持独立稳定。
-
-### R1C 下一步：数据缓存与无闪烁切换
-
-优先采用 TanStack Query：
-
-- `LifeAppShell` 持久 QueryClient；
-- 今日、饮食、日历、小窝使用稳定 query key；
-- mutation 后只更新/失效相关数据；
-- 页面切换优先显示缓存，后台 revalidate；
-- 消除实机“点一下就整块重新 loading”的刷新感。
-
-## R2：首页心情
-
-- 首页只展示双方心情；
-- “记录/修改”只能写当前登录账号；
-- 另一方只读；
-- 点击记录弹出独立毛绒情绪选择层；
-- 移除字符模拟情绪图标。
-
-## R3：饮食餐次
-
-- 早餐/午餐/晚餐为固定槽，进入后不能改餐次；
-- 加餐为 0..N；
-- 新增加餐先选上午/下午/晚上；
-- 已有加餐按具体记录编辑。
-
-## R4：情绪日历
-
-- 情绪直接散落在月历中；
-- 无心情为空；
-- 今天使用小太阳特殊状态；
-- 有心情显示双方各自情绪图；
-- 日期排布优先复用成熟 MIT 项目逻辑，视觉统一重做。
-
-## R5：小窝 / 我的职责重分
-
-- 小窝：两人共同拥有的内容（体重、信箱、药箱、游戏机）；
-- 我的：当前账号、同步状态、数据管理、设置、退出登录；
-- 删除重复产品说明。
-
-## R6：全站视觉还原
-
-- 以“岛屿生活视觉语言 V2 · 方案B”为验收基线；
-- 减少标准 SaaS 卡片堆叠；
-- 场景页加强插画和空间构图；
-- 第三方库只复用逻辑/结构，统一通过视觉适配层。
+R1-R6 重构及代码级统一验证已完成。下一次产品验收应在获得单次 Vercel 部署授权后，通过真实移动端 / 浏览器检查视觉、导航、空态、长文本、真实数据与旧游戏回归。
 
 ## 部署约束
-
-`vercel.json` 默认保持 `git.deploymentEnabled: false`。任何 Preview / Production 部署必须再次获得用户明确授权。
+`vercel.json` 默认保持 `git.deploymentEnabled: false`。任何 Preview / Production 必须再次获得明确授权。

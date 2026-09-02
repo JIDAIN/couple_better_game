@@ -1,16 +1,13 @@
-import type { LifePartnerKey, MoodKey, SleepRecord } from "@/lib/life/life-service";
+import type { MoodKey, SleepRecord } from "@/lib/life/life-service";
 
-export const SELF_KEY: LifePartnerKey = "cat";
-export const TA_KEY: LifePartnerKey = "fish";
-
-export const MOODS: Array<{ key: MoodKey; emoji: string; label: string; tone: string }> = [
-  { key: "happy", emoji: "☺", label: "开心", tone: "bg-[var(--life-pink)]" },
-  { key: "calm", emoji: "•ᴗ•", label: "平静", tone: "bg-[var(--life-mint)]" },
-  { key: "neutral", emoji: "•‿•", label: "一般", tone: "bg-[var(--life-yellow)]" },
-  { key: "anxious", emoji: "•﹏•", label: "焦虑", tone: "bg-[var(--life-blue)]" },
-  { key: "sad", emoji: "｡•́︿•̀｡", label: "难过", tone: "bg-[var(--life-pink)]" },
-  { key: "angry", emoji: "•̀⤙•́", label: "生气", tone: "bg-[var(--life-coral)]" },
-  { key: "tired", emoji: "- ᴗ -", label: "疲惫", tone: "bg-[var(--life-blue)]" },
+export const MOODS: Array<{ key: MoodKey; emoji: string; label: string; tone: string; softTone: string }> = [
+  { key: "happy", emoji: "😊", label: "开心", tone: "bg-[var(--life-pink)]", softTone: "#ffe7eb" },
+  { key: "calm", emoji: "😌", label: "平静", tone: "bg-[var(--life-mint)]", softTone: "#e5f5ed" },
+  { key: "neutral", emoji: "🙂", label: "一般", tone: "bg-[var(--life-yellow)]", softTone: "#fff2ce" },
+  { key: "anxious", emoji: "😟", label: "焦虑", tone: "bg-[var(--life-blue)]", softTone: "#e4f4fb" },
+  { key: "sad", emoji: "😢", label: "难过", tone: "bg-[var(--life-pink)]", softTone: "#ffe9f0" },
+  { key: "angry", emoji: "😠", label: "生气", tone: "bg-[var(--life-coral)]", softTone: "#ffe5df" },
+  { key: "tired", emoji: "😴", label: "疲惫", tone: "bg-[var(--life-blue)]", softTone: "#e7f0ff" },
 ];
 
 export function localIsoDate(date = new Date()) {

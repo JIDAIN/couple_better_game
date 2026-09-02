@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { AppLifeBottomNav } from "@/components/ui/AppLifeBottomNav";
-import { LifeIdentityProvider } from "@/components/life/LifeIdentityContext";
 
 export type LifeAppShellProps = {
   children: ReactNode;
@@ -10,11 +9,9 @@ export type LifeAppShellProps = {
 
 export function LifeAppShell({ children }: LifeAppShellProps) {
   return (
-    <LifeIdentityProvider>
-      <div className="island-life-v2 min-h-screen bg-[var(--life-bg)]">
-        <div className="pb-20">{children}</div>
-        <AppLifeBottomNav />
-      </div>
-    </LifeIdentityProvider>
+    <div className="island-life-v2 min-h-screen bg-[var(--life-bg)]">
+      <div className="pb-20">{children}</div>
+      <AppLifeBottomNav />
+    </div>
   );
 }
