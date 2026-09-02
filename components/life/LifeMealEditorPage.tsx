@@ -8,7 +8,15 @@ import { AppInput } from "@/components/ui/AppInput";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
 import { AppTextarea } from "@/components/ui/AppTextarea";
-import { createMealRecord, fetchMeals, MealApiError, updateMealRecord } from "@/lib/nutrition/meal-client";
+import {
+  createMealRecord,
+  deleteMealPhoto,
+  fetchMeals,
+  mealPhotoUrl,
+  MealApiError,
+  updateMealRecord,
+  uploadMealPhoto,
+} from "@/lib/nutrition/meal-client";
 import type { MealItemRecord, MealRecord, MealType, MealWritePayload, NutritionPartnerKey } from "@/lib/nutrition/meal-service";
 
 const MEAL_OPTIONS: Array<{ value: MealType; label: string }> = [
@@ -17,6 +25,14 @@ const MEAL_OPTIONS: Array<{ value: MealType; label: string }> = [
   { value: "dinner", label: "晚餐" },
   { value: "snack", label: "加餐" },
 ];
+const DEFAULT_MEAL_ART: Record<string, string> = {
+  breakfast: "/illustrations/meals/breakfast.svg",
+  lunch: "/illustrations/meals/lunch.svg",
+  dinner: "/illustrations/meals/dinner.svg",
+  snack: "/illustrations/meals/snack.svg",
+};
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
 type ItemDraft = {
   key: string;
@@ -58,8 +74,7 @@ function numberOrNull(value: string) {
 function dateTimeWithLocalOffset(mealDate: string, time: string) {
   if (!time) return null;
   const local = new Date(`${mealDate}T${time}:00`);
-  if (Number.isNaN(local.getTime())) return null;
-  return local.toISOString();
+  return Number.isNaN(local.getTime()) ? null : local.toISOString();
 }
 
 export function LifeMealEditorPage() {
@@ -78,10 +93,15 @@ export function LifeMealEditorPage() {
   const [time, setTime] = useState("");
   const [note, setNote] = useState("");
   const [items, setItems] = useState<ItemDraft[]>([emptyItem()]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
   const [loading, setLoading] = useState(Boolean(mealId));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const partnerKey: NutritionPartnerKey = role === "me" ? "cat" : "fish";
+
+  useEffect(() => () => { if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); }, [photoPreviewUrl]);
 
   useEffect(() => {
     if (!mealId) return;
@@ -100,33 +120,43 @@ export function LifeMealEditorPage() {
         setItems(found.items.length ? found.items.map(fromItem) : [emptyItem()]);
       })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "读取这餐失败"))
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [initialDate, initialPartner, mealId]);
 
   const caloriePreview = useMemo(() => {
     const parsed = items.map((item) => numberOrNull(item.caloriesKcal));
     const valid = parsed.every((value) => value === null || (!Number.isNaN(value) && Number.isInteger(value)));
     const complete = valid && parsed.length > 0 && parsed.every((value) => value !== null);
-    return complete
-      ? parsed.reduce<number>((sum, value) => sum + (value ?? 0), 0)
-      : null;
+    return complete ? parsed.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null;
   }, [items]);
+
+  const photoSrc = photoPreviewUrl ?? (!removePhoto && meal?.photoPath ? mealPhotoUrl(meal) : (DEFAULT_MEAL_ART[mealType] ?? DEFAULT_MEAL_ART.lunch));
+  const customPhotoVisible = Boolean(photoPreviewUrl || (!removePhoto && meal?.photoPath));
 
   function updateItem(itemKey: string, patch: Partial<ItemDraft>) {
     setItems((current) => current.map((item) => item.key === itemKey ? { ...item, ...patch } : item));
   }
 
+  function choosePhoto(file: File | null) {
+    setError(null);
+    if (!file) return;
+    if (!PHOTO_TYPES.has(file.type.toLowerCase())) { setError("照片仅支持 JPEG、PNG、WebP、HEIC/HEIF"); return; }
+    if (file.size > MAX_PHOTO_BYTES) { setError("照片需要小于 10MB"); return; }
+    setPhotoFile(file);
+    setRemovePhoto(false);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function clearPhoto() {
+    setPhotoFile(null);
+    setPhotoPreviewUrl(null);
+    setRemovePhoto(Boolean(meal?.photoPath));
+  }
+
   async function save() {
     setError(null);
-    if (!items.length || items.some((item) => !item.rawName.trim())) {
-      setError("每个食物明细都需要填写名称");
-      return;
-    }
+    if (!items.length || items.some((item) => !item.rawName.trim())) { setError("每个食物明细都需要填写名称"); return; }
 
     const parsedItems: MealWritePayload["items"] = [];
     for (const item of items) {
@@ -134,14 +164,8 @@ export function LifeMealEditorPage() {
       const carbs = numberOrNull(item.carbsG);
       const protein = numberOrNull(item.proteinG);
       const fat = numberOrNull(item.fatG);
-      if ([calories, carbs, protein, fat].some((value) => Number.isNaN(value))) {
-        setError("营养数值只能填写 0 或更大的数字");
-        return;
-      }
-      if (calories != null && !Number.isInteger(calories)) {
-        setError("热量如果填写，需要使用整数 kcal");
-        return;
-      }
+      if ([calories, carbs, protein, fat].some((value) => Number.isNaN(value))) { setError("营养数值只能填写 0 或更大的数字"); return; }
+      if (calories != null && !Number.isInteger(calories)) { setError("热量如果填写，需要使用整数 kcal"); return; }
       parsedItems.push({
         foodId: null,
         rawName: item.rawName.trim(),
@@ -158,10 +182,6 @@ export function LifeMealEditorPage() {
     }
 
     const allCaloriesKnown = parsedItems.every((item) => item.caloriesKcal !== null);
-    const totalCaloriesKcal = allCaloriesKnown
-      ? parsedItems.reduce((sum, item) => sum + (item.caloriesKcal ?? 0), 0)
-      : null;
-
     const payload: MealWritePayload = {
       partnerKey,
       mealDate: date,
@@ -170,7 +190,7 @@ export function LifeMealEditorPage() {
       snackPeriod: null,
       status: "confirmed",
       source: meal?.source ?? "manual",
-      totalCaloriesKcal,
+      totalCaloriesKcal: allCaloriesKnown ? parsedItems.reduce((sum, item) => sum + (item.caloriesKcal ?? 0), 0) : null,
       calorieMinKcal: null,
       calorieMaxKcal: null,
       note: note.trim() || null,
@@ -180,8 +200,16 @@ export function LifeMealEditorPage() {
 
     setSaving(true);
     try {
-      if (meal) await updateMealRecord(meal.id, payload);
-      else await createMealRecord(payload);
+      let saved = meal ? await updateMealRecord(meal.id, payload) : await createMealRecord(payload);
+      setMeal(saved);
+      try {
+        if (photoFile) saved = await uploadMealPhoto(saved.id, photoFile);
+        else if (removePhoto && saved.photoPath) saved = await deleteMealPhoto(saved.id);
+        setMeal(saved);
+      } catch (cause) {
+        setError(cause instanceof MealApiError ? `餐食已经保存，但照片没有保存：${cause.message}` : "餐食已经保存，但照片没有保存成功");
+        return;
+      }
       router.push("/food");
       router.refresh();
     } catch (cause) {
@@ -192,7 +220,7 @@ export function LifeMealEditorPage() {
   }
 
   return (
-    <AppPageShell title={meal ? "编辑一餐" : "添加一餐"} subtitle="只要记下吃了什么就能保存；热量和三大营养素都可以以后再补。">
+    <AppPageShell title={meal ? "编辑一餐" : "添加一餐"} subtitle="记录实际吃了什么；照片和营养估算都可以按需补充。">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link href="/food" className="text-sm font-bold text-[var(--life-teal-strong)]">← 返回饮食</Link>
         <span className="text-xs text-[var(--life-text-muted)]">{loading ? "读取中…" : meal ? "修改现有记录" : "新记录"}</span>
@@ -202,41 +230,32 @@ export function LifeMealEditorPage() {
         <section className="life-surface life-section-card grid gap-3">
           <AppRoleSwitch value={role} onChange={setRole} />
           <div className="grid grid-cols-2 gap-2.5">
-            <label className="grid gap-1 text-xs font-bold text-[var(--life-text-body)]">
-              日期
-              <AppInput type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-            </label>
-            <label className="grid gap-1 text-xs font-bold text-[var(--life-text-body)]">
-              时间（可选）
-              <AppInput type="time" value={time} onChange={(event) => setTime(event.target.value)} />
-            </label>
+            <label className="grid gap-1 text-xs font-bold text-[var(--life-text-body)]">日期<AppInput type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+            <label className="grid gap-1 text-xs font-bold text-[var(--life-text-body)]">时间（可选）<AppInput type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
           </div>
           <div>
             <p className="mb-1.5 text-xs font-bold text-[var(--life-text-body)]">餐次</p>
             <div className="grid grid-cols-4 gap-1.5">
-              {MEAL_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  aria-pressed={mealType === option.value}
-                  onClick={() => setMealType(option.value)}
-                  className={`rounded-xl px-2 py-2 text-xs font-extrabold ${mealType === option.value ? "bg-[var(--life-mint)] text-[#255f4d]" : "bg-[var(--life-surface-soft)] text-[var(--life-text-body)]"}`}
-                >
-                  {option.label}
-                </button>
-              ))}
+              {MEAL_OPTIONS.map((option) => <button key={option.value} type="button" aria-pressed={mealType === option.value} onClick={() => setMealType(option.value)} className={`rounded-xl px-2 py-2 text-xs font-extrabold ${mealType === option.value ? "bg-[var(--life-mint)] text-[#255f4d]" : "bg-[var(--life-surface-soft)] text-[var(--life-text-body)]"}`}>{option.label}</button>)}
             </div>
           </div>
         </section>
 
+        <section className="life-surface life-section-card">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div><p className="text-sm font-extrabold text-[var(--life-text)]">餐食照片</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">不上传时自动显示默认卡通图。</p></div>
+            {customPhotoVisible ? <button type="button" onClick={clearPhoto} className="text-xs font-bold text-[var(--life-danger)]">移除照片</button> : null}
+          </div>
+          <img src={photoSrc} alt={customPhotoVisible ? "当前餐食照片" : "默认餐食卡通图"} className="aspect-[4/3] w-full rounded-[var(--life-radius-control)] object-cover" />
+          <label className="mt-3 flex cursor-pointer items-center justify-center rounded-xl bg-[var(--life-surface-soft)] px-3 py-2.5 text-sm font-extrabold text-[var(--life-teal-strong)]">
+            {customPhotoVisible ? "更换照片" : "上传实物照片"}
+            <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="sr-only" disabled={saving} onChange={(event) => choosePhoto(event.target.files?.[0] ?? null)} />
+          </label>
+        </section>
+
         {items.map((item, index) => (
           <section key={item.key} className="life-surface life-section-card">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-extrabold text-[var(--life-text)]">食物 {index + 1}</p>
-              {items.length > 1 ? (
-                <button type="button" onClick={() => setItems((current) => current.filter((entry) => entry.key !== item.key))} className="text-xs font-bold text-[var(--life-danger)]">移除</button>
-              ) : null}
-            </div>
+            <div className="mb-3 flex items-center justify-between"><p className="text-sm font-extrabold text-[var(--life-text)]">食物 {index + 1}</p>{items.length > 1 ? <button type="button" onClick={() => setItems((current) => current.filter((entry) => entry.key !== item.key))} className="text-xs font-bold text-[var(--life-danger)]">移除</button> : null}</div>
             <div className="grid gap-2.5">
               <AppInput placeholder="食物名称，例如：米饭、鸡胸肉" value={item.rawName} onChange={(event) => updateItem(item.key, { rawName: event.target.value })} />
               <AppInput placeholder="份量描述（可选），例如：一小碗" value={item.portionDescription} onChange={(event) => updateItem(item.key, { portionDescription: event.target.value })} />
@@ -253,10 +272,7 @@ export function LifeMealEditorPage() {
         <button type="button" onClick={() => setItems((current) => [...current, emptyItem()])} className="life-feature-tile justify-center text-sm font-extrabold text-[var(--life-teal-strong)]">＋ 添加一种食物</button>
 
         <section className="life-surface life-section-card grid gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-[var(--life-text-body)]">当前总热量</span>
-            <strong className="text-lg tabular-nums text-[var(--life-text)]">{caloriePreview == null ? "未估算" : `${caloriePreview} kcal`}</strong>
-          </div>
+          <div className="flex items-center justify-between"><span className="text-sm font-bold text-[var(--life-text-body)]">当前总热量</span><strong className="text-lg tabular-nums text-[var(--life-text)]">{caloriePreview == null ? "未估算" : `${caloriePreview} kcal`}</strong></div>
           <p className="text-[10px] text-[var(--life-text-muted)]">留空表示“没有估算”，不会被当成 0 kcal。</p>
           <AppTextarea rows={3} placeholder="备注（可选）" value={note} onChange={(event) => setNote(event.target.value)} />
         </section>

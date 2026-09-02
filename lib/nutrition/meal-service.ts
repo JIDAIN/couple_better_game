@@ -43,6 +43,7 @@ export type MealItemRecord = MealItemWrite & {
 
 export type MealRecord = Omit<MealWritePayload, "items"> & {
   id: string;
+  photoPath: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
