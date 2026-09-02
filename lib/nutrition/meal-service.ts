@@ -10,7 +10,7 @@ export type MealItemWrite = {
   displayName: string;
   portionDescription: string | null;
   estimatedWeightG: number | null;
-  caloriesKcal: number;
+  caloriesKcal: number | null;
   calorieMinKcal: number | null;
   calorieMaxKcal: number | null;
   proteinG: number | null;
@@ -26,7 +26,7 @@ export type MealWritePayload = {
   snackPeriod: SnackPeriod | null;
   status: MealStatus;
   source: MealSource;
-  totalCaloriesKcal: number;
+  totalCaloriesKcal: number | null;
   calorieMinKcal: number | null;
   calorieMaxKcal: number | null;
   note: string | null;
@@ -58,19 +58,8 @@ type ParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: string };
 
-const MEAL_TYPES: readonly MealType[] = [
-  "breakfast",
-  "lunch",
-  "dinner",
-  "snack",
-  "other",
-];
-const SNACK_PERIODS: readonly SnackPeriod[] = [
-  "morning",
-  "afternoon",
-  "evening",
-  "late_night",
-];
+const MEAL_TYPES: readonly MealType[] = ["breakfast", "lunch", "dinner", "snack", "other"];
+const SNACK_PERIODS: readonly SnackPeriod[] = ["morning", "afternoon", "evening", "late_night"];
 const MEAL_STATUSES: readonly MealStatus[] = ["draft", "confirmed"];
 const MEAL_SOURCES: readonly MealSource[] = ["manual", "chatgpt", "import"];
 const PARTNER_KEYS: readonly NutritionPartnerKey[] = ["fish", "cat"];
@@ -82,8 +71,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function trimText(value: unknown, maxLength: number) {
   if (typeof value !== "string") return null;
   const text = value.trim();
-  if (!text) return null;
-  if (text.length > maxLength) return null;
+  if (!text || text.length > maxLength) return null;
   return text;
 }
 
@@ -94,23 +82,15 @@ function isIsoDate(value: string) {
   const month = Number(match[2]);
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 export function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function optionalNonNegativeNumber(value: unknown): ParseResult<number | null> {
-  if (value === null || value === undefined || value === "") {
-    return { ok: true, value: null };
-  }
+  if (value === null || value === undefined || value === "") return { ok: true, value: null };
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     return { ok: false, reason: "营养数值必须是非负数字" };
   }
@@ -118,9 +98,7 @@ function optionalNonNegativeNumber(value: unknown): ParseResult<number | null> {
 }
 
 function optionalNonNegativeInteger(value: unknown): ParseResult<number | null> {
-  if (value === null || value === undefined || value === "") {
-    return { ok: true, value: null };
-  }
+  if (value === null || value === undefined || value === "") return { ok: true, value: null };
   if (!Number.isInteger(value) || (value as number) < 0) {
     return { ok: false, reason: "热量必须是非负整数" };
   }
@@ -128,14 +106,10 @@ function optionalNonNegativeInteger(value: unknown): ParseResult<number | null> 
 }
 
 function parseMealItem(value: unknown, index: number): ParseResult<MealItemWrite> {
-  if (!isRecord(value)) {
-    return { ok: false, reason: `第 ${index + 1} 个食物明细格式不正确` };
-  }
+  if (!isRecord(value)) return { ok: false, reason: `第 ${index + 1} 个食物明细格式不正确` };
 
   const rawName = trimText(value.rawName, 200);
-  if (!rawName) {
-    return { ok: false, reason: `第 ${index + 1} 个食物缺少名称` };
-  }
+  if (!rawName) return { ok: false, reason: `第 ${index + 1} 个食物缺少名称` };
 
   const foodIdRaw = trimText(value.foodId, 64);
   if (foodIdRaw && !isUuid(foodIdRaw)) {
@@ -143,25 +117,19 @@ function parseMealItem(value: unknown, index: number): ParseResult<MealItemWrite
   }
 
   const calories = optionalNonNegativeInteger(value.caloriesKcal);
-  if (!calories.ok || calories.value === null) {
-    return { ok: false, reason: `第 ${index + 1} 个食物需要有效的 caloriesKcal` };
-  }
+  if (!calories.ok) return calories;
   const calorieMin = optionalNonNegativeInteger(value.calorieMinKcal);
   if (!calorieMin.ok) return calorieMin;
   const calorieMax = optionalNonNegativeInteger(value.calorieMaxKcal);
   if (!calorieMax.ok) return calorieMax;
 
-  if (
-    calorieMin.value !== null &&
-    calorieMax.value !== null &&
-    calorieMin.value > calorieMax.value
-  ) {
+  if (calorieMin.value !== null && calorieMax.value !== null && calorieMin.value > calorieMax.value) {
     return { ok: false, reason: `第 ${index + 1} 个食物的热量区间上下限颠倒` };
   }
-  if (calorieMin.value !== null && calories.value < calorieMin.value) {
+  if (calories.value !== null && calorieMin.value !== null && calories.value < calorieMin.value) {
     return { ok: false, reason: `第 ${index + 1} 个食物的估计热量低于区间下限` };
   }
-  if (calorieMax.value !== null && calories.value > calorieMax.value) {
+  if (calories.value !== null && calorieMax.value !== null && calories.value > calorieMax.value) {
     return { ok: false, reason: `第 ${index + 1} 个食物的估计热量高于区间上限` };
   }
 
@@ -193,9 +161,7 @@ function parseMealItem(value: unknown, index: number): ParseResult<MealItemWrite
 }
 
 export function parseMealWritePayload(value: unknown): ParseResult<MealWritePayload> {
-  if (!isRecord(value)) {
-    return { ok: false, reason: "餐食数据格式不正确" };
-  }
+  if (!isRecord(value)) return { ok: false, reason: "餐食数据格式不正确" };
 
   if (!PARTNER_KEYS.includes(value.partnerKey as NutritionPartnerKey)) {
     return { ok: false, reason: "partnerKey 只能是 fish 或 cat" };
@@ -225,12 +191,8 @@ export function parseMealWritePayload(value: unknown): ParseResult<MealWritePayl
   }
 
   const rawItems = value.items ?? [];
-  if (!Array.isArray(rawItems)) {
-    return { ok: false, reason: "items 必须是数组" };
-  }
-  if (rawItems.length > 50) {
-    return { ok: false, reason: "单餐食物明细不能超过 50 项" };
-  }
+  if (!Array.isArray(rawItems)) return { ok: false, reason: "items 必须是数组" };
+  if (rawItems.length > 50) return { ok: false, reason: "单餐食物明细不能超过 50 项" };
 
   const items: MealItemWrite[] = [];
   for (let index = 0; index < rawItems.length; index += 1) {
@@ -241,11 +203,11 @@ export function parseMealWritePayload(value: unknown): ParseResult<MealWritePayl
 
   const total = optionalNonNegativeInteger(value.totalCaloriesKcal);
   if (!total.ok) return total;
-  const derivedTotal = items.reduce((sum, item) => sum + item.caloriesKcal, 0);
-  const totalCaloriesKcal = total.value ?? (items.length > 0 ? derivedTotal : null);
-  if (totalCaloriesKcal === null) {
-    return { ok: false, reason: "需要提供 totalCaloriesKcal 或至少一个食物明细" };
-  }
+  const allItemCaloriesKnown = items.length > 0 && items.every((item) => item.caloriesKcal !== null);
+  const derivedTotal = allItemCaloriesKnown
+    ? items.reduce((sum, item) => sum + (item.caloriesKcal ?? 0), 0)
+    : null;
+  const totalCaloriesKcal = total.value ?? derivedTotal;
 
   const calorieMin = optionalNonNegativeInteger(value.calorieMinKcal);
   if (!calorieMin.ok) return calorieMin;
@@ -263,38 +225,27 @@ export function parseMealWritePayload(value: unknown): ParseResult<MealWritePayl
   const calorieMinKcal = calorieMin.value ?? derivedMin;
   const calorieMaxKcal = calorieMax.value ?? derivedMax;
 
-  if (
-    calorieMinKcal !== null &&
-    calorieMaxKcal !== null &&
-    calorieMinKcal > calorieMaxKcal
-  ) {
+  if (calorieMinKcal !== null && calorieMaxKcal !== null && calorieMinKcal > calorieMaxKcal) {
     return { ok: false, reason: "整餐热量区间上下限颠倒" };
   }
-  if (calorieMinKcal !== null && totalCaloriesKcal < calorieMinKcal) {
+  if (totalCaloriesKcal !== null && calorieMinKcal !== null && totalCaloriesKcal < calorieMinKcal) {
     return { ok: false, reason: "整餐估计热量低于区间下限" };
   }
-  if (calorieMaxKcal !== null && totalCaloriesKcal > calorieMaxKcal) {
+  if (totalCaloriesKcal !== null && calorieMaxKcal !== null && totalCaloriesKcal > calorieMaxKcal) {
     return { ok: false, reason: "整餐估计热量高于区间上限" };
   }
 
   const status = (value.status ?? "confirmed") as MealStatus;
-  if (!MEAL_STATUSES.includes(status)) {
-    return { ok: false, reason: "status 不正确" };
-  }
+  if (!MEAL_STATUSES.includes(status)) return { ok: false, reason: "status 不正确" };
   const source = (value.source ?? "manual") as MealSource;
-  if (!MEAL_SOURCES.includes(source)) {
-    return { ok: false, reason: "source 不正确" };
-  }
+  if (!MEAL_SOURCES.includes(source)) return { ok: false, reason: "source 不正确" };
 
   const note = trimText(value.note, 2000);
   if (typeof value.note === "string" && value.note.trim().length > 2000) {
     return { ok: false, reason: "note 不能超过 2000 个字符" };
   }
   const idempotencyKey = trimText(value.idempotencyKey, 200);
-  if (
-    typeof value.idempotencyKey === "string" &&
-    value.idempotencyKey.trim().length > 200
-  ) {
+  if (typeof value.idempotencyKey === "string" && value.idempotencyKey.trim().length > 200) {
     return { ok: false, reason: "idempotencyKey 不能超过 200 个字符" };
   }
 
@@ -331,9 +282,6 @@ export function parseMealQuery(searchParams: URLSearchParams): ParseResult<MealQ
 
   return {
     ok: true,
-    value: {
-      mealDate,
-      partnerKey: person ? (person as NutritionPartnerKey) : null,
-    },
+    value: { mealDate, partnerKey: person ? (person as NutritionPartnerKey) : null },
   };
 }

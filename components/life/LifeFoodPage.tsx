@@ -28,7 +28,7 @@ function mealNames(meal: MealRecord) {
   return meal.items.map((item) => item.displayName || item.rawName).filter(Boolean).join("、") || "已记录一餐";
 }
 
-function macroTotals(meals: MealRecord[]) {
+function nutritionTotals(meals: MealRecord[]) {
   return meals.reduce(
     (acc, meal) => {
       meal.items.forEach((item) => {
@@ -45,10 +45,22 @@ function macroTotals(meals: MealRecord[]) {
           acc.hasFat = true;
         }
       });
-      acc.calories += meal.totalCaloriesKcal;
+      if (meal.totalCaloriesKcal != null) {
+        acc.calories += meal.totalCaloriesKcal;
+        acc.knownCalories += 1;
+      }
       return acc;
     },
-    { carbs: 0, protein: 0, fat: 0, calories: 0, hasCarbs: false, hasProtein: false, hasFat: false },
+    {
+      carbs: 0,
+      protein: 0,
+      fat: 0,
+      calories: 0,
+      knownCalories: 0,
+      hasCarbs: false,
+      hasProtein: false,
+      hasFat: false,
+    },
   );
 }
 
@@ -75,7 +87,7 @@ function MealPhotoSlot({ meal, label }: { meal?: MealRecord; label: string }) {
 }
 
 function MealNutrition({ meal }: { meal?: MealRecord }) {
-  const totals = macroTotals(meal ? [meal] : []);
+  const totals = nutritionTotals(meal ? [meal] : []);
   const empty = !meal;
   return (
     <div className="grid gap-2">
@@ -85,7 +97,7 @@ function MealNutrition({ meal }: { meal?: MealRecord }) {
       <div className="flex items-baseline justify-between border-t border-[var(--life-border-soft)] pt-2">
         <span className="text-xs font-bold text-[var(--life-text-body)]">总热量</span>
         <span className="text-base font-extrabold tabular-nums text-[var(--life-text)]">
-          {meal ? `${meal.totalCaloriesKcal} kcal` : "—"}
+          {meal?.totalCaloriesKcal == null ? "未估算" : `${meal.totalCaloriesKcal} kcal`}
         </span>
       </div>
     </div>
@@ -132,7 +144,8 @@ export function LifeFoodPage() {
     });
     return map;
   }, [meals]);
-  const daily = useMemo(() => macroTotals(meals), [meals]);
+  const daily = useMemo(() => nutritionTotals(meals), [meals]);
+  const allCaloriesKnown = meals.length > 0 && daily.knownCalories === meals.length;
 
   function changeRole(next: AppRoleSwitchValue) {
     if (next === role) return;
@@ -209,7 +222,9 @@ export function LifeFoodPage() {
           <AppNutritionBar label="脂肪" value={daily.hasFat ? Number(daily.fat.toFixed(1)) : null} unit="g" max={100} />
           <div className="mt-1 flex items-center justify-between rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)] px-3 py-2.5">
             <span className="text-sm font-bold text-[var(--life-text-body)]">总热量</span>
-            <span className="text-lg font-extrabold tabular-nums text-[var(--life-text)]">{meals.length ? `${daily.calories} kcal` : "未记录"}</span>
+            <span className="text-lg font-extrabold tabular-nums text-[var(--life-text)]">
+              {meals.length === 0 ? "未记录" : allCaloriesKnown ? `${daily.calories} kcal` : "未完整估算"}
+            </span>
           </div>
         </div>
       </section>

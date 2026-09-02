@@ -73,7 +73,6 @@ describe("ChatGPT meal persistence protocol", () => {
 
   it("rejects non-chatgpt idempotency keys", () => {
     const result = prepareConfirmedChatgptMeal(draft, "web-meal-1");
-
     expect(result).toMatchObject({ ok: false });
   });
 
@@ -89,18 +88,35 @@ describe("ChatGPT meal persistence protocol", () => {
     });
   });
 
-  it("rejects a meal total that does not equal item totals", () => {
+  it("rejects a meal total that does not equal fully known item totals", () => {
     const result = prepareConfirmedChatgptMeal(
-      {
-        ...draft,
-        totalCaloriesKcal: 440,
-      },
+      { ...draft, totalCaloriesKcal: 440 },
       "chatgpt:fish:2026-09-02:meal-003",
     );
 
     expect(result).toMatchObject({
       ok: false,
-      reason: "ChatGPT 餐食总热量必须等于食物明细热量之和",
+      reason: "ChatGPT 餐食总热量必须等于已完整估算的食物明细热量之和",
     });
+  });
+
+  it("allows saving food facts without inventing calories", () => {
+    const result = prepareConfirmedChatgptMeal(
+      {
+        partnerKey: "cat",
+        mealDate: "2026-09-02",
+        mealType: "dinner",
+        items: [
+          { rawName: "烤鱼", caloriesKcal: null },
+          { rawName: "青菜" },
+        ],
+      },
+      "chatgpt:cat:2026-09-02:meal-no-kcal",
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.totalCaloriesKcal).toBeNull();
+    expect(result.value.items.map((item) => item.caloriesKcal)).toEqual([null, null]);
   });
 });

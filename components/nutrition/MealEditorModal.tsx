@@ -109,7 +109,7 @@ function itemToDraft(item: MealItemRecord): MealItemDraft {
     displayName: item.displayName,
     portionDescription: item.portionDescription ?? "",
     estimatedWeightG: item.estimatedWeightG,
-    caloriesKcal: String(item.caloriesKcal),
+    caloriesKcal: item.caloriesKcal == null ? "" : String(item.caloriesKcal),
     calorieMinKcal:
       item.calorieMinKcal == null ? "" : String(item.calorieMinKcal),
     calorieMaxKcal:
@@ -173,15 +173,6 @@ function optionalInteger(value: string, label: string) {
   return { ok: true as const, value: number };
 }
 
-function requiredInteger(value: string, label: string) {
-  const parsed = optionalInteger(value, label);
-  if (!parsed.ok) return parsed;
-  if (parsed.value == null) {
-    return { ok: false as const, reason: `${label}还没有填写` };
-  }
-  return { ok: true as const, value: parsed.value };
-}
-
 function dateTimeWithLocalOffset(mealDate: string, time: string) {
   if (!time) return null;
   const local = new Date(`${mealDate}T${time}:00`);
@@ -208,7 +199,7 @@ function buildPayload(draft: MealDraft) {
     if (!rawName) {
       return { ok: false as const, reason: `第 ${index + 1} 项还没有填写食物名称` };
     }
-    const calories = requiredInteger(item.caloriesKcal, `第 ${index + 1} 项热量`);
+    const calories = optionalInteger(item.caloriesKcal, `第 ${index + 1} 项热量`);
     if (!calories.ok) return calories;
     const calorieMin = optionalInteger(item.calorieMinKcal, `第 ${index + 1} 项热量下限`);
     if (!calorieMin.ok) return calorieMin;
@@ -222,10 +213,18 @@ function buildPayload(draft: MealDraft) {
     ) {
       return { ok: false as const, reason: `第 ${index + 1} 项的热量区间上下限颠倒了` };
     }
-    if (calorieMin.value != null && calories.value < calorieMin.value) {
+    if (
+      calories.value != null &&
+      calorieMin.value != null &&
+      calories.value < calorieMin.value
+    ) {
       return { ok: false as const, reason: `第 ${index + 1} 项估算热量低于区间下限` };
     }
-    if (calorieMax.value != null && calories.value > calorieMax.value) {
+    if (
+      calories.value != null &&
+      calorieMax.value != null &&
+      calories.value > calorieMax.value
+    ) {
       return { ok: false as const, reason: `第 ${index + 1} 项估算热量高于区间上限` };
     }
 
@@ -244,7 +243,10 @@ function buildPayload(draft: MealDraft) {
     });
   }
 
-  const totalCaloriesKcal = items.reduce((sum, item) => sum + item.caloriesKcal, 0);
+  const allCaloriesKnown = items.every((item) => item.caloriesKcal != null);
+  const totalCaloriesKcal = allCaloriesKnown
+    ? items.reduce((sum, item) => sum + (item.caloriesKcal ?? 0), 0)
+    : null;
   const calorieMinKcal = items.every((item) => item.calorieMinKcal != null)
     ? items.reduce((sum, item) => sum + (item.calorieMinKcal ?? 0), 0)
     : null;
@@ -286,14 +288,11 @@ export function MealEditorModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const previewTotal = useMemo(
-    () =>
-      draft.items.reduce((sum, item) => {
-        const value = Number(item.caloriesKcal);
-        return Number.isInteger(value) && value >= 0 ? sum + value : sum;
-      }, 0),
-    [draft.items],
-  );
+  const previewTotal = useMemo(() => {
+    const values = draft.items.map((item) => optionalInteger(item.caloriesKcal, "热量"));
+    if (values.some((value) => !value.ok || value.value == null)) return null;
+    return values.reduce((sum, value) => sum + (value.ok ? (value.value ?? 0) : 0), 0);
+  }, [draft.items]);
 
   function updateItem(key: string, patch: Partial<MealItemDraft>) {
     setDraft((current) => ({
@@ -456,7 +455,7 @@ export function MealEditorModal({
             <div>
               <p className="ui-field-label">食物明细</p>
               <p className="mt-0.5 text-[11px] font-medium ui-text-soft">
-                当前合计约 {previewTotal} kcal
+                {previewTotal == null ? "热量未完整估算" : `当前合计约 ${previewTotal} kcal`}
               </p>
             </div>
             <AppButton
@@ -529,7 +528,7 @@ export function MealEditorModal({
                   />
                 </label>
                 <label className="block min-w-0">
-                  <span className="ui-field-label">估算 kcal</span>
+                  <span className="ui-field-label">估算 kcal（可选）</span>
                   <AppInput
                     type="number"
                     min={0}

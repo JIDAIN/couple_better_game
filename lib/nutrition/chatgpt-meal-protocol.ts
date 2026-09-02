@@ -33,24 +33,17 @@ export function buildChatgptMealIdempotencyKey(
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 
-  if (!nonce) {
-    throw new Error("confirmationNonce 不能为空");
-  }
+  if (!nonce) throw new Error("confirmationNonce 不能为空");
 
   const key = `${CHATGPT_MEAL_IDEMPOTENCY_PREFIX}${partnerKey}:${mealDate}:${nonce}`;
-  if (key.length > 200) {
-    throw new Error("ChatGPT meal idempotency key 过长");
-  }
+  if (key.length > 200) throw new Error("ChatGPT meal idempotency key 过长");
   return key;
 }
 
 /**
- * Canonical P2 preparation step. Call this only after the user has explicitly
- * confirmed that the current meal draft should be persisted.
- *
- * This helper deliberately does not try to infer confirmation language. The
- * conversation layer owns that semantic decision; this function only makes the
- * resulting payload safe and canonical.
+ * Canonical preparation step. Call this only after the user explicitly
+ * confirms the current meal draft should be persisted.
+ * Missing calorie estimates are valid facts: null means not estimated, never 0.
  */
 export function prepareConfirmedChatgptMeal(
   value: unknown,
@@ -63,9 +56,7 @@ export function prepareConfirmedChatgptMeal(
     };
   }
 
-  if (!isRecord(value)) {
-    return { ok: false, reason: "ChatGPT 餐食草稿格式不正确" };
-  }
+  if (!isRecord(value)) return { ok: false, reason: "ChatGPT 餐食草稿格式不正确" };
 
   const parsed = parseMealWritePayload({
     ...value,
@@ -79,15 +70,18 @@ export function prepareConfirmedChatgptMeal(
     return { ok: false, reason: "ChatGPT 记上时至少需要一个食物明细" };
   }
 
-  const itemTotal = parsed.value.items.reduce(
-    (sum, item) => sum + item.caloriesKcal,
-    0,
-  );
-  if (parsed.value.totalCaloriesKcal !== itemTotal) {
-    return {
-      ok: false,
-      reason: "ChatGPT 餐食总热量必须等于食物明细热量之和",
-    };
+  const knownCalories = parsed.value.items.every((item) => item.caloriesKcal !== null);
+  if (knownCalories) {
+    const itemTotal = parsed.value.items.reduce(
+      (sum, item) => sum + (item.caloriesKcal ?? 0),
+      0,
+    );
+    if (parsed.value.totalCaloriesKcal !== itemTotal) {
+      return {
+        ok: false,
+        reason: "ChatGPT 餐食总热量必须等于已完整估算的食物明细热量之和",
+      };
+    }
   }
 
   return { ok: true, value: parsed.value };
