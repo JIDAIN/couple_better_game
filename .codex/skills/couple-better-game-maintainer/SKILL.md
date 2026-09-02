@@ -5,10 +5,10 @@ description: >
   Use it for feature work, bug fixes, architecture changes, Supabase/API work,
   nutrition and weight features, game-rule changes, UI maintenance, testing,
   documentation updates, and production-safety reviews.
-version: 2.2.0
+version: 2.2.1
 ---
 
-# Couple Better Game Maintainer Skill v2.2.0
+# Couple Better Game Maintainer Skill v2.2.1
 
 ## Mission
 
@@ -23,6 +23,7 @@ version: 2.2.0
 secret 不进入浏览器或普通聊天
 延续既有动森感 UI，不为新功能另造视觉体系
 ChatGPT 未明确确认时绝不写餐食
+同日数据按 partnerKey + date 关联展示，但不跨域偷改
 UI / service / API / DB 分层清楚
 修改可测试、可回滚、可文档化
 ```
@@ -78,6 +79,20 @@ foods / food_aliases（可选引用）
 ### Exercise
 
 运动分钟是每日游戏事实；未来如果增加独立运动日志，要通过明确设计关联，不能悄悄改变现有字段含义。
+
+### 同日关联展示
+
+四个域可以、也应该在产品层按：
+
+```text
+partnerKey + date
+```
+
+关联展示。关联只用于同一天总览，不代表自动写回：
+
+- meals 有数据、daily record 没数据时，deficit 显示“未记录”；
+- daily record 有 deficit、meals 没数据时，摄入显示“未记录”；
+- 不允许为了让页面“完整”而伪造另一域数据。
 
 ## 3. 游戏修改协议
 
@@ -185,11 +200,11 @@ chatgpt:<partnerKey>:<mealDate>:<confirmationNonce>
 当前角色映射：
 
 ```text
-用户自己的饮食聊天 -> fish
-伴侣专用饮食聊天   -> cat
+用户自己的饮食聊天 -> cat（猫猫）
+鱼鱼的饮食聊天     -> fish（鱼鱼）
 ```
 
-上下文不明确时不能猜测后写入。
+上下文不明确时不能猜测后写入；如果用户在当前对话中明确声明角色，以当前明确声明为最高优先级。
 
 已经成功写入后，普通事实补充不自动改库；需要明确更新意图。P2 首版自动持久化入口负责新增，已有餐食仍可从 Web UI 编辑/删除。
 
@@ -364,12 +379,14 @@ npm run build
 
 ```text
 [ ] 没有混淆 intake / deficit / weight / exercise
+[ ] 同日总览按 partnerKey + date 关联，但没有跨域自动覆盖
 [ ] 没有把 secret 放入浏览器或普通聊天
 [ ] 没有恢复 public GitHub data
 [ ] 没有绕过新设备保护
 [ ] 没有凭 legacy 变量名误改 currency
 [ ] ChatGPT 未确认时没有写 meal
 [ ] ChatGPT 重试复用了同一 idempotency key
+[ ] ChatGPT 角色映射遵循当前明确声明：用户=cat，鱼鱼=fish
 [ ] 多表写入考虑事务
 [ ] 派生数据可以从事实重算
 [ ] UI 延续现有 App* / animal-island-ui 体系
