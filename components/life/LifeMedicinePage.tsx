@@ -69,8 +69,8 @@ export function LifeMedicinePage() {
     catch (cause) { setError(cause instanceof Error ? cause.message : "删除失败"); }
   }
 
-  return <AppPageShell title="家庭药箱" subtitle="药都在这里；重点看数量和真正的最终失效日。" actions={<Link href="/nest" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回小窝</Link>}>
-    <section className="life-surface life-section-card">
+  return <AppPageShell title="家庭药箱" subtitle="看清数量和最终失效日。" actions={<Link href="/nest" className="life-back-link">返回小窝</Link>}>
+    <section className="life-surface life-section-card life-toolbar">
       <div className="flex gap-2"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索药品" className="min-w-0 flex-1 rounded-2xl border border-[var(--life-border)] bg-white px-3 py-2.5 text-sm"/><button onClick={() => openEdit()} className="rounded-2xl bg-[var(--life-teal)] px-4 py-2.5 text-sm font-extrabold text-white">＋ 添加</button></div>
       <div className="mt-3 flex gap-2 overflow-x-auto pb-1">{(["all","soon","expired","normal","unknown"] as Filter[]).map((key)=><button key={key} onClick={()=>setFilter(key)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${filter===key?"bg-[var(--life-teal)] text-white":"bg-[var(--life-surface-soft)] text-[var(--life-text-body)]"}`}>{key==="all"?"全部":statusText[key]}</button>)}</div>
     </section>

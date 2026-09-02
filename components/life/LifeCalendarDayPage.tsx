@@ -85,7 +85,7 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
   }
 
   return (
-    <AppPageShell title={displayDate(date)} subtitle="我 / Ta 按当前登录账号动态解释。" actions={<Link href="/calendar" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回月历</Link>}>
+    <AppPageShell title={displayDate(date)} subtitle="回看这一天的小日常。" actions={<Link href="/calendar" className="life-back-link">返回月历</Link>}>
       {loading ? <div className="life-surface life-section-card text-sm font-bold text-[var(--life-text-muted)]">正在翻这一天的记录…</div> : null}
       {error ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
 

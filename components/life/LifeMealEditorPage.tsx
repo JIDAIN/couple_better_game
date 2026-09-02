@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -262,14 +263,14 @@ export function LifeMealEditorPage() {
   }
 
   return (
-    <AppPageShell title={meal ? `编辑${title}` : `添加${title}`} subtitle="餐次由入口决定，不在编辑页改成另一餐。">
+    <AppPageShell title={meal ? `编辑${title}` : `添加${title}`} subtitle="餐次由入口决定，只记录这一餐吃了什么。">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <Link href="/food" className="text-sm font-bold text-[var(--life-teal-strong)]">← 返回饮食</Link>
+        <Link href="/food" className="life-back-link">← 返回饮食</Link>
         <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-xs font-extrabold text-[var(--life-text-body)]">{title}</span>
       </div>
 
       <div className="grid gap-3">
-        <section className="life-surface life-section-card grid gap-3">
+        <section className="life-surface life-section-card life-editor-meta grid gap-3">
           <div className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)] px-3 py-2.5">
             <p className="text-[10px] font-bold text-[var(--life-text-muted)]">正在记录</p>
             <p className="mt-0.5 text-sm font-black text-[var(--life-text)]">我的 · {title}</p>
@@ -280,12 +281,12 @@ export function LifeMealEditorPage() {
           </div>
         </section>
 
-        <section className="life-surface life-section-card">
+        <section className="life-surface life-section-card life-photo-editor">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div><p className="text-sm font-extrabold text-[var(--life-text)]">餐食照片</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">不上传时使用统一卡通图。</p></div>
             {customPhotoVisible ? <button type="button" onClick={clearPhoto} className="text-xs font-bold text-[var(--life-danger)]">移除照片</button> : null}
           </div>
-          <img src={photoSrc} alt={customPhotoVisible ? "当前餐食照片" : "默认餐食卡通图"} className="aspect-[4/3] w-full rounded-[var(--life-radius-control)] object-cover" />
+          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-[var(--life-radius-control)]"><Image unoptimized src={photoSrc} alt={customPhotoVisible ? "当前餐食照片" : "默认餐食卡通图"} fill sizes="(max-width: 480px) 94vw, 450px" className="object-cover" /></div>
           <label className="mt-3 flex cursor-pointer items-center justify-center rounded-xl bg-[var(--life-surface-soft)] px-3 py-2.5 text-sm font-extrabold text-[var(--life-teal-strong)]">
             {customPhotoVisible ? "更换照片" : "上传实物照片"}
             <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="sr-only" disabled={saving} onChange={(event) => choosePhoto(event.target.files?.[0] ?? null)} />
@@ -293,7 +294,7 @@ export function LifeMealEditorPage() {
         </section>
 
         {items.map((item, index) => (
-          <section key={item.key} className="life-surface life-section-card">
+          <section key={item.key} className="life-surface life-section-card life-food-item-editor">
             <div className="mb-3 flex items-center justify-between"><p className="text-sm font-extrabold text-[var(--life-text)]">食物 {index + 1}</p>{items.length > 1 ? <button type="button" onClick={() => setItems((current) => current.filter((entry) => entry.key !== item.key))} className="text-xs font-bold text-[var(--life-danger)]">移除</button> : null}</div>
             <div className="grid gap-2.5">
               <AppInput placeholder="食物名称，例如：米饭、鸡胸肉" value={item.rawName} onChange={(event) => updateItem(item.key, { rawName: event.target.value })} />

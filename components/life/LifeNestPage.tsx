@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 
@@ -12,14 +13,15 @@ export function LifeNestPage() {
   return (
     <AppPageShell title="小窝" subtitle="这里放两个人共同拥有、共同使用的生活内容。">
       <section className="life-nest-scene" aria-label="我们的生活角落">
-        <div className="life-nest-window" aria-hidden><span>☁️</span><span>☀️</span></div>
-        <div className="life-nest-plant" aria-hidden>🪴</div>
-        <div className="life-nest-sofa" aria-hidden><span>🐱</span><span>🐟</span></div>
+        <div className="life-nest-window" aria-hidden><span className="life-window-cloud" /><span className="life-window-sun" /></div>
+        <div className="life-nest-plant" aria-hidden><i /><i /><i /><i /><span /></div>
+        <div className="life-nest-sofa" aria-hidden />
+        <Image src="/illustrations/life/activity-girls.png" alt="" width={360} height={240} className="life-nest-people" />
         <div className="life-nest-rug" aria-hidden />
         <div className="life-nest-caption"><strong>我们的生活角落</strong><span>共同的东西，安静地收在这里。</span></div>
       </section>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="life-nest-grid mt-3 grid grid-cols-2 gap-2.5">
         {tiles.map((tile) => (
           <Link key={tile.title} href={tile.href} className={`life-nest-tile ${tile.tone}`}>
             <span className="life-nest-tile-icon" aria-hidden>{tile.icon}</span>

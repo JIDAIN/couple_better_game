@@ -123,6 +123,67 @@
   .life-activity-girls { width: 7.2rem; }
 }
 
+/* R7 page composition */
+.life-today-card { border-radius: 18px; }
+.life-today-card > div:first-child { margin-bottom: 0.65rem; }
+.life-activity-scene {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 18% 100%, rgb(174 220 200 / 0.72) 0 2.4rem, transparent 2.45rem),
+    linear-gradient(180deg, #eef9f5 0%, #fff8e8 100%);
+}
+.life-activity-scene::before { content: ""; position: absolute; inset: auto 0 0; height: 0.42rem; background: var(--life-mint); opacity: 0.32; }
+.life-activity-scene > * { position: relative; z-index: 1; }
+
+.life-meal-card { content-visibility: auto; contain-intrinsic-size: 13rem; }
+.life-meal-card .life-nutrition-bar { grid-template-columns: 3rem minmax(0,1fr) auto; }
+.life-daily-summary { border-color: color-mix(in srgb, var(--life-yellow) 35%, var(--life-border-soft)); }
+.life-editor-meta { background: linear-gradient(135deg, rgb(255 253 248 / .96), color-mix(in srgb, var(--life-yellow) 12%, white)); }
+.life-photo-editor img { max-height: 13rem; }
+.life-food-item-editor { border-left: 3px solid color-mix(in srgb, var(--life-mint) 65%, white); }
+.life-calendar-page {
+  background:
+    linear-gradient(rgb(120 145 135 / .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(120 145 135 / .035) 1px, transparent 1px),
+    rgb(255 254 250 / .94);
+  background-size: 1.6rem 1.6rem;
+}
+
+.life-back-link { display: inline-flex; min-height: 2rem; align-items: center; border-radius: 999px; background: rgb(255 253 248 / .72); padding: 0.4rem 0.7rem; color: var(--life-teal-strong); font-size: 0.68rem; font-weight: 800; }
+.life-toolbar { position: sticky; top: 0.35rem; z-index: 10; background: rgb(255 253 248 / .94); backdrop-filter: blur(12px); }
+.life-letter-card { box-shadow: 0 2px 9px rgb(78 92 85 / .055); }
+.life-letter-card::before { content: ""; position: absolute; inset: 0.45rem; pointer-events: none; border: 1px dashed rgb(150 135 112 / .16); border-radius: 13px; }
+.life-letter-card > * { position: relative; }
+.life-weight-hero { background: linear-gradient(135deg, rgb(255 253 248 / .96), color-mix(in srgb, var(--life-mint) 13%, white)); }
+.life-data-section { content-visibility: auto; contain-intrinsic-size: 15rem; }
+
+.life-nest-window { overflow: hidden; }
+.life-window-sun { width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--life-yellow); box-shadow: 0 0 0 .25rem rgb(255 216 138 / .2); }
+.life-window-cloud { position: relative; width: 1.65rem; height: .55rem; border-radius: 999px; background: white; }
+.life-window-cloud::before, .life-window-cloud::after { content: ""; position: absolute; bottom: 0; border-radius: 50%; background: white; }
+.life-window-cloud::before { left: .2rem; width: .7rem; height: .7rem; }
+.life-window-cloud::after { right: .18rem; width: .5rem; height: .5rem; }
+.life-nest-plant { width: 3.2rem; height: 4rem; font-size: 0; }
+.life-nest-plant i { position: absolute; bottom: 1.15rem; left: 1.25rem; width: .75rem; height: 2.05rem; border-radius: 100% 0 100% 0; background: #71b77d; transform-origin: bottom; }
+.life-nest-plant i:nth-child(1) { transform: rotate(-52deg); }
+.life-nest-plant i:nth-child(2) { transform: rotate(-22deg) scale(.9); }
+.life-nest-plant i:nth-child(3) { transform: rotate(24deg) scale(.95); }
+.life-nest-plant i:nth-child(4) { transform: rotate(55deg) scale(.8); }
+.life-nest-plant span { position: absolute; bottom: 0; left: .72rem; width: 1.85rem; height: 1.35rem; border-radius: .3rem .3rem .75rem .75rem; background: #e89572; }
+.life-nest-sofa { z-index: 1; }
+.life-nest-people { position: absolute; z-index: 3; left: 50%; bottom: 1.55rem; width: 7.1rem; height: 6.8rem; transform: translateX(-50%); object-fit: contain; object-position: bottom; }
+.life-nest-rug { z-index: 0; }
+.life-nest-grid .life-nest-tile { min-height: 7.65rem; }
+
+@media (max-width: 390px) {
+  .life-section-card { padding: 0.72rem; }
+  .life-today-card { border-radius: 16px; }
+  .life-meal-card > div:last-child { gap: 0.65rem; }
+  .life-nest-scene { min-height: 10.4rem; }
+  .life-nest-grid .life-nest-tile { min-height: 7.25rem; }
+}
+
 /* R7 visual calibration: compact mobile rhythm and illustration-first hierarchy. */
 .island-life-v2 {
   min-height: 100dvh;

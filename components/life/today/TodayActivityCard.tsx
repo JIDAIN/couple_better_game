@@ -56,19 +56,19 @@ export function TodayActivityCard({
   }
 
   return (
-    <section className="life-surface life-section-card overflow-hidden">
+    <section className="life-surface life-section-card life-today-card overflow-hidden">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-extrabold text-[var(--life-text)]">👟 活动</p>
-          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">学习、散步、约会、桌游，都只是今天做过的事。</p>
+          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">今天一起做过的事。</p>
         </div>
         <AppButton variant="ghost" onClick={() => setEditing((value) => !value)}>{editing ? "完成" : "+ 记录"}</AppButton>
       </div>
 
-      <div className="mb-3 flex min-h-20 items-end justify-between rounded-[var(--life-radius-control)] bg-[linear-gradient(180deg,var(--life-surface-soft),color-mix(in_srgb,var(--life-mint)_25%,white))] px-4 pt-3">
+      <div className="life-activity-scene mb-3 flex min-h-20 items-end justify-between rounded-[var(--life-radius-control)] px-4 pt-3">
         <div className="pb-3 text-xs leading-5 text-[var(--life-text-body)]">
           <strong className="block text-sm text-[var(--life-text)]">今天一起做了什么？</strong>
-          <span>以后这里会替换成你们自己的动森角色。</span>
+          <span>普通的一天，也值得被记住。</span>
         </div>
         <Image src="/illustrations/life/activity-girls.png" alt="一起生活的两个女孩" width={360} height={240} className="life-activity-girls" />
       </div>

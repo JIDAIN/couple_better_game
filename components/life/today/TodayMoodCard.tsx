@@ -50,11 +50,11 @@ export function TodayMoodCard({
 
   return (
     <>
-      <section className="life-surface life-section-card life-home-feature">
+      <section className="life-surface life-section-card life-home-feature life-today-card">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-extrabold text-[var(--life-text)]">🍃 心情</p>
-            <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">今天的感受，各自记录自己的。</p>
+            <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">各自记录，彼此看见。</p>
           </div>
           <AppButton variant="ghost" onClick={() => setPickerOpen(true)}>
             {myMood ? "修改我的" : "+ 记录我的"}

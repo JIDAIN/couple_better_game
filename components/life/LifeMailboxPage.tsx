@@ -70,8 +70,8 @@ export function LifeMailboxPage() {
     return <AppPageShell title="小信箱" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;
   }
 
-  return <AppPageShell title="小信箱" subtitle="“我”是当前登录的人，收到/寄出都会随账号切换。" actions={<Link href="/nest" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回小窝</Link>}>
-    <section className="life-surface life-section-card">
+  return <AppPageShell title="小信箱" subtitle="写给彼此的话，慢慢留在这里。" actions={<Link href="/nest" className="life-back-link">返回小窝</Link>}>
+    <section className="life-surface life-section-card life-toolbar">
       <div className="flex items-center justify-between gap-3">
         <div className="grid flex-1 grid-cols-2 rounded-full bg-[var(--life-surface-soft)] p-1 text-xs font-extrabold">
           <button onClick={() => setTab("received")} className={`rounded-full px-3 py-2 ${tab === "received" ? "bg-white text-[var(--life-teal-strong)] shadow-[var(--life-shadow-soft)]" : "text-[var(--life-text-muted)]"}`}>收到的</button>
@@ -85,7 +85,7 @@ export function LifeMailboxPage() {
     <div className="mt-3 grid gap-3">
       {loading ? <div className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在翻信箱…</div> : null}
       {!loading && visible.length === 0 ? <div className="life-surface life-section-card text-center"><div className="text-3xl">💌</div><p className="mt-2 text-sm font-bold text-[var(--life-text-body)]">这里还没有信</p><p className="mt-1 text-xs text-[var(--life-text-muted)]">想说的话可以慢慢写下来。</p></div> : null}
-      {visible.map((letter, index) => <article key={letter.id} className={`relative overflow-hidden rounded-[var(--life-radius-card)] border border-[var(--life-border-soft)] p-4 shadow-[var(--life-shadow-soft)] ${letter.format === "postcard" ? "bg-[color:color-mix(in_srgb,var(--life-blue)_18%,white)]" : index % 2 ? "bg-[color:color-mix(in_srgb,var(--life-yellow)_15%,white)]" : "bg-[var(--life-surface)]"}`}>
+      {visible.map((letter, index) => <article key={letter.id} className={`life-letter-card relative overflow-hidden rounded-[var(--life-radius-card)] border border-[var(--life-border-soft)] p-4 ${letter.format === "postcard" ? "bg-[color:color-mix(in_srgb,var(--life-blue)_18%,white)]" : index % 2 ? "bg-[color:color-mix(in_srgb,var(--life-yellow)_15%,white)]" : "bg-[var(--life-surface)]"}`}>
         <div className="absolute right-4 top-4 rotate-6 rounded-md border border-[var(--life-border)] bg-white/70 px-2 py-1 text-[10px]">{letter.format === "postcard" ? "POSTCARD" : "LETTER"}</div>
         <p className="pr-20 text-[11px] font-extrabold text-[var(--life-text-muted)]">{roleLabel(letter.senderKey)} → {roleLabel(letter.recipientKey)} · {dateText(letter.sentAt)}</p>
         <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--life-text-body)]">{letter.body}</p>

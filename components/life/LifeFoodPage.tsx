@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
@@ -32,6 +33,7 @@ const DEFAULT_MEAL_ART: Record<string, string> = {
   dinner: "/illustrations/meals/dinner.svg",
   snack: "/illustrations/meals/snack.svg",
 };
+const EMPTY_MEALS: MealRecord[] = [];
 
 function localIsoDate(date = new Date()) {
   const y = date.getFullYear();
@@ -73,7 +75,7 @@ function MealPhotoSlot({ meal, label, mealType }: { meal?: MealRecord; label: st
   const src = customPhoto && meal ? mealPhotoUrl(meal) : (DEFAULT_MEAL_ART[mealType] ?? DEFAULT_MEAL_ART.lunch);
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)]">
-      <img src={src} alt={customPhoto && meal ? `${label}实物照片：${mealNames(meal)}` : `${label}默认卡通插图`} className="h-full w-full object-cover" onError={() => { if (customPhoto) setPhotoFailed(true); }} />
+      <Image unoptimized src={src} alt={customPhoto && meal ? `${label}实物照片：${mealNames(meal)}` : `${label}默认卡通插图`} fill sizes="(max-width: 480px) 42vw, 190px" className="object-cover" onError={() => { if (customPhoto) setPhotoFailed(true); }} />
       {!customPhoto ? <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(transparent,rgba(74,65,57,0.5))] px-2.5 pb-2 pt-7 text-white"><p className="line-clamp-1 text-[10px] font-bold">{meal ? mealNames(meal) : `${label}还没有记录`}</p></div> : null}
     </div>
   );
@@ -108,7 +110,7 @@ export function LifeFoodPage() {
     fetcher,
     staleMs: 20_000,
   });
-  const meals = query.data ?? [];
+  const meals = query.data ?? EMPTY_MEALS;
   const error = query.error instanceof MealApiError ? query.error.message : query.error?.message ?? null;
 
   const fixed = useMemo(() => new Map(FIXED_MEALS.map(({ type }) => [type, meals.filter((meal) => meal.mealType === type)])), [meals]);
@@ -136,7 +138,7 @@ export function LifeFoodPage() {
             const records = fixed.get(type) ?? [];
             const primary = records[0];
             return (
-              <section key={type} className="life-surface life-section-card">
+              <section key={type} className="life-surface life-section-card life-meal-card">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div><p className="text-sm font-extrabold text-[var(--life-text)]">{icon} {label}</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">固定餐次 · 一天一个入口</p></div>
                   {canEdit ? <Link href={mealHref(date, partnerKey, type, primary?.id)} className="rounded-full bg-[var(--life-mint)] px-3 py-1.5 text-xs font-extrabold text-[#255f4d] shadow-[var(--life-shadow-press)]">{primary ? "编辑这顿" : `+ 添加${label}`}</Link> : <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--life-text-muted)]">只读</span>}
@@ -147,7 +149,7 @@ export function LifeFoodPage() {
             );
           })}
 
-          <section className="life-surface life-section-card">
+          <section className="life-surface life-section-card life-meal-card">
             <div className="flex items-center justify-between gap-3">
               <div><p className="text-sm font-extrabold text-[var(--life-text)]">🍓 加餐</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">一天可以有多次，每一次都是独立记录。</p></div>
               {canEdit ? <button type="button" onClick={() => setSnackChooserOpen(true)} className="rounded-full bg-[var(--life-mint)] px-3 py-1.5 text-xs font-extrabold text-[#255f4d] shadow-[var(--life-shadow-press)]">+ 新增加餐</button> : <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--life-text-muted)]">只读</span>}
@@ -171,7 +173,7 @@ export function LifeFoodPage() {
           </section>
         </div>
 
-        <section className="life-surface life-section-card mt-4">
+        <section className="life-surface life-section-card life-daily-summary mt-3">
           <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-extrabold text-[var(--life-text)]">今日摄入统计</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">三餐与全部加餐合计，只记录事实。</p></div>{query.loading && !query.data ? <span className="text-xs text-[var(--life-text-muted)]">首次读取…</span> : null}</div>
           <div className="grid gap-2.5">
             <AppNutritionBar label="碳水" value={daily.hasCarbs ? Number(daily.carbs.toFixed(1)) : null} unit="g" max={300} />

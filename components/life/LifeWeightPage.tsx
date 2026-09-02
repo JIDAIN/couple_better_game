@@ -170,11 +170,11 @@ export function LifeWeightPage() {
   }
 
   return (
-    <AppPageShell title="体重" subtitle="“我”是当前登录的人；Ta 只用于查看另一方。" actions={<Link href="/nest" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回小窝</Link>}>
+    <AppPageShell title="体重" subtitle="记录变化，不评价数字。" actions={<Link href="/nest" className="life-back-link">返回小窝</Link>}>
       <div className="grid gap-3">
         <AppRoleSwitch value={role} onChange={switchRole} />
 
-        <section className="life-surface life-section-card">
+        <section className="life-surface life-section-card life-weight-hero">
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-xs font-bold text-[var(--life-text-muted)]">最近一次记录</p>
@@ -190,7 +190,7 @@ export function LifeWeightPage() {
           </div>
         </section>
 
-        <section className="life-surface life-section-card">
+        <section className="life-surface life-section-card life-data-section">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-extrabold text-[var(--life-text)]">最近趋势</p>
             <div className="flex gap-1 rounded-full bg-[var(--life-surface-soft)] p-1">
@@ -201,7 +201,7 @@ export function LifeWeightPage() {
           <p className="mt-2 text-[10px] leading-5 text-[var(--life-text-muted)]">折线只描述测量事实，不设置目标线、排名或“达标”评价。</p>
         </section>
 
-        {canEdit ? <section className="life-surface life-section-card">
+        {canEdit ? <section className="life-surface life-section-card life-data-section">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-extrabold text-[var(--life-text)]">{editing ? "修改记录" : "记一次体重"}</p>
@@ -217,7 +217,7 @@ export function LifeWeightPage() {
           <div className="mt-3"><AppButton variant="primary" disabled={saving} onClick={() => void save()}>{saving ? "保存中…" : editing ? "保存修改" : "保存体重"}</AppButton></div>
         </section> : <section className="life-surface life-section-card text-xs leading-5 text-[var(--life-text-muted)]">Ta 的体重在这里仅查看；Ta 登录自己的账号后，这一栏会自动变成“我”并可以记录。</section>}
 
-        <section className="life-surface life-section-card">
+        <section className="life-surface life-section-card life-data-section">
           <div className="mb-3 flex items-center justify-between gap-3"><p className="text-sm font-extrabold text-[var(--life-text)]">历史记录</p><span className="text-[10px] font-bold text-[var(--life-text-muted)]">{records.length} 条</span></div>
           <div className="grid gap-2">
             {loading ? <p className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-3 py-3 text-xs font-bold text-[var(--life-text-muted)]">正在读取记录…</p> : null}

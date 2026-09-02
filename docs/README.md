@@ -18,6 +18,7 @@
 | [`10-v2-life-redesign.md`](10-v2-life-redesign.md) | V2 为什么把生活系统设为主产品、旧游戏如何隐藏保留？ |
 | [`11-ai-write-architecture.md`](11-ai-write-architecture.md) | ChatGPT 如何跨饮食、生活、体重、药箱复用安全写入架构？ |
 | [`12-island-life-design-system.md`](12-island-life-design-system.md) | **V2 所有可见 UI 的唯一主视觉规范** |
+| [`24-r7-mobile-ui-calibration.md`](24-r7-mobile-ui-calibration.md) | R7 如何根据手机截图校准全站 UI？ |
 
 ## V2 UI 当前代码基础
 
