@@ -103,3 +103,30 @@ export async function deleteMealRecord(mealId: string) {
   const body = await readJson<MealWriteResponse>(response);
   return body.meal;
 }
+
+export function mealPhotoUrl(meal: MealRecord) {
+  return `/api/meals/${encodeURIComponent(meal.id)}/photo?v=${encodeURIComponent(meal.updatedAt)}`;
+}
+
+export async function uploadMealPhoto(mealId: string, file: File) {
+  const form = new FormData();
+  form.set("file", file);
+  const response = await fetch(`/api/meals/${encodeURIComponent(mealId)}/photo`, {
+    method: "PUT",
+    credentials: "same-origin",
+    cache: "no-store",
+    body: form,
+  });
+  const body = await readJson<MealWriteResponse>(response);
+  return body.meal;
+}
+
+export async function deleteMealPhoto(mealId: string) {
+  const response = await fetch(`/api/meals/${encodeURIComponent(mealId)}/photo`, {
+    method: "DELETE",
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  const body = await readJson<MealWriteResponse>(response);
+  return body.meal;
+}
