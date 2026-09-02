@@ -151,16 +151,6 @@
   border-radius: var(--life-radius-control);
   background: var(--life-surface);
   color: var(--life-text-body);
-  transition:
-    transform var(--life-motion-fast) ease,
-    border-color var(--life-motion-fast) ease,
-    background var(--life-motion-fast) ease;
-}
-
-.life-mood-chip[aria-checked="true"] {
-  border-color: color-mix(in srgb, var(--life-teal) 55%, white);
-  background: color-mix(in srgb, var(--life-mint) 28%, white);
-  transform: translateY(-1px);
 }
 
 .life-nutrition-bar {
@@ -185,8 +175,112 @@
   background: var(--life-teal);
 }
 
+.life-sync-pill {
+  justify-self: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--life-mint) 28%, white);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--life-teal-strong);
+}
+
+.life-home-feature {
+  overflow: hidden;
+}
+
+.life-person-state {
+  border: 1px solid var(--life-border-soft);
+  border-radius: var(--life-radius-card);
+  background: color-mix(in srgb, var(--life-surface) 92%, var(--life-mint) 8%);
+  padding: 0.9rem;
+  text-align: center;
+}
+
+.life-person-state.is-me {
+  border-color: color-mix(in srgb, var(--life-teal) 28%, var(--life-border-soft));
+  background: color-mix(in srgb, var(--life-mint) 13%, white);
+}
+
+.life-person-state-orb {
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-inline: auto;
+  place-items: center;
+  border-radius: 50% 48% 52% 46%;
+  box-shadow: inset 0 -5px 0 rgb(63 71 70 / 0.05), 0 6px 18px rgb(78 92 85 / 0.08);
+  font-size: 2rem;
+}
+
+.life-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(45 58 53 / 0.25);
+  padding: 0.75rem;
+  backdrop-filter: blur(3px);
+}
+
+.life-mood-sheet {
+  width: min(100%, 31rem);
+  border: 1px solid var(--life-border-soft);
+  border-radius: 30px 30px 24px 24px;
+  background: #fffdf8;
+  padding: 1rem 1rem 1.15rem;
+  box-shadow: var(--life-shadow-float);
+  animation: life-sheet-up var(--life-motion-normal) ease-out;
+}
+
+.life-mood-choice {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: var(--life-text-body);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.life-mood-choice:disabled {
+  opacity: 0.6;
+}
+
+.life-mood-orb {
+  display: grid;
+  width: 3.8rem;
+  height: 3.8rem;
+  place-items: center;
+  border: 2px solid transparent;
+  border-radius: 48% 52% 46% 54%;
+  box-shadow: 0 5px 14px rgb(78 92 85 / 0.08), inset 0 -4px 0 rgb(63 71 70 / 0.04);
+  font-size: 1.75rem;
+  transition: transform var(--life-motion-fast) ease, border-color var(--life-motion-fast) ease;
+}
+
+.life-mood-choice.is-active .life-mood-orb {
+  border-color: var(--life-teal);
+  transform: translateY(-2px) scale(1.04);
+}
+
+@keyframes life-sheet-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (min-width: 640px) {
   .life-page-shell {
     padding-inline: 1.25rem;
+  }
+  .life-sheet-backdrop {
+    align-items: center;
+  }
+  .life-mood-sheet {
+    border-radius: 30px;
   }
 }
