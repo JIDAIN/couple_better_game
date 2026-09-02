@@ -1,0 +1,192 @@
+:root {
+  /* V2 island-life visual language. Keep these tokens separate from Legacy Game colors. */
+  --life-bg: #fffaf2;
+  --life-surface: #fffdf8;
+  --life-surface-soft: #f7fbf6;
+  --life-surface-warm: #fff4e6;
+
+  --life-mint: #aedcc8;
+  --life-mint-strong: #76b99c;
+  --life-teal: #55a99e;
+  --life-teal-strong: #358b83;
+  --life-yellow: #ffd88a;
+  --life-coral: #ff9e8e;
+  --life-blue: #b7dff0;
+  --life-pink: #ffd6dc;
+
+  --life-text: #3f4746;
+  --life-text-body: #66706e;
+  --life-text-muted: #919997;
+  --life-border: #e6e2d8;
+  --life-border-soft: #efebe2;
+
+  --life-success: #78b987;
+  --life-warning: #edb856;
+  --life-danger: #ec7d75;
+  --life-info: #73b6cf;
+
+  --life-radius-sm: 12px;
+  --life-radius-control: 16px;
+  --life-radius-card: 22px;
+  --life-radius-hero: 28px;
+
+  --life-shadow-soft: 0 4px 16px rgb(78 92 85 / 0.08);
+  --life-shadow-float: 0 12px 32px rgb(78 92 85 / 0.13);
+  --life-shadow-press: 0 3px 0 rgb(90 128 111 / 0.18);
+
+  --life-space-xs: 0.375rem;
+  --life-space-sm: 0.625rem;
+  --life-space-md: 1rem;
+  --life-space-lg: 1.5rem;
+  --life-space-xl: 2rem;
+
+  --life-motion-fast: 140ms;
+  --life-motion-normal: 220ms;
+  --life-motion-slow: 360ms;
+}
+
+.island-life-v2 {
+  color: var(--life-text);
+  background: var(--life-bg);
+}
+
+.life-page-shell {
+  width: min(100%, 46rem);
+  margin-inline: auto;
+  padding: 1rem 0.75rem 5.5rem;
+}
+
+.life-surface {
+  border: 1px solid var(--life-border-soft);
+  border-radius: var(--life-radius-card);
+  background: var(--life-surface);
+  box-shadow: var(--life-shadow-soft);
+}
+
+.life-section-card {
+  padding: 1rem;
+}
+
+.life-record-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.25rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--life-border-soft);
+  border-radius: var(--life-radius-control);
+  background: var(--life-surface);
+}
+
+.life-record-row + .life-record-row {
+  margin-top: 0.5rem;
+}
+
+.life-feature-tile {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--life-border-soft);
+  border-radius: var(--life-radius-card);
+  background: var(--life-surface);
+  padding: 0.85rem;
+  color: var(--life-text);
+  text-align: left;
+  box-shadow: var(--life-shadow-soft);
+  transition:
+    transform var(--life-motion-fast) ease,
+    box-shadow var(--life-motion-normal) ease,
+    border-color var(--life-motion-normal) ease;
+}
+
+.life-feature-tile:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--life-shadow-float);
+}
+
+.life-feature-tile:active {
+  transform: translateY(1px);
+}
+
+.life-role-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 999px;
+  background: #f4f1e9;
+}
+
+.life-role-switch button {
+  min-height: 2rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--life-text-body);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition:
+    background var(--life-motion-fast) ease,
+    color var(--life-motion-fast) ease,
+    box-shadow var(--life-motion-fast) ease;
+}
+
+.life-role-switch button[aria-pressed="true"] {
+  background: linear-gradient(180deg, var(--life-mint), #93cdb4);
+  color: #255f4d;
+  box-shadow: var(--life-shadow-press);
+}
+
+.life-mood-chip {
+  display: flex;
+  min-height: 3.35rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  border: 1px solid var(--life-border-soft);
+  border-radius: var(--life-radius-control);
+  background: var(--life-surface);
+  color: var(--life-text-body);
+  transition:
+    transform var(--life-motion-fast) ease,
+    border-color var(--life-motion-fast) ease,
+    background var(--life-motion-fast) ease;
+}
+
+.life-mood-chip[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--life-teal) 55%, white);
+  background: color-mix(in srgb, var(--life-mint) 28%, white);
+  transform: translateY(-1px);
+}
+
+.life-nutrition-bar {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  color: var(--life-text-body);
+}
+
+.life-nutrition-track {
+  height: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f0eee8;
+}
+
+.life-nutrition-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--life-teal);
+}
+
+@media (min-width: 640px) {
+  .life-page-shell {
+    padding-inline: 1.25rem;
+  }
+}
