@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cursor } from "animal-island-ui";
+import { LifeIdentityProvider } from "@/components/life/LifeIdentityContext";
 import "animal-island-ui/style";
 import "./globals.css";
 import "./island-life-tokens.css";
@@ -36,7 +37,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
-        <Cursor className="app-cursor-root">{children}</Cursor>
+        <LifeIdentityProvider>
+          <Cursor className="app-cursor-root">{children}</Cursor>
+        </LifeIdentityProvider>
       </body>
     </html>
   );
