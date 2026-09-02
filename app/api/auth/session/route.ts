@@ -1,21 +1,25 @@
 import { NextResponse } from "next/server";
-import { clearLifeSessionCookies, setLifeSessionCookies } from "@/lib/server/life-auth-response";
-import { resolveLifeAuth } from "@/lib/server/supabase-auth-http";
+import { LIFE_ACCOUNT_COOKIE, resolveFixedLifeIdentity } from "@/lib/server/fixed-life-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const auth = await resolveLifeAuth(request);
-  if (!auth) {
-    return clearLifeSessionCookies(
-      NextResponse.json({ ok: true, authenticated: false }, { headers: { "Cache-Control": "no-store" } }),
-    );
-  }
+  const identity = resolveFixedLifeIdentity(request);
   const response = NextResponse.json(
-    { ok: true, authenticated: true, identity: auth.identity },
+    identity
+      ? { ok: true, authenticated: true, identity }
+      : { ok: true, authenticated: false },
     { headers: { "Cache-Control": "no-store" } },
   );
-  if (auth.refreshedSession) return setLifeSessionCookies(response, auth.refreshedSession);
+  if (!identity) {
+    response.cookies.set(LIFE_ACCOUNT_COOKIE, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 0,
+    });
+  }
   return response;
 }
