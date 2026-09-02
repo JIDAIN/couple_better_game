@@ -1,6 +1,6 @@
 # R7：移动端 UI 校准
 
-> 状态：代码级重构完成，等待获得单次 Vercel Preview 授权后做真实手机验收。
+> 状态：R7 已于 2026-09-03 部署 Production；Git 自动部署已重新关闭，等待真实手机验收反馈。
 
 ## 1. 原因
 
@@ -34,11 +34,11 @@ R6 建立了视觉 token 和页面 adapter，但 Production 手机截图表明�
 心累 / 生气 / 兴奋 / 烦躁 / 心动 / 平静 / 伤心 / 开心
 ```
 
-透明毛绒圆脸素材统一用于首页、选择器、月历、日期详情和 `/ui-lab`。新增稳定数据值 `excited`，通过独立 migration 扩展数据库约束；线上 migration 尚未执行。
+透明毛绒圆脸素材统一用于首页、选择器、月历、日期详情和 `/ui-lab`。新增稳定数据值 `excited`，通过独立 migration 扩展数据库约束；Production migration 已于 2026-09-03 执行并验证。
 
 ## 5. 验证与上线边界
 
-代码完成后统一执行 Test / Lint / Build。Vercel Preview、Production 部署和 Production Supabase migration 都不会在未获用户明确授权时执行。
+代码完成后统一执行 Test / Lint / Build。本次在取得用户单次明确授权后完成 Production Supabase migration 与 Vercel Production 部署，随后立即恢复 `git.deploymentEnabled: false`。
 
 ## 6. 无感同步
 
