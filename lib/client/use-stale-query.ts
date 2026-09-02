@@ -29,6 +29,36 @@ export function invalidateStaleQuery(prefix: string) {
   }
 }
 
+export function clearStaleQueries() {
+  queryCache.clear();
+}
+
+export async function prefetchStaleQuery<T>({
+  key,
+  fetcher,
+  staleMs = 30_000,
+}: {
+  key: string;
+  fetcher: () => Promise<T>;
+  staleMs?: number;
+}) {
+  const cached = entryFor<T>(key);
+  const fresh = cached?.data !== undefined && Date.now() - cached.updatedAt < staleMs;
+  if (fresh) return cached.data;
+  if (cached?.promise) return cached.promise;
+
+  const promise = fetcher();
+  queryCache.set(key, { data: cached?.data, updatedAt: cached?.updatedAt ?? 0, promise });
+  try {
+    const data = await promise;
+    queryCache.set(key, { data, updatedAt: Date.now() });
+    return data;
+  } catch (cause) {
+    queryCache.set(key, { data: cached?.data, updatedAt: cached?.updatedAt ?? 0 });
+    throw cause;
+  }
+}
+
 export function useStaleQuery<T>({
   key,
   fetcher,
