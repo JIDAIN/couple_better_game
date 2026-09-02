@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppInput } from "@/components/ui/AppInput";
@@ -69,7 +70,7 @@ export function TodayActivityCard({
           <strong className="block text-sm text-[var(--life-text)]">今天一起做了什么？</strong>
           <span>以后这里会替换成你们自己的动森角色。</span>
         </div>
-        <div className="pb-1 text-4xl" aria-label="两位女孩的临时岛民形象">👧🏻🌿👧🏻</div>
+        <Image src="/illustrations/life/activity-girls.png" alt="一起生活的两个女孩" width={360} height={240} className="life-activity-girls" />
       </div>
 
       <div className="grid gap-2">

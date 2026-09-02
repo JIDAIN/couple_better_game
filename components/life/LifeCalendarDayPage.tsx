@@ -9,6 +9,7 @@ import { fetchMeals, MealApiError } from "@/lib/nutrition/meal-client";
 import type { LifeDayRecord, LifePartnerKey, MoodRecord, SleepRecord } from "@/lib/life/life-service";
 import type { MealRecord, NutritionPartnerKey } from "@/lib/nutrition/meal-service";
 import { displayDate, durationText, formatTime, moodVisual } from "@/components/life/today/today-life-model";
+import { MoodIcon } from "@/components/ui/MoodIcon";
 
 function personMood(moods: MoodRecord[], key: LifePartnerKey) {
   return moods.find((item) => item.partnerKey === key);
@@ -33,7 +34,7 @@ function PersonMood({ label, mood }: { label: string; mood?: MoodRecord }) {
   return (
     <div className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-3 py-3 text-center">
       <p className="text-[10px] font-bold text-[var(--life-text-muted)]">{label}</p>
-      {visual ? <><span className={`mx-auto mt-2 grid h-12 w-12 place-items-center rounded-full text-sm font-black text-[var(--life-text)] shadow-[var(--life-shadow-press)] ${visual.tone}`}>{visual.emoji}</span><p className="mt-1.5 text-xs font-extrabold text-[var(--life-text)]">{visual.label}</p></> : <p className="mt-5 text-xs font-bold text-[var(--life-text-muted)]">未记录</p>}
+      {visual ? <><MoodIcon moodKey={visual.key} label={visual.label} className="mx-auto mt-2 h-14 w-14" /><p className="mt-1.5 text-xs font-extrabold text-[var(--life-text)]">{visual.label}</p></> : <p className="mt-5 text-xs font-bold text-[var(--life-text-muted)]">未记录</p>}
     </div>
   );
 }

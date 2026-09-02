@@ -25,6 +25,16 @@ describe("life-service", () => {
     });
   });
 
+  it("accepts the eighth excited mood", () => {
+    const result = parseMoodWritePayload({
+      partnerKey: "cat",
+      moodDate: "2026-09-03",
+      moodKey: "excited",
+      source: "manual",
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it("rejects invalid calendar dates", () => {
     expect(parseLifeDayDate("2026-02-31").ok).toBe(false);
   });
