@@ -11,12 +11,13 @@
 | [`03-data-model.md`](03-data-model.md) | 哪些是事实数据？当前各数据域如何隔离？ |
 | [`04-api-and-sync.md`](04-api-and-sync.md) | 当前真实 API、cloud session、同步保护怎么工作？ |
 | [`05-business-rules.md`](05-business-rules.md) | Legacy game 的金币、宝石、热力图、周规则是什么？ |
-| [`06-ui-guidelines.md`](06-ui-guidelines.md) | animal-island-ui 和项目 wrapper 应该怎么用？ |
+| [`06-ui-guidelines.md`](06-ui-guidelines.md) | 当前 App* / animal-island-ui 维护约束是什么？ |
 | [`07-development-testing.md`](07-development-testing.md) | 新功能放哪里、怎么测试、怎么更新文档？ |
 | [`08-deployment-security.md`](08-deployment-security.md) | Vercel/Supabase 怎么部署，密钥和隐私如何保护？ |
 | [`09-status-roadmap.md`](09-status-roadmap.md) | 已完成、进行中、下一步、技术债是什么？ |
 | [`10-v2-life-redesign.md`](10-v2-life-redesign.md) | V2 为什么把生活系统设为主产品、旧游戏如何隐藏保留？ |
 | [`11-ai-write-architecture.md`](11-ai-write-architecture.md) | ChatGPT 如何跨饮食、生活、体重、药箱复用安全写入架构？ |
+| [`12-island-life-design-system.md`](12-island-life-design-system.md) | V2 岛屿生活视觉语言、开源 UI 复用和 `/ui-lab` 应遵守什么规则？ |
 
 根目录另外有：
 
@@ -45,7 +46,7 @@
 - 重构 / 迁移过程报告不作为长期事实源；稳定结论合并进主文档。
 - `CHANGELOG` 记录“发生了什么”，roadmap 记录“现在在哪、下一步是什么”。
 - API、schema、规则变化必须同步对应文档。
-- V2 的产品边界与 AI 写入架构属于长期设计约束，因此保留 `10` / `11` 两份专项主文档。
+- V2 的产品边界、AI 写入架构和岛屿生活 Design System 都属于长期设计约束，因此保留 `10` / `11` / `12` 三份专项主文档。
 - 临时 audit、调研和迁移 checklist 优先放 issue / PR / 对话，不继续堆在 `docs/`。
 
 ## 历史文档
