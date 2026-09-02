@@ -89,9 +89,17 @@ export function useStaleQuery<T>({
   }, [fetcher, key, staleMs]);
 
   useEffect(() => {
-    setData(peekStaleQuery<T>(key));
-    setLoading(peekStaleQuery<T>(key) === undefined);
-    void refresh(false).catch(() => undefined);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const cached = peekStaleQuery<T>(key);
+      setData(cached);
+      setLoading(cached === undefined);
+      void refresh(false).catch(() => undefined);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [key, refresh]);
 
   const update = useCallback((next: T | ((current: T | undefined) => T)) => {
