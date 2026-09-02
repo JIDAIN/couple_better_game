@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeLifeRequest, LIFE_NO_STORE_HEADERS, lifeJsonError, readJsonBody } from "../../../../lib/server/life-api";
+import { LIFE_NO_STORE_HEADERS, lifeJsonError, readJsonBody, requireLifeIdentity } from "../../../../lib/server/life-api";
 import { parseWeightPartner, parseWeightWritePayload } from "../../../../lib/life/weight-service";
 import { createWeight, listWeights, WeightCloudError } from "../../../../lib/server/supabase-weight";
 
@@ -11,8 +11,8 @@ function cloudError(error: WeightCloudError) {
 }
 
 export async function GET(request: Request) {
-  const auth = await authorizeLifeRequest(request);
-  if (auth) return auth;
+  const auth = await requireLifeIdentity(request);
+  if (auth.response) return auth.response;
   const person = parseWeightPartner(new URL(request.url).searchParams.get("person"));
   if (!person.ok) return lifeJsonError(person.reason, 400, "BAD_REQUEST");
   try {
@@ -25,11 +25,14 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authorizeLifeRequest(request);
-  if (auth) return auth;
+  const auth = await requireLifeIdentity(request);
+  if (auth.response) return auth.response;
   const body = await readJsonBody(request);
   if (!body.ok) return body.response;
-  const parsed = parseWeightWritePayload(body.value);
+  const raw = typeof body.value === "object" && body.value !== null && !Array.isArray(body.value)
+    ? { ...body.value, partnerKey: auth.identity.partnerKey }
+    : body.value;
+  const parsed = parseWeightWritePayload(raw);
   if (!parsed.ok) return lifeJsonError(parsed.reason, 400, "INVALID_WEIGHT");
   try {
     const weight = await createWeight(parsed.value);
