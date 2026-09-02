@@ -4,7 +4,7 @@ import { AppPageShell } from "@/components/ui/AppPageShell";
 const tiles = [
   { href: "/nest/weight", icon: "⚖️", title: "体重", note: "看看最近的变化", tone: "bg-[color:color-mix(in_srgb,var(--life-blue)_34%,white)]", active: true },
   { href: "#", icon: "💌", title: "小信箱", note: "留给彼此的话", tone: "bg-[color:color-mix(in_srgb,var(--life-pink)_36%,white)]", active: false },
-  { href: "#", icon: "🧰", title: "家庭药箱", note: "常备药与有效期", tone: "bg-[color:color-mix(in_srgb,var(--life-teal)_24%,white)]", active: false },
+  { href: "/nest/medicine", icon: "🧰", title: "家庭药箱", note: "数量、开封与有效期", tone: "bg-[color:color-mix(in_srgb,var(--life-teal)_24%,white)]", active: true },
   { href: "#", icon: "🎮", title: "游戏机", note: "小游戏都放在这里", tone: "bg-[color:color-mix(in_srgb,var(--life-yellow)_38%,white)]", active: false },
 ] as const;
 
@@ -35,16 +35,14 @@ export function LifeNestPage() {
               <div className="mt-auto pt-3 text-[10px] font-extrabold text-[var(--life-teal-strong)]">{tile.active ? "打开 →" : "后续开放"}</div>
             </>
           );
-          if (tile.active) {
-            return <Link key={tile.title} href={tile.href} className="life-surface flex min-h-44 flex-col rounded-[var(--life-radius-card)] p-4 transition active:scale-[0.98]">{body}</Link>;
-          }
+          if (tile.active) return <Link key={tile.title} href={tile.href} className="life-surface flex min-h-44 flex-col rounded-[var(--life-radius-card)] p-4 transition active:scale-[0.98]">{body}</Link>;
           return <div key={tile.title} aria-disabled="true" className="life-surface flex min-h-44 flex-col rounded-[var(--life-radius-card)] p-4 opacity-80">{body}</div>;
         })}
       </div>
 
       <section className="mt-3 rounded-[var(--life-radius-card)] bg-[var(--life-surface-warm)] px-4 py-3">
-        <p className="text-xs font-bold text-[var(--life-text-body)]">慢慢把小窝填满</p>
-        <p className="mt-1 text-[11px] leading-5 text-[var(--life-text-muted)]">体重先接入真实数据；药箱等拿到实际资料后再按真实字段建立，不提前塞假数据。</p>
+        <p className="text-xs font-bold text-[var(--life-text-body)]">小窝正在逐步接入真实数据</p>
+        <p className="mt-1 text-[11px] leading-5 text-[var(--life-text-muted)]">体重和家庭药箱已经可用；小信箱与游戏机继续按既定顺序开发。</p>
       </section>
     </AppPageShell>
   );
