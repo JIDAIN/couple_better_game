@@ -6,13 +6,22 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-describe("V2-R1B auth boundary", () => {
-  it("keeps service secrets out of the login page", () => {
+describe("V2-R1B fixed account boundary", () => {
+  it("uses only the two fixed accounts and one shared password login", () => {
     const login = source("components/life/LifeLoginPage.tsx");
-    expect(login).toContain("/api/auth/${mode}");
-    expect(login).toContain('"login", "signup"');
+    expect(login).toContain('(["cat", "fish"] as const)');
+    expect(login).toContain('fetch("/api/auth/login"');
+    expect(login).not.toContain("signup");
+    expect(login).not.toContain("email");
     expect(login).not.toContain("SUPABASE_SECRET_KEY");
-    expect(login).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
+  });
+
+  it("binds the server session to partnerKey", () => {
+    const fixedAuth = source("lib/server/fixed-life-auth.ts");
+    expect(fixedAuth).toContain("LIFE_ACCOUNT_COOKIE");
+    expect(fixedAuth).toContain('partnerKey: LifePartnerKey');
+    expect(fixedAuth).toContain('createHmac("sha256"');
+    expect(fixedAuth).toContain("isValidSyncPassword");
   });
 
   it("enforces personal ownership on mood, sleep and weight writes", () => {
@@ -23,20 +32,14 @@ describe("V2-R1B auth boundary", () => {
     ]) {
       expect(source(path)).toContain("authorizePersonalPartnerWrite");
     }
+    expect(source("lib/server/life-api.ts")).toContain("OWN_RECORD_ONLY");
   });
 
-  it("keeps old cloud session explicitly transitional", () => {
-    const lifeApi = source("lib/server/life-api.ts");
-    expect(lifeApi).toContain("Migration compatibility only");
-    expect(lifeApi).toContain("isAuthorizedCloudRequest");
-    expect(lifeApi).toContain("OWN_RECORD_ONLY");
-  });
-
-  it("stores only invite hashes in the pairing schema", () => {
-    const migration = source("supabase/migrations/20260902150500_add_auth_pairing_flow.sql");
-    expect(migration).toContain("code_hash");
-    expect(migration).toContain("digest(v_code, 'sha256')");
-    expect(migration).not.toMatch(/\n\s*code\s+text/);
+  it("removes unused registration and pairing schema in the final migration", () => {
+    const cleanup = source("supabase/migrations/20260902154500_remove_unused_auth_pairing.sql");
+    expect(cleanup).toContain("DROP TABLE IF EXISTS public.couple_space_invites");
+    expect(cleanup).toContain("DROP TABLE IF EXISTS public.couple_space_members");
+    expect(cleanup).toContain("DROP TABLE IF EXISTS public.life_user_profiles");
   });
 
   it("still prevents Git-triggered Vercel deployments", () => {
