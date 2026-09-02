@@ -58,9 +58,10 @@ docs/10-v2-life-redesign.md
 - [x] 根 `/` 暂时不切换，避免在新生活首页未完成前影响生产逻辑；
 - [x] 建立 `components/life/LifeAppShell.tsx` 作为新生活系统代码边界；
 - [x] GitHub CI Node 版本由 20 对齐到 Vercel production 的 Node 24；
-- [ ] 把纯饮食 UI 对 `HomeResourcesProvider` 的直接依赖移到旧游戏适配层；
-- [ ] Vercel Preview 验证 `/` 与 `/game` 都可正常运行；
-- [ ] CI Test / Lint / Build 全部通过后再考虑合并。
+- [x] 把纯饮食 UI 从 `HomeResourcesProvider` 中抽成 `DailyMealsPanelCore`，旧 `DailyMealsPanel` 只保留游戏关联适配；
+- [x] GitHub CI Test / Lint / Build 在 Node 24 下全部通过；
+- [x] Vercel Preview 为 READY，构建产物同时生成 `/` 与 `/game`；
+- [ ] 在带 Vercel Preview 身份的真实浏览器中人工点开 `/game` 做最终视觉/交互验收。
 
 V2-P0 不改 Supabase schema，不改游戏规则，不改兑换机制。
 
@@ -132,6 +133,15 @@ HomeResourcesProvider
 ```
 
 V2 不把 `HomeResourcesProvider` 扩大为生活系统全局 Provider。
+
+饮食边界当前已经调整为：
+
+```text
+DailyMealsPanel            旧游戏适配层；读取 HomeResourcesProvider
+└─ DailyMealsPanelCore     纯饮食 UI；不读取 HomeResourcesProvider
+```
+
+未来独立“饮食”主页面直接复用 `DailyMealsPanelCore`，不需要挂载旧游戏 Provider。
 
 ## 7. 饮食后续
 
@@ -219,12 +229,15 @@ Browser -> Next.js API -> server-only Supabase -> PostgreSQL
 
 ## 12. 下一步是什么
 
-当前直接继续完成：
+V2-P0 的代码边界和自动验证已经完成；在合并前只剩一次人工 Preview 验收。
+
+通过后进入：
 
 ```text
-V2-P0
--> 解耦 DailyMealsPanel 与 HomeResourcesProvider
--> Vercel Preview / CI 验证
+V2-P1
+-> 设计 mood_entries / sleep_records / activity_entries
+-> 新增 migration / RPC / Next.js API
+-> 暂时不切换根首页
 ```
 
 Supabase 当前保持不变。
