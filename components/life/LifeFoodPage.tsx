@@ -79,9 +79,9 @@ function MealNutrition({ meal }: { meal?: MealRecord }) {
   const empty = !meal;
   return (
     <div className="grid gap-2">
-      <AppNutritionBar label="碳水" value={empty || !totals.hasCarbs ? null : totals.carbs} unit="g" max={100} />
-      <AppNutritionBar label="蛋白质" value={empty || !totals.hasProtein ? null : totals.protein} unit="g" max={60} />
-      <AppNutritionBar label="脂肪" value={empty || !totals.hasFat ? null : totals.fat} unit="g" max={50} />
+      <AppNutritionBar label="碳水" value={empty || !totals.hasCarbs ? null : Number(totals.carbs.toFixed(1))} unit="g" max={100} />
+      <AppNutritionBar label="蛋白质" value={empty || !totals.hasProtein ? null : Number(totals.protein.toFixed(1))} unit="g" max={60} />
+      <AppNutritionBar label="脂肪" value={empty || !totals.hasFat ? null : Number(totals.fat.toFixed(1))} unit="g" max={50} />
       <div className="flex items-baseline justify-between border-t border-[var(--life-border-soft)] pt-2">
         <span className="text-xs font-bold text-[var(--life-text-body)]">总热量</span>
         <span className="text-base font-extrabold tabular-nums text-[var(--life-text)]">
@@ -105,7 +105,6 @@ export function LifeFoodPage() {
     const id = requestId.current + 1;
     requestId.current = id;
     let cancelled = false;
-    setLoading(true);
     fetchMeals({ mealDate: date, partnerKey })
       .then((records) => {
         if (cancelled || requestId.current !== id) return;
@@ -135,16 +134,28 @@ export function LifeFoodPage() {
   }, [meals]);
   const daily = useMemo(() => macroTotals(meals), [meals]);
 
+  function changeRole(next: AppRoleSwitchValue) {
+    if (next === role) return;
+    setLoading(true);
+    setRole(next);
+  }
+
+  function changeDate(next: string) {
+    if (!next || next === date) return;
+    setLoading(true);
+    setDate(next);
+  }
+
   return (
     <AppPageShell title="饮食" subtitle="一天吃了什么，单独查看我或 Ta。">
       <div className="mb-4 grid gap-3">
-        <AppRoleSwitch value={role} onChange={setRole} />
+        <AppRoleSwitch value={role} onChange={changeRole} />
         <label className="life-surface flex items-center justify-between gap-3 px-3 py-2.5">
           <span className="text-xs font-bold text-[var(--life-text-body)]">查看日期</span>
           <input
             type="date"
             value={date}
-            onChange={(event) => setDate(event.target.value)}
+            onChange={(event) => changeDate(event.target.value)}
             className="rounded-xl border border-[var(--life-border-soft)] bg-[var(--life-surface)] px-2.5 py-1.5 text-sm font-bold text-[var(--life-text)]"
           />
         </label>
@@ -193,9 +204,9 @@ export function LifeFoodPage() {
           {loading ? <span className="text-xs text-[var(--life-text-muted)]">加载中…</span> : null}
         </div>
         <div className="grid gap-2.5">
-          <AppNutritionBar label="碳水" value={daily.hasCarbs ? daily.carbs : null} unit="g" max={300} />
-          <AppNutritionBar label="蛋白质" value={daily.hasProtein ? daily.protein : null} unit="g" max={120} />
-          <AppNutritionBar label="脂肪" value={daily.hasFat ? daily.fat : null} unit="g" max={100} />
+          <AppNutritionBar label="碳水" value={daily.hasCarbs ? Number(daily.carbs.toFixed(1)) : null} unit="g" max={300} />
+          <AppNutritionBar label="蛋白质" value={daily.hasProtein ? Number(daily.protein.toFixed(1)) : null} unit="g" max={120} />
+          <AppNutritionBar label="脂肪" value={daily.hasFat ? Number(daily.fat.toFixed(1)) : null} unit="g" max={100} />
           <div className="mt-1 flex items-center justify-between rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)] px-3 py-2.5">
             <span className="text-sm font-bold text-[var(--life-text-body)]">总热量</span>
             <span className="text-lg font-extrabold tabular-nums text-[var(--life-text)]">{meals.length ? `${daily.calories} kcal` : "未记录"}</span>
