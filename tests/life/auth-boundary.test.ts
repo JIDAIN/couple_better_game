@@ -16,18 +16,28 @@ describe("V2 fixed account boundary", () => {
     expect(login).not.toContain("选择账号");
     expect(login).not.toContain('(["cat", "fish"] as const)');
     expect(login).not.toContain("signup");
-    expect(login).not.toContain("email");
   });
 
-  it("maps account names to partnerKey and keeps session signing separate from sync password", () => {
+  it("authenticates username and password against the server-only Supabase RPC", () => {
     const fixedAuth = source("lib/server/fixed-life-auth.ts");
     expect(fixedAuth).toContain("LIFE_ACCOUNT_COOKIE");
     expect(fixedAuth).toContain('partnerKey: LifePartnerKey');
-    expect(fixedAuth).toContain('username === "cat"');
-    expect(fixedAuth).toContain('username === "fish"');
+    expect(fixedAuth).toContain('rpc/authenticate_fixed_life_account');
+    expect(fixedAuth).toContain('p_username: normalizedUsername');
+    expect(fixedAuth).toContain('p_password: password');
     expect(fixedAuth).toContain('createHmac("sha256"');
-    expect(fixedAuth).toContain("LIFE_ACCOUNT_PASSWORD");
-    expect(fixedAuth).not.toContain("isValidSyncPassword");
+    expect(fixedAuth).not.toContain("LIFE_ACCOUNT_PASSWORD");
+    expect(fixedAuth).not.toContain("DATA_EDIT_PASSWORD");
+  });
+
+  it("keeps credential rows server-only and password hashes out of source data", () => {
+    const migration = source("supabase/migrations/20260903112500_add_fixed_life_account_credentials.sql");
+    expect(migration).toContain("life_fixed_accounts");
+    expect(migration).toContain("password_hash");
+    expect(migration).toContain("extensions.crypt");
+    expect(migration).toContain("grant execute on function public.authenticate_fixed_life_account(text, text) to service_role");
+    expect(migration).not.toContain("jidain@163.com");
+    expect(migration).not.toContain("15535373352@163.com");
   });
 
   it("does not show the legacy sync-password gate on Today", () => {
