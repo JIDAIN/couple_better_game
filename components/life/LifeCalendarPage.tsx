@@ -65,7 +65,6 @@ export function LifeCalendarPage() {
   useEffect(() => {
     const id = ++requestId.current;
     let cancelled = false;
-    setLoading(true);
     fetchLifeMonth(month)
       .then((record) => {
         if (cancelled || requestId.current !== id) return;
@@ -86,11 +85,17 @@ export function LifeCalendarPage() {
   const byDate = useMemo(() => new Map((data?.days ?? []).map((day) => [day.date, day.moods])), [data]);
   const cells = useMemo(() => monthCells(month), [month]);
 
+  function moveMonth(amount: number) {
+    setLoading(true);
+    setError(null);
+    setMonth((value) => shiftMonth(value, amount));
+  }
+
   return (
     <AppPageShell title="日历" subtitle="把每天的心情留在月历里；点开日期再看当天发生了什么。">
       <section className="life-surface life-section-card overflow-hidden">
         <div className="flex items-center justify-between gap-3">
-          <button type="button" aria-label="上个月" onClick={() => setMonth((value) => shiftMonth(value, -1))} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--life-surface-soft)] text-lg font-black text-[var(--life-text-body)]">‹</button>
+          <button type="button" aria-label="上个月" onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--life-surface-soft)] text-lg font-black text-[var(--life-text-body)]">‹</button>
           <div className="text-center">
             <p className="text-lg font-extrabold text-[var(--life-text)]">{monthTitle(month)}</p>
             <div className="mt-1 flex items-center justify-center gap-3 text-[10px] font-bold text-[var(--life-text-muted)]">
@@ -98,7 +103,7 @@ export function LifeCalendarPage() {
               {loading ? <span>加载中…</span> : null}
             </div>
           </div>
-          <button type="button" aria-label="下个月" onClick={() => setMonth((value) => shiftMonth(value, 1))} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--life-surface-soft)] text-lg font-black text-[var(--life-text-body)]">›</button>
+          <button type="button" aria-label="下个月" onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--life-surface-soft)] text-lg font-black text-[var(--life-text-body)]">›</button>
         </div>
 
         <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold text-[var(--life-text-muted)]">
