@@ -12,49 +12,51 @@
 
 ## R1：账户与导航基础 ✅
 
-### R1A ✅ 已完成
-- 当前底部 Tab 再次点击自身不再触发同路由导航。
+### R1A ✅
+- 当前底部 Tab 再次点击自身不触发同路由导航。
 
-### R1B ✅ 固定双账号方案
+### R1B ✅
 - 底层账号固定 `cat / fish`，共享旧 `DATA_EDIT_PASSWORD`。
-- 前端“我 / Ta”按当前登录身份动态解释。
+- 前端“我 / Ta”相对当前登录身份动态解释。
 - HMAC 签名 HttpOnly Cookie；不开放注册、邀请码或第三账号。
 - 详细说明见 `docs/17-auth-and-pairing.md`。
 
-### R1C ✅ 导航持久化与 stale-while-revalidate 缓存基础
-- `LifeIdentityProvider` 上移根 layout。
-- 新增 `lib/client/use-stale-query.ts`。
-- 今日页使用稳定 `life-day:YYYY-MM-DD` query key；返回首页优先显示缓存，后台同步不清空原内容。
+### R1C ✅
+- 根 layout 持久 `LifeIdentityProvider`。
+- 新增 stale-while-revalidate query cache。
+- 今日页优先显示缓存、后台同步。
 - 详细说明见 `docs/18-r1c-navigation-cache.md`。
 
 ## R2：首页心情 / 睡眠 ✅
 
-已完成：
-
-- 首页继续展示双方心情，但记录/修改入口只操作当前 `mePartnerKey`；
-- 点击“记录我的 / 修改我的”弹出独立 bottom sheet；
-- Ta 的心情只读，由 Ta 自己登录填写；
-- 删除 ASCII 字符模拟脸，替换为真实表情图标 + 岛屿柔和色块；
-- 睡眠展示双方事实，但编辑器只允许填写“我”的入睡 / 起床时间；
-- 服务端 `OWN_RECORD_ONLY` 继续作为最终写权限兜底；
+- 心情只编辑当前 `mePartnerKey`；Ta 只读；
+- 独立 bottom sheet 选择心情；
+- 删除 ASCII 字符脸；
+- 睡眠只编辑“我”的入睡 / 起床时间；
 - 详细说明见 `docs/19-r2-today-mood-sleep.md`。
 
-## R3：饮食餐次 ▶ 下一阶段
+## R3：饮食餐次与多加餐 ✅
 
-- 早餐/午餐/晚餐为固定槽，进入后不能改餐次；
-- 加餐为 0..N；
-- 新增加餐先选上午/下午/晚上；
-- 已有加餐按具体记录编辑；
-- Meal create/update/delete 接入当前账号所有权校验；
-- 饮食数据接入 R1C cache。
+已完成：
 
-## R4：情绪日历
+- 早餐 / 午餐 / 晚餐改为固定槽，入口决定 mealType，编辑页不再允许改餐次；
+- 加餐改为 `0..N` 独立记录；
+- “新增加餐”先选上午 / 下午 / 晚上，再进入统一餐食编辑；
+- 每一条加餐按 `mealId` 独立编辑；
+- Ta 饮食只读；
+- Meal create/update/delete 与 photo write 全部按服务端 meal owner + 当前 session 校验；
+- 饮食页接入 `meals:{partnerKey}:{date}` cache，保存后只 invalidate 对应查询，不再 `router.refresh()`；
+- 历史同餐次重复数据不自动删除，只提示整理；
+- 详细说明见 `docs/20-r3-meal-model.md`。
+
+## R4：情绪日历 ▶ 下一阶段
 
 - 情绪直接散落在月历中；
 - 无心情为空；
 - 今天使用小太阳特殊状态；
 - 有心情显示双方各自情绪图；
-- 日期排布优先复用成熟 MIT 项目逻辑，视觉统一重做。
+- 日期排布复用成熟 calendar grid 思路，视觉统一重做；
+- 月历接入 R1C cache。
 
 ## R5：小窝 / 我的职责重分
 
