@@ -1,0 +1,84 @@
+.life-calendar-paper {
+  border: 1px solid color-mix(in srgb, var(--life-mint) 18%, var(--life-border-soft));
+  border-radius: 30px;
+  background: color-mix(in srgb, var(--life-surface) 94%, var(--life-yellow) 6%);
+  padding: 1rem 0.65rem 1.15rem;
+  box-shadow: var(--life-shadow-soft);
+}
+
+.life-round-button {
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--life-mint) 22%, white);
+  color: var(--life-teal-strong);
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.life-calendar-day {
+  display: flex;
+  height: 5.2rem;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 18px;
+  padding: 0.25rem 0.1rem;
+  text-decoration: none;
+  transition: background var(--life-motion-fast) ease, transform var(--life-motion-fast) ease;
+}
+.life-calendar-day:active { transform: scale(0.96); }
+.life-calendar-day:hover { background: color-mix(in srgb, var(--life-mint) 10%, transparent); }
+
+.life-calendar-date {
+  position: relative;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--life-text-body);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+.life-calendar-date.is-today {
+  background: color-mix(in srgb, var(--life-yellow) 35%, white);
+  color: var(--life-text);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--life-yellow) 70%, #d8b35e);
+}
+.life-today-sun {
+  position: absolute;
+  right: -0.65rem;
+  top: -0.55rem;
+  font-size: 0.8rem;
+  transform: rotate(8deg);
+}
+
+.life-calendar-moods {
+  position: relative;
+  display: flex;
+  min-height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.2rem;
+}
+.life-calendar-mood {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 2px solid #fffdf8;
+  border-radius: 48% 52% 45% 55%;
+  box-shadow: 0 3px 9px rgb(78 92 85 / 0.09);
+  font-size: 1.05rem;
+}
+.life-calendar-mood.is-offset { margin-left: -0.55rem; transform: translateY(0.35rem) rotate(4deg); }
+
+@media (max-width: 390px) {
+  .life-calendar-paper { padding-inline: 0.35rem; }
+  .life-calendar-day { height: 4.85rem; }
+  .life-calendar-mood { width: 1.8rem; height: 1.8rem; font-size: 0.95rem; }
+}
