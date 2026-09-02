@@ -46,7 +46,11 @@ export function TodayLifePage() {
   }, [query, router]);
 
   if (queryNeedsLogin) {
-    return <AppPageShell title="岛屿生活" subtitle="正在前往登录…" />;
+    return (
+      <AppPageShell title="岛屿生活" subtitle="正在前往登录…">
+        <div />
+      </AppPageShell>
+    );
   }
 
   return (
