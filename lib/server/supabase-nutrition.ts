@@ -6,12 +6,18 @@ import type {
 
 const DEFAULT_SUPABASE_URL = "https://bfhntnzngozdqsmgfvjk.supabase.co";
 const DEFAULT_SPACE_SLUG = "couple-better-game";
+const MEAL_PHOTO_BUCKET = "meal-photos";
 
 type RpcErrorBody = {
   message?: string;
   details?: string;
   hint?: string;
   code?: string;
+};
+
+type MealPhotoReplacement = {
+  previousPhotoPath: string | null;
+  meal: MealRecord;
 };
 
 export class NutritionCloudError extends Error {
@@ -21,6 +27,8 @@ export class NutritionCloudError extends Error {
       | "SERVER_CONFIG"
       | "NUTRITION_READ_FAILED"
       | "NUTRITION_WRITE_FAILED"
+      | "PHOTO_READ_FAILED"
+      | "PHOTO_WRITE_FAILED"
       | "CLOUD_NETWORK_ERROR",
   ) {
     super(message);
@@ -39,8 +47,27 @@ function supabaseSecretKey() {
   return env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
 }
 
-function coupleSpaceSlug() {
+export function coupleSpaceSlug() {
   return env("COUPLE_SPACE_SLUG") || DEFAULT_SPACE_SLUG;
+}
+
+function serviceHeaders(extra?: HeadersInit) {
+  const secretKey = supabaseSecretKey();
+  if (!secretKey) {
+    throw new NutritionCloudError(
+      "Supabase 服务端环境变量未配置完整",
+      "SERVER_CONFIG",
+    );
+  }
+  return {
+    apikey: secretKey,
+    Authorization: `Bearer ${secretKey}`,
+    ...extra,
+  };
+}
+
+function storagePath(path: string) {
+  return path.split("/").map(encodeURIComponent).join("/");
 }
 
 async function callRpc<T>(
@@ -61,11 +88,7 @@ async function callRpc<T>(
   try {
     response = await fetch(`${url}/rest/v1/rpc/${functionName}`, {
       method: "POST",
-      headers: {
-        apikey: secretKey,
-        Authorization: `Bearer ${secretKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: serviceHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
       cache: "no-store",
     });
@@ -119,9 +142,105 @@ export async function updateMeal(mealId: string, payload: MealWritePayload) {
 }
 
 export async function deleteMeal(mealId: string) {
-  return callRpc<MealRecord>(
+  const meal = await callRpc<MealRecord>(
     "delete_meal_record",
     { p_meal_id: mealId, p_space_slug: coupleSpaceSlug() },
     "write",
   );
+  if (meal.photoPath) {
+    await deleteMealPhotoObject(meal.photoPath).catch(() => undefined);
+  }
+  return meal;
+}
+
+export async function getMealPhotoPath(mealId: string) {
+  return callRpc<string | null>(
+    "get_meal_photo_path",
+    { p_meal_id: mealId, p_space_slug: coupleSpaceSlug() },
+    "read",
+  );
+}
+
+export async function replaceMealPhotoPath(mealId: string, photoPath: string | null) {
+  return callRpc<MealPhotoReplacement>(
+    "replace_meal_photo_path",
+    {
+      p_meal_id: mealId,
+      p_photo_path: photoPath,
+      p_space_slug: coupleSpaceSlug(),
+    },
+    "write",
+  );
+}
+
+export function buildMealPhotoPath(mealId: string, extension: string) {
+  const safeExtension = extension.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  if (!safeExtension) throw new Error("照片扩展名不正确");
+  return `${coupleSpaceSlug()}/${mealId}/${crypto.randomUUID()}.${safeExtension}`;
+}
+
+export async function uploadMealPhotoObject(
+  path: string,
+  bytes: ArrayBuffer,
+  contentType: string,
+) {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${supabaseUrl()}/storage/v1/object/${MEAL_PHOTO_BUCKET}/${storagePath(path)}`,
+      {
+        method: "POST",
+        headers: serviceHeaders({
+          "Content-Type": contentType,
+          "x-upsert": "false",
+          "Cache-Control": "3600",
+        }),
+        body: bytes,
+        cache: "no-store",
+      },
+    );
+  } catch {
+    throw new NutritionCloudError("上传餐食照片时连接失败", "CLOUD_NETWORK_ERROR");
+  }
+  if (!response.ok) {
+    const result = (await response.json().catch(() => null)) as RpcErrorBody | null;
+    throw new NutritionCloudError(result?.message ?? "上传餐食照片失败", "PHOTO_WRITE_FAILED");
+  }
+}
+
+export async function downloadMealPhotoObject(path: string) {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${supabaseUrl()}/storage/v1/object/authenticated/${MEAL_PHOTO_BUCKET}/${storagePath(path)}`,
+      {
+        method: "GET",
+        headers: serviceHeaders(),
+        cache: "no-store",
+      },
+    );
+  } catch {
+    throw new NutritionCloudError("读取餐食照片时连接失败", "CLOUD_NETWORK_ERROR");
+  }
+  if (!response.ok) {
+    throw new NutritionCloudError("读取餐食照片失败", "PHOTO_READ_FAILED");
+  }
+  return response;
+}
+
+export async function deleteMealPhotoObject(path: string) {
+  let response: Response;
+  try {
+    response = await fetch(`${supabaseUrl()}/storage/v1/object/${MEAL_PHOTO_BUCKET}`, {
+      method: "DELETE",
+      headers: serviceHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefixes: [path] }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new NutritionCloudError("删除餐食照片时连接失败", "CLOUD_NETWORK_ERROR");
+  }
+  if (!response.ok) {
+    throw new NutritionCloudError("删除餐食照片失败", "PHOTO_WRITE_FAILED");
+  }
 }
