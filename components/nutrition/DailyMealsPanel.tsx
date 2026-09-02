@@ -1,24 +1,13 @@
 "use client";
 
-import { useCallback } from "react";
-import { selectDailyGameOverview } from "../../lib/home/daily-overview-service";
-import type { NutritionPartnerKey } from "../../lib/nutrition/meal-service";
-import { useHomeResources } from "../home/HomeResourcesProvider";
-import {
-  DailyMealsPanelCore,
-  type LinkedDailyGameOverview,
-} from "./DailyMealsPanelCore";
-
+/**
+ * Legacy-game compatibility boundary.
+ *
+ * The old 变美变瘦大作战 intentionally stays on the long-lived pre-meal-journal UI.
+ * Detailed breakfast/lunch/dinner/snack records now belong only to the V2 /food flow.
+ * Keeping this adapter as a no-op lets HomeScreen retain its stable structure without
+ * reintroducing the newer meal CRUD / ChatGPT meal UI into /game.
+ */
 export function DailyMealsPanel() {
-  const { dailyRecords } = useHomeResources();
-
-  const getLinkedGameOverview = useCallback(
-    (
-      date: string,
-      partner: NutritionPartnerKey,
-    ): LinkedDailyGameOverview => selectDailyGameOverview(dailyRecords, date, partner),
-    [dailyRecords],
-  );
-
-  return <DailyMealsPanelCore getLinkedGameOverview={getLinkedGameOverview} />;
+  return null;
 }
