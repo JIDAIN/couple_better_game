@@ -1,19 +1,19 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { fetchLifeDay, LifeApiError } from "@/lib/life/life-client";
 import type { LifeDayRecord } from "@/lib/life/life-service";
 import { useStaleQuery } from "@/lib/client/use-stale-query";
-import { LifeCloudGate } from "./today/LifeCloudGate";
 import { TodayActivityCard } from "./today/TodayActivityCard";
 import { TodayMoodCard } from "./today/TodayMoodCard";
 import { TodaySleepCard } from "./today/TodaySleepCard";
 import { displayDate, localIsoDate } from "./today/today-life-model";
 
 export function TodayLifePage() {
+  const router = useRouter();
   const [date] = useState(() => localIsoDate());
-  const [needsLogin, setNeedsLogin] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const fetcher = useCallback(() => fetchLifeDay(date), [date]);
   const query = useStaleQuery<LifeDayRecord>({
@@ -28,21 +28,26 @@ export function TodayLifePage() {
     : null;
   const visibleError = actionError ?? queryError;
 
+  useEffect(() => {
+    if (queryNeedsLogin) router.replace("/login");
+  }, [queryNeedsLogin, router]);
+
   const reload = useCallback(async () => {
     setActionError(null);
     try {
       await query.refresh(true);
-      setNeedsLogin(false);
     } catch (cause) {
       if (cause instanceof LifeApiError && cause.status === 401) {
-        setNeedsLogin(true);
+        router.replace("/login");
         return;
       }
       setActionError(cause instanceof Error ? cause.message : "读取今天的生活记录失败");
     }
-  }, [query]);
+  }, [query, router]);
 
-  if (needsLogin || queryNeedsLogin) return <LifeCloudGate onConnected={reload} />;
+  if (queryNeedsLogin) {
+    return <AppPageShell title="岛屿生活" subtitle="正在前往登录…" />;
+  }
 
   return (
     <AppPageShell title={displayDate(date)} subtitle="只记重要的小日常，照顾好彼此。">
