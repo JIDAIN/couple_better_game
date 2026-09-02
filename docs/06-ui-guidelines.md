@@ -136,19 +136,24 @@ node_modules/animal-island-ui/dist/types/index.d.ts
 
 ## 7. 当前饮食 UI 约定
 
-P1 饮食 UI 已落在现有 `#today` notice-board，不新造“营养中心”页面：
+饮食 UI 和 P2.5 同日关联都落在现有 `#today` notice-board，不新造“营养中心”页面：
 
 ```text
 今日 notice-board
 └─ AppSectionPanel「饮食小记」
    ├─ 日期
    ├─ fish / cat 角色切换
-   ├─ 当天 kcal / 餐数
+   ├─ 当天餐数 / kcal
+   ├─ AppCard「当天合在一起看」
+   │  ├─ 实际摄入
+   │  ├─ 游戏热量缺口
+   │  ├─ 运动分钟
+   │  └─ 游戏体重快照
    ├─ AppCard 餐食记录
    └─ AppModal 新增 / 编辑 / 删除确认
 ```
 
-实现使用：
+实现继续使用：
 
 ```text
 AppSectionPanel
@@ -161,12 +166,22 @@ AppRoleAvatar
 animal-island-ui Title
 ```
 
+### “当天合在一起看”视觉规则
+
+- 仍然是普通 `AppCard variant="soft"`，不是新页面或新视觉 primitive；
+- 左侧实际摄入、右侧游戏热量缺口并列，强调“同一天”而不是“同一字段”；
+- 文案必须出现“游戏热量缺口”或等价明确词，避免让用户误以为它由 meals 自动计算；
+- meals 未记录、Meal API 未加载、daily record 未填写必须是三个可区分状态；
+- 运动和体重快照作为次级信息，不抢过饮食明细本身；
+- P2.5 不引入新底部导航、不改 notice-board 场景。
+
 ### 饮食 UI 不允许做的事
 
 - 为饮食单独创造一套与当前项目不同的色板、卡片、按钮、弹窗；
 - 因为“营养功能很多”就擅自添加第五个底部 Tab；
 - 用真实摄入的视觉文案暗示它会自动修改游戏 deficit；
-- 把 ChatGPT 来源记录做成另一套 UI / 数据结构。
+- 把 ChatGPT 来源记录做成另一套 UI / 数据结构；
+- 为了让“当天合在一起看”看起来完整而伪造缺失的 daily record。
 
 如果未来饮食功能明显超过今日公告板可承载范围，应先更新产品信息架构文档，再做页面迁移，而不是边开发边改导航。
 
@@ -182,7 +197,7 @@ animal-island-ui Title
 - 数字列 tabular / 不抖动；
 - loading / disabled / error 有可见状态。
 
-饮食首版已经采用窄屏两列/按钮网格、可滚动 AppModal、tabular kcal 和 loading/empty/error 状态；后续修改不能破坏这些基础可用性。
+饮食首版和 P2.5 使用窄屏两列 summary、可滚动 AppModal、tabular kcal 和 loading/empty/error 状态；后续修改不能破坏这些基础可用性。
 
 ## 9. 热力图日期视觉
 
@@ -223,6 +238,7 @@ npm run build
 - 常用手机窄屏；
 - 长食物名 / 长备注；
 - 多个 food items；
+- “当天合在一起看”的两列布局；
 - loading / empty / error；
 - 弹窗滚动与底部按钮；
 - 底部导航遮挡。
