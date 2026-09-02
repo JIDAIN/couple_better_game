@@ -87,6 +87,12 @@ function mealTime(meal: MealRecord) {
 }
 
 function calorieText(meal: MealRecord) {
+  if (meal.totalCaloriesKcal == null) {
+    if (meal.calorieMinKcal != null && meal.calorieMaxKcal != null) {
+      return `未估算定值（${meal.calorieMinKcal}–${meal.calorieMaxKcal} kcal）`;
+    }
+    return "未估算热量";
+  }
   if (meal.calorieMinKcal != null && meal.calorieMaxKcal != null) {
     return `${meal.totalCaloriesKcal} kcal（${meal.calorieMinKcal}–${meal.calorieMaxKcal}）`;
   }
@@ -126,6 +132,13 @@ function totalCalorieRange(meals: MealRecord[]) {
   );
 }
 
+function totalCaloriesIfComplete(meals: MealRecord[]) {
+  if (meals.length === 0 || meals.some((meal) => meal.totalCaloriesKcal == null)) {
+    return null;
+  }
+  return meals.reduce((sum, meal) => sum + (meal.totalCaloriesKcal ?? 0), 0);
+}
+
 function mealLoadError(caught: unknown) {
   if (caught instanceof MealApiError && caught.status === 401) {
     return "还没有连接云端，请先到「小窝 → 数据管理」连接云端后再记录饮食";
@@ -146,7 +159,7 @@ function LinkedDailySummary({
 }: {
   selectedPartner: NutritionPartnerKey;
   meals: MealRecord[];
-  totalCalories: number;
+  totalCalories: number | null;
   totalRange: { min: number; max: number } | null;
   gameOverview: LinkedDailyGameOverview;
   loading: boolean;
@@ -158,7 +171,9 @@ function LinkedDailySummary({
       ? "暂未加载"
       : meals.length === 0
         ? "未记录"
-        : `${totalCalories} kcal`;
+        : totalCalories == null
+          ? "未完整估算"
+          : `${totalCalories} kcal`;
   const intakeDetail =
     !loading && !error && meals.length > 0 && totalRange
       ? `估算区间 ${totalRange.min}–${totalRange.max}`
@@ -311,7 +326,9 @@ function MealCard({ meal, onEdit }: { meal: MealRecord; onEdit: () => void }) {
                   ) : null}
                 </div>
                 <div className="shrink-0 text-right tabular-nums">
-                  <p className="font-semibold ui-text-main">{item.caloriesKcal} kcal</p>
+                  <p className="font-semibold ui-text-main">
+                    {item.caloriesKcal == null ? "未估算" : `${item.caloriesKcal} kcal`}
+                  </p>
                   {item.calorieMinKcal != null && item.calorieMaxKcal != null ? (
                     <p className="ui-text-soft">
                       {item.calorieMinKcal}–{item.calorieMaxKcal}
@@ -403,10 +420,7 @@ export function DailyMealsPanelCore({
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const totalCalories = useMemo(
-    () => meals.reduce((sum, meal) => sum + meal.totalCaloriesKcal, 0),
-    [meals],
-  );
+  const totalCalories = useMemo(() => totalCaloriesIfComplete(meals), [meals]);
   const totalRange = useMemo(() => totalCalorieRange(meals), [meals]);
   const gameOverview = useMemo(
     () => getLinkedGameOverview?.(selectedDate, selectedPartner) ?? null,
@@ -451,6 +465,13 @@ export function DailyMealsPanelCore({
       setDeleting(false);
     }
   }
+
+  const totalSummary =
+    meals.length === 0
+      ? "0 餐"
+      : totalCalories == null
+        ? `${meals.length} 餐 · 热量未完整估算`
+        : `${meals.length} 餐 · ${totalCalories} kcal`;
 
   return (
     <>
@@ -497,7 +518,7 @@ export function DailyMealsPanelCore({
         <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/45 px-3 py-2.5">
           <div className="min-w-0">
             <p className="text-xs font-bold ui-text-main">
-              {loading ? "正在翻饮食小记…" : `${meals.length} 餐 · ${totalCalories} kcal`}
+              {loading ? "正在翻饮食小记…" : totalSummary}
             </p>
             <p className="mt-0.5 text-[10px] font-medium ui-text-soft">
               {selectedDate === today ? "今天" : selectedDate} · {selectedPartner === "fish" ? "鱼鱼" : "猫猫"}
