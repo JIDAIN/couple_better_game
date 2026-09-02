@@ -12,49 +12,20 @@ const items: ReadonlyArray<{ href: LifeNavHref; icon: string; label: string }> =
   { href: "/me", icon: "⚙️", label: "我的" },
 ];
 
-const baseClass =
-  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[var(--life-radius-control)] px-1 text-[11px] font-bold transition duration-[var(--life-motion-fast)]";
+const baseClass = "life-bottom-nav-item flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[var(--life-radius-control)] px-1 text-[11px] font-bold transition duration-[var(--life-motion-fast)]";
 
 export function AppLifeBottomNav() {
   const pathname = usePathname();
-
   return (
-    <nav
-      aria-label="生活系统主导航"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--life-border-soft)] bg-[color:color-mix(in_srgb,var(--life-surface)_94%,transparent)] px-2 pt-1.5 pb-[max(0.45rem,env(safe-area-inset-bottom))] shadow-[0_-6px_22px_rgb(78_92_85_/_0.07)] backdrop-blur-md"
-    >
+    <nav aria-label="生活系统主导航" className="life-bottom-nav fixed inset-x-0 bottom-0 z-40 px-2 pt-1.5 pb-[max(0.45rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto grid w-full max-w-[46rem] grid-cols-5 gap-1">
         {items.map((item) => {
           const active = isLifeNavItemActive(pathname, item.href);
-          const content = (
-            <>
-              <span className="text-lg leading-none" aria-hidden>{item.icon}</span>
-              <span>{item.label}</span>
-            </>
-          );
-
+          const content = <><span className="text-lg leading-none" aria-hidden>{item.icon}</span><span>{item.label}</span></>;
           if (active) {
-            return (
-              <span
-                key={item.href}
-                aria-current="page"
-                className={`${baseClass} cursor-default bg-[var(--life-surface-soft)] text-[var(--life-teal-strong)]`}
-              >
-                {content}
-              </span>
-            );
+            return <span key={item.href} aria-current="page" className={`${baseClass} is-active cursor-default text-[var(--life-teal-strong)]`}>{content}</span>;
           }
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch
-              className={`${baseClass} text-[var(--life-text-muted)] hover:bg-[var(--life-surface-soft)] hover:text-[var(--life-text-body)]`}
-            >
-              {content}
-            </Link>
-          );
+          return <Link key={item.href} href={item.href} prefetch className={`${baseClass} text-[var(--life-text-muted)]`}>{content}</Link>;
         })}
       </div>
     </nav>
