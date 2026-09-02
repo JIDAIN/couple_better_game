@@ -4,9 +4,7 @@
 
 这份文件是“现在做到哪一步、下一步做什么”的唯一主状态页。
 
-## 1. 当前生产状态
-
-`main` 已完成 V2-P0 和 V2-P1，但生产根 `/` 仍显示成熟的双人健康游戏；旧游戏没有被删除。
+## 1. 当前里程碑状态
 
 已完成：
 
@@ -18,17 +16,28 @@ P2.5 同日饮食 + 游戏记录            ✅
 V2-P0 新旧系统边界                  ✅
 V2-P1 Life facts + API + AI 基础    ✅
 V2-UI0 视觉语言设计与人工确认        ✅
+V2-UI1 视觉 token / App* / Pattern  ✅
 ```
+
+当前开发：
+
+```text
+V2-P2 新生活 App Shell + 今日首页
+```
+
+分支：`v2/life-homepage`。
 
 ## 2. 视觉规范源
 
-统一视觉语言已经定稿：
+V2 后续所有可见 UI 必须遵循：
 
 ```text
 docs/12-island-life-design-system.md
 ```
 
-这是 V2 后续可见 UI 的唯一主视觉规范。核心方向：暖白/奶油底、薄荷/青绿主识别、柔黄/珊瑚/浅蓝点缀；不再使用大面积棕色；低密度页面主题感更强，高密度数据页面保持克制。
+核心方向：暖白/奶油底、薄荷/青绿主识别、柔黄/珊瑚/浅蓝点缀；不使用大面积棕色；低密度页面主题感更强，高密度数据页面保持克制。外部 GitHub UI 只能通过 App*/Pattern 适配后进入业务层。
+
+UI1 已在 `main` 落地独立 `--life-*` token、`AppPageShell`、`AppRoleSwitch`、`AppRecordRow`、`AppFeatureTile`、`AppNutritionBar` 与 `/ui-lab`。
 
 ## 3. V2 信息架构（定稿）
 
@@ -61,34 +70,30 @@ docs/12-island-life-design-system.md
 └─ 账号 / 设置 / 数据等后续入口
 ```
 
-游戏机本轮只开发游戏列表，不开发新的游戏详情 UI。
+旧游戏继续完整保留在 `/game`。游戏机本轮只开发游戏列表，不开发新的游戏详情 UI。
 
-## 4. V2-UI1 当前实施结果
+## 4. V2-P2 当前实现
 
-开发分支：
+已经在开发分支完成：
 
-```text
-v2/ui-foundation
-```
+- [x] 根 `/` 切换为新 Life App Shell；
+- [x] 原完整游戏继续保留 `/game`；
+- [x] 新底部导航 `今日 / 饮食 / 日历 / 小窝 / 我的`；
+- [x] `/food`、`/calendar`、`/nest`、`/me` 先建立不会 404 的占位路由，不临时制造未定稿业务 UI；
+- [x] 首页只显示心情 / 睡眠 / 活动；
+- [x] 心情显示双方彩色情绪圆脸，并提供记录/修改入口；
+- [x] 睡眠只记录入睡 / 起床，自动计算时长，并支持跨午夜；
+- [x] 活动统一为轻量文本记录，可新增 / 删除；
+- [x] Life API 401 时显示共享云端会话连接入口；
+- [x] 应用 metadata/theme 改为「岛屿生活」；
+- [x] 首页拆分为 Mood / Sleep / Activity 独立组件，避免继续形成巨型页面；
+- [x] GitHub Test ✅；
+- [x] GitHub Lint ✅；
+- [x] GitHub Build ✅；
+- [x] 本轮初始页面提交曾成功生成 Vercel Preview；
+- [ ] 最新重构 head 的新 Preview：Vercel Hobby 当日部署次数限制阻塞，非代码 Build 失败。
 
-已经落地：
-
-- [x] `app/island-life-tokens.css`：V2 独立视觉 token，不覆盖 Legacy Game 旧色板；
-- [x] 暖白 / 薄荷 / 青绿 / 柔黄 / 珊瑚 / 浅蓝语义色；
-- [x] 统一正文、边框、圆角、阴影、间距、动效 token；
-- [x] `AppPageShell`；
-- [x] `AppRoleSwitch`，固定默认文案 `我 / Ta`；
-- [x] `AppRecordRow`；
-- [x] `AppFeatureTile`；
-- [x] `AppNutritionBar`；
-- [x] `/ui-lab` 重建为定稿视觉语言组件展厅；
-- [x] 心情、睡眠、活动 Pattern 与首页三入口规则对齐；
-- [x] 饮食营养统计条 Pattern；
-- [x] 小窝四入口 Pattern；
-- [ ] GitHub Test / Lint / Build 最终验证；
-- [ ] Vercel Preview 视觉检查。
-
-`/ui-lab` 仍只使用假数据，不读写 Life API / Supabase，也不触发 Legacy Game settlement。
+本阶段没有 Supabase migration，没有修改 Legacy Game 结算、金币、宝石或兑换规则。
 
 ## 5. 数据边界
 
@@ -109,6 +114,8 @@ record_write_receipts
 ```
 
 生活系统中的“活动”是统一用户概念；手动 UI 不强迫填写分类，未来 AI 可以在明确事实基础上填 `activity_type / duration_minutes`。
+
+当前 UI 内部仍沿用既有角色键：`cat = 我`、`fish = Ta`；可见文案统一使用 `我 / Ta`。
 
 ## 6. AI 写入架构原则
 
@@ -136,7 +143,7 @@ read-back
 meal / mood / sleep / activity / weight / medicine
 ```
 
-AI 不获得任意 SQL 权限。
+AI 不获得任意 SQL 权限。网页、AI 和 import 最终复用同一领域事实和写入服务。
 
 ## 7. 旧游戏与饮食边界
 
@@ -250,9 +257,9 @@ V2-P1  心情 / 睡眠 / 活动 schema + API             ✅
 ↓
 V2-UI0 统一视觉语言设计 + 人工确认                  ✅
 ↓
-V2-UI1 视觉 token / App* / Pattern 基础实现         🚧（代码已落地，待 CI/Preview）
+V2-UI1 视觉 token / App* / Pattern 基础实现         ✅
 ↓
-V2-P2  新生活 App Shell + 今日首页
+V2-P2  新生活 App Shell + 今日首页                  🚧（实现完成，待合并/发布确认）
 ↓
 V2-P3  独立饮食页 + 编辑一餐 + kcal optional
 ↓
@@ -282,15 +289,16 @@ Browser -> Next.js API -> server-only Supabase -> PostgreSQL
 - Web / ChatGPT / import 复用领域事实；
 - 外部写入使用稳定幂等键；
 - `/ui-lab` 不读写真实数据；
-- UI1 不改 Legacy Game 规则，不改 Supabase schema。
+- V2-P2 不改 Legacy Game 规则，不改 Supabase schema；
+- Life 页面遇到无效云端会话时，只通过 `/api/cloud-session` 建立 HttpOnly 会话，不在新 Life UI 扩散旧的同步密码 localStorage 模式。
 
 ## 13. 下一步
 
-先完成 UI1 的 CI / Preview 验证。通过后进入：
+V2-P2 合并并确认生产根 `/` 已切换到生活首页后，进入：
 
 ```text
-V2-P2
-新生活 App Shell + 正式「今日」页面
+V2-P3
+独立饮食页 + 编辑一餐 + kcal optional
 ```
 
-正式首页只接现有 Life API 的心情 / 睡眠 / 活动，不把饮食、体重、药箱或小信箱塞回首页。
+饮食开发必须复用现有 Meal API / Meal CRUD / `DailyMealsPanelCore`，并按定稿视觉实现 `我 / Ta` 单人切换、左实物图右营养统计和当日营养汇总。
