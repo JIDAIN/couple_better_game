@@ -4,7 +4,7 @@ import { AppPageShell } from "@/components/ui/AppPageShell";
 const tiles = [
   { href: "/nest/weight", icon: "⚖️", title: "体重", note: "看看最近的变化", tone: "bg-[color:color-mix(in_srgb,var(--life-blue)_34%,white)]", active: true },
   { href: "#", icon: "💌", title: "小信箱", note: "留给彼此的话", tone: "bg-[color:color-mix(in_srgb,var(--life-pink)_36%,white)]", active: false },
-  { href: "#", icon: "🧰", title: "家庭药箱", note: "常备药与有效期", tone: "bg-[color:color-mix(in_srgb,var(--life-aqua)_32%,white)]", active: false },
+  { href: "#", icon: "🧰", title: "家庭药箱", note: "常备药与有效期", tone: "bg-[color:color-mix(in_srgb,var(--life-teal)_24%,white)]", active: false },
   { href: "#", icon: "🎮", title: "游戏机", note: "小游戏都放在这里", tone: "bg-[color:color-mix(in_srgb,var(--life-yellow)_38%,white)]", active: false },
 ] as const;
 
