@@ -14,11 +14,12 @@ describe("relative me / Ta identity", () => {
     expect(identity).toContain("taPartnerKey: partnerKey ? oppositePartnerKey(partnerKey) : null");
   });
 
-  it("does not label cat as me and fish as Ta on the login screen", () => {
+  it("keeps the login screen identity-neutral before authentication", () => {
     const login = source("components/life/LifeLoginPage.tsx");
-    expect(login).toContain("猫猫（cat）");
-    expect(login).toContain("鱼鱼（fish）");
+    expect(login).toContain('autoComplete="username"');
+    expect(login).toContain('autoComplete="current-password"');
     expect(login).not.toContain('account === "cat" ? "我" : "Ta"');
+    expect(login).not.toContain("选择账号");
   });
 
   it("uses relative identity on key life pages", () => {
