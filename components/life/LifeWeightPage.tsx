@@ -7,12 +7,10 @@ import { AppInput } from "@/components/ui/AppInput";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
 import { AppTextarea } from "@/components/ui/AppTextarea";
+import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { createWeightRecord, deleteWeightRecord, fetchWeights, updateWeightRecord, WeightApiError } from "@/lib/life/weight-client";
-import type { LifePartnerKey } from "@/lib/life/life-service";
 import type { WeightRecord, WeightWritePayload } from "@/lib/life/weight-service";
 
-const SELF_KEY: LifePartnerKey = "cat";
-const TA_KEY: LifePartnerKey = "fish";
 const RANGES = [
   { days: 7, label: "7天" },
   { days: 30, label: "30天" },
@@ -63,6 +61,7 @@ function WeightChart({ records }: { records: WeightRecord[] }) {
 }
 
 export function LifeWeightPage() {
+  const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [role, setRole] = useState<AppRoleSwitchValue>("me");
   const [records, setRecords] = useState<WeightRecord[]>([]);
   const [range, setRange] = useState(30);
@@ -73,9 +72,11 @@ export function LifeWeightPage() {
   const [date, setDate] = useState(() => localDate());
   const [weight, setWeight] = useState("");
   const [note, setNote] = useState("");
-  const partnerKey = role === "me" ? SELF_KEY : TA_KEY;
+  const partnerKey = role === "me" ? mePartnerKey : taPartnerKey;
+  const canEdit = role === "me";
 
   useEffect(() => {
+    if (!partnerKey) return;
     let cancelled = false;
     fetchWeights(partnerKey)
       .then((data) => { if (!cancelled) { setRecords(data); setError(null); } })
@@ -106,7 +107,7 @@ export function LifeWeightPage() {
   }
 
   function edit(record: WeightRecord) {
-    if (record.linkedDailyRecordSideId) return;
+    if (!canEdit || record.linkedDailyRecordSideId) return;
     setEditing(record);
     setDate(record.measurementDate);
     setWeight(String(record.weightKg));
@@ -121,6 +122,7 @@ export function LifeWeightPage() {
   }
 
   async function save() {
+    if (!partnerKey || !canEdit) return;
     const value = Number(weight);
     if (!Number.isFinite(value) || value <= 0 || value >= 500) {
       setError("请输入有效体重（0–500 kg）");
@@ -149,7 +151,7 @@ export function LifeWeightPage() {
   }
 
   async function remove(record: WeightRecord) {
-    if (record.linkedDailyRecordSideId) return;
+    if (!canEdit || record.linkedDailyRecordSideId) return;
     setSaving(true);
     setError(null);
     try {
@@ -163,8 +165,12 @@ export function LifeWeightPage() {
     }
   }
 
+  if (!partnerKey) {
+    return <AppPageShell title="体重" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;
+  }
+
   return (
-    <AppPageShell title="体重" subtitle="只看自己的变化；切换后再查看 Ta。" actions={<Link href="/nest" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回小窝</Link>}>
+    <AppPageShell title="体重" subtitle="“我”是当前登录的人；Ta 只用于查看另一方。" actions={<Link href="/nest" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回小窝</Link>}>
       <div className="grid gap-3">
         <AppRoleSwitch value={role} onChange={switchRole} />
 
@@ -195,11 +201,11 @@ export function LifeWeightPage() {
           <p className="mt-2 text-[10px] leading-5 text-[var(--life-text-muted)]">折线只描述测量事实，不设置目标线、排名或“达标”评价。</p>
         </section>
 
-        <section className="life-surface life-section-card">
+        {canEdit ? <section className="life-surface life-section-card">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-extrabold text-[var(--life-text)]">{editing ? "修改记录" : "记一次体重"}</p>
-              <p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">旧游戏同步的记录继续由旧游戏维护。</p>
+              <p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">只能编辑当前登录账号自己的记录。</p>
             </div>
             {editing ? <button type="button" onClick={resetForm} className="text-xs font-extrabold text-[var(--life-teal-strong)]">取消修改</button> : null}
           </div>
@@ -209,7 +215,7 @@ export function LifeWeightPage() {
           </div>
           <div className="mt-2.5"><AppTextarea rows={2} placeholder="备注（可选）" value={note} onChange={(event) => setNote(event.target.value)} /></div>
           <div className="mt-3"><AppButton variant="primary" disabled={saving} onClick={() => void save()}>{saving ? "保存中…" : editing ? "保存修改" : "保存体重"}</AppButton></div>
-        </section>
+        </section> : <section className="life-surface life-section-card text-xs leading-5 text-[var(--life-text-muted)]">Ta 的体重在这里仅查看；Ta 登录自己的账号后，这一栏会自动变成“我”并可以记录。</section>}
 
         <section className="life-surface life-section-card">
           <div className="mb-3 flex items-center justify-between gap-3"><p className="text-sm font-extrabold text-[var(--life-text)]">历史记录</p><span className="text-[10px] font-bold text-[var(--life-text-muted)]">{records.length} 条</span></div>
@@ -222,7 +228,7 @@ export function LifeWeightPage() {
                   <div className="flex items-baseline gap-2"><strong className="text-base tabular-nums text-[var(--life-text)]">{Number(record.weightKg).toFixed(1)} kg</strong><span className="text-[10px] font-bold text-[var(--life-text-muted)]">{record.measurementDate}</span></div>
                   <p className="mt-0.5 truncate text-[10px] text-[var(--life-text-muted)]">{record.linkedDailyRecordSideId ? "来自旧游戏每日打卡" : record.note || "生活系统记录"}</p>
                 </div>
-                {record.linkedDailyRecordSideId ? <span className="shrink-0 rounded-full bg-white/70 px-2 py-1 text-[9px] font-bold text-[var(--life-text-muted)]">游戏同步</span> : <div className="flex shrink-0 gap-2"><button type="button" onClick={() => edit(record)} className="text-xs font-extrabold text-[var(--life-teal-strong)]">编辑</button><button type="button" disabled={saving} onClick={() => void remove(record)} className="text-xs font-extrabold text-[var(--life-danger)]">删除</button></div>}
+                {canEdit && !record.linkedDailyRecordSideId ? <div className="flex shrink-0 gap-2"><button type="button" onClick={() => edit(record)} className="text-xs font-extrabold text-[var(--life-teal-strong)]">编辑</button><button type="button" disabled={saving} onClick={() => void remove(record)} className="text-xs font-extrabold text-[var(--life-danger)]">删除</button></div> : <span className="shrink-0 rounded-full bg-white/70 px-2 py-1 text-[9px] font-bold text-[var(--life-text-muted)]">{record.linkedDailyRecordSideId ? "游戏同步" : "只读"}</span>}
               </div>
             ))}
           </div>

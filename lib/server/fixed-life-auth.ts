@@ -12,7 +12,7 @@ type SessionPayload = {
 
 export type FixedLifeIdentity = {
   partnerKey: LifePartnerKey;
-  displayName: "我" | "Ta";
+  displayName: "猫猫" | "鱼鱼";
 };
 
 function env(name: string) {
@@ -83,7 +83,7 @@ export function resolveFixedLifeIdentity(request: Request): FixedLifeIdentity | 
     if (typeof payload.expiresAt !== "number" || payload.expiresAt <= Math.floor(Date.now() / 1000)) return null;
     return {
       partnerKey: payload.partnerKey,
-      displayName: payload.partnerKey === "cat" ? "我" : "Ta",
+      displayName: payload.partnerKey === "cat" ? "猫猫" : "鱼鱼",
     };
   } catch {
     return null;

@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppInput } from "@/components/ui/AppInput";
+import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { saveSleep } from "@/lib/life/life-client";
 import type { LifeDayRecord, LifePartnerKey, SleepRecord } from "@/lib/life/life-service";
-import { SELF_KEY, TA_KEY, buildSleepTimestamps, durationText, formatTime, timeInputValue } from "./today-life-model";
+import { buildSleepTimestamps, durationText, formatTime, timeInputValue } from "./today-life-model";
 
 export function TodaySleepCard({
   date,
@@ -18,6 +19,7 @@ export function TodaySleepCard({
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
 }) {
+  const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const sleepByRole = useMemo(() => {
@@ -26,18 +28,17 @@ export function TodaySleepCard({
     return map;
   }, [day.sleeps]);
 
-  async function savePair() {
+  async function saveMine() {
+    if (!mePartnerKey) return;
     const form = document.getElementById("life-sleep-form") as HTMLFormElement | null;
     if (!form) return;
     const data = new FormData(form);
+    const sleepAt = String(data.get("self-sleep") ?? "");
+    const wakeAt = String(data.get("self-wake") ?? "");
+    if (!sleepAt || !wakeAt) return;
     setSaving(true);
     try {
-      for (const [partnerKey, prefix] of [[SELF_KEY, "self"], [TA_KEY, "ta"]] as const) {
-        const sleepAt = String(data.get(`${prefix}-sleep`) ?? "");
-        const wakeAt = String(data.get(`${prefix}-wake`) ?? "");
-        if (!sleepAt || !wakeAt) continue;
-        await saveSleep({ partnerKey, sleepDate: date, ...buildSleepTimestamps(date, sleepAt, wakeAt) });
-      }
+      await saveSleep({ partnerKey: mePartnerKey, sleepDate: date, ...buildSleepTimestamps(date, sleepAt, wakeAt) });
       setEditing(false);
       await onChanged();
     } catch (cause) {
@@ -47,28 +48,31 @@ export function TodaySleepCard({
     }
   }
 
+  if (!mePartnerKey || !taPartnerKey) {
+    return <section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section>;
+  }
+
   return (
     <section className="life-surface life-section-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-extrabold text-[var(--life-text)]">🌙 睡眠</p>
-          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">只记录入睡和起床时间。</p>
+          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">我可以记录自己的睡眠，Ta 的记录由 Ta 登录后填写。</p>
         </div>
         <AppButton variant="ghost" onClick={() => setEditing((value) => !value)}>
-          {editing ? "收起" : day.sleeps.length ? "修改" : "+ 记录"}
+          {editing ? "收起" : sleepByRole.has(mePartnerKey) ? "修改" : "+ 记录"}
         </AppButton>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <SleepBubble label="我" record={sleepByRole.get(SELF_KEY)} tone="var(--life-blue)" />
-        <SleepBubble label="Ta" record={sleepByRole.get(TA_KEY)} tone="var(--life-teal)" />
+        <SleepBubble label="我" record={sleepByRole.get(mePartnerKey)} tone="var(--life-blue)" />
+        <SleepBubble label="Ta" record={sleepByRole.get(taPartnerKey)} tone="var(--life-teal)" />
       </div>
 
       {editing ? (
         <form id="life-sleep-form" className="mt-4 grid gap-3 border-t border-[var(--life-border-soft)] pt-4" onSubmit={(event) => event.preventDefault()}>
-          <SleepEditor label="我" prefix="self" record={sleepByRole.get(SELF_KEY)} />
-          <SleepEditor label="Ta" prefix="ta" record={sleepByRole.get(TA_KEY)} />
-          <AppButton variant="primary" disabled={saving} onClick={() => void savePair()}>{saving ? "保存中…" : "保存睡眠"}</AppButton>
+          <SleepEditor label="我" prefix="self" record={sleepByRole.get(mePartnerKey)} />
+          <AppButton variant="primary" disabled={saving} onClick={() => void saveMine()}>{saving ? "保存中…" : "保存睡眠"}</AppButton>
         </form>
       ) : null}
     </section>
