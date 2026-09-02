@@ -4,317 +4,246 @@
 
 「🐟和🐱变美变瘦大作战」是一个两个人共同使用的轻量健康习惯养成工具。
 
-产品把两类需求放在一起，但不混成一个数据模型：
+产品同时包含两条线：
 
-1. **游戏化坚持**：每天记录游戏 `deficit`、运动和体重快照，获得金币/宝石，查看成长地图并兑换奖励。
-2. **真实健康记录**：记录实际饮食，并逐步加入真实体重趋势和每日总览。
+1. **游戏化坚持**：记录游戏 `deficit`、运动和体重快照，获得金币/宝石，查看成长地图并兑换奖励。
+2. **真实健康记录**：记录实际饮食，并逐步加入真实体重趋势和完整每日总览。
 
-它不是营养计算器自动控制游戏结果的系统。真实摄入与游戏 deficit 保持独立。
+两条线可以在“同一天”一起看，但不能混成同一个数据字段。
 
 ## 2. 两个固定角色
-
-当前空间固定使用：
 
 - `fish`：鱼鱼
 - `cat`：猫猫
 
-这是业务角色，不是账号权限。当前没有完整的“两个独立登录用户”系统。
-
-ChatGPT 饮食聊天当前约定：
+当前 ChatGPT 饮食聊天约定：
 
 ```text
 用户自己的饮食聊天 -> cat（猫猫）
 鱼鱼的饮食聊天     -> fish（鱼鱼）
 ```
 
-如果聊天上下文无法可靠判断角色，不允许猜测后写入；用户在当前对话中明确说明角色时，以当前明确说明为最高优先级。
+上下文不明确时不得猜角色后写入；用户明确说明角色时，以当前明确说明优先。
 
 ## 3. 当前页面
 
-主界面由四个底部 Tab 组成：
+主导航固定为：
+
+```text
+今日 / 地图 / 兑换 / 小窝
+```
 
 ### 今日 `#today`
 
-- 今日成长资源概览
-- 当日游戏记录入口
-- 双方体重快照 / deficit / 运动录入
-- 游戏结算预览和确认
-- **饮食小记**：按日期和角色查看实际饮食、当天总摄入、餐食热量区间和食物明细
-- 手动新增 / 编辑 / 删除餐食
+当前包含：
 
-饮食功能继续使用原有 notice-board 场景，不新增第五个底部 Tab。
+- 今日成长资源概览；
+- 双方游戏体重快照 / deficit / 运动录入；
+- 游戏结算预览和保存；
+- 「饮食小记」：按日期和角色查看实际饮食；
+- 手动新增 / 编辑 / 删除餐食；
+- **“当天合在一起看”**：同一角色同一天展示实际摄入、游戏热量缺口、运动和体重快照。
 
-ChatGPT 明确“记上”后的餐食会写入同一套 Supabase meal facts，因此下一次 Web 查询能直接看到，不需要再手动复制一次。
-
-当前下一步会按 `partnerKey + date` 把同一天的餐食总摄入/明细与当天游戏 `deficit / exercise / weight snapshot` 关联展示。**关联展示不等于自动修改**：缺哪一侧就显示“未记录”，不能为了页面完整自动伪造或覆盖另一域。
+饮食功能仍属于原有 notice-board，不新增第五个主 Tab。
 
 ### 地图 `#map`
 
-- 双人月度热力图
-- 月份切换
-- 周六到周五完整周展示
-- 跨月真实记录继续显示但弱化
+- 双人月度成长热力图；
+- 周六到周五完整周；
+- 跨月真实记录可见但弱化。
 
-### 商店 `#shop`
+### 兑换 `#shop`
 
-- 奖励分类
-- 使用金币或宝石兑换
-- 兑换记录
-- 分类与历史记录维护
+- 奖励分类；
+- 金币 / 宝石兑换；
+- 兑换历史维护。
 
 ### 小窝 `#nest`
 
-子页面：
+- 最近记录；
+- 规则说明；
+- 数据管理；
+- 成长日志。
 
-- 首页 / 最近记录
-- 规则说明
-- 数据管理
-- 成长日志
-
-数据管理包含：
-
-- 云端状态
-- 新设备连接云端并下载
-- 从云端重新加载
-- 同步到云端
-- JSON 完整备份 / 恢复
-- 每周复盘 CSV 导出
-
-## 4. 当前核心用户流程
+## 4. 核心用户流程
 
 ### 4.1 每日游戏打卡
 
 ```text
 打开今日页
--> 输入鱼鱼/猫猫当天游戏数据
+-> 输入鱼鱼 / 猫猫游戏数据
 -> 前端规则层生成奖励预览
 -> 确认保存
--> 写入本地 AppDataStore
--> 派生钱包/周统计/热力图
--> 标记为“有未同步修改”
--> 之后同步到 Supabase
+-> AppDataStore / localStorage
+-> 派生钱包、周统计、热力图
+-> 后续同步到 Supabase
 ```
 
-目前游戏最终结算仍由前端 `lib/home` service/rules 完成；云端保存会规范化快照，但**还没有服务端独立重新计算整套游戏奖励**。这是后续安全强化项。
+当前游戏最终结算仍由前端 `lib/home` service/rules 完成，服务端尚未独立重算整套奖励。
 
 ### 4.2 手动记录饮食
 
 ```text
-打开今日页「饮食小记」
--> 选择日期和鱼鱼/猫猫
--> 查看当天餐食
--> “记一餐”
--> 选择早餐/午餐/晚餐/加餐/其他
--> 填写一个或多个食物、份量、估算 kcal，可选上下限
--> 保存
--> Next.js meal API
+今日 -> 饮食小记
+-> 选日期 / 角色
+-> 记一餐
+-> 填餐型、食物、份量、kcal、可选上下限
+-> Next.js Meal API
 -> Supabase meals + meal_items
 ```
 
-这条流程不经过游戏 `HomeResourcesState`，也不会因为新增一餐就改 `deficit`、金币、宝石或热力图。
-
-已有餐食可以：
-
-- 展开查看食物明细；
-- 编辑完整 meal payload；
-- 软删除。
-
-如果没有有效 cloud session，饮食区域会提示先去“小窝 → 数据管理”连接云端，而不是绕过鉴权直连数据库。
+新增一餐不会自动修改 `deficit`、金币、宝石或 heatmap。
 
 ### 4.3 ChatGPT “记上”
 
 ```text
 发食物图片 / 描述
 -> ChatGPT 估算
--> 用户补充或修正
--> 仍然不写数据库
--> 用户明确“记上”或等价保存意图
--> 生成一次 chatgpt: 幂等键
--> 调用 service-only create_chatgpt_meal_record
--> 写现有 meals + meal_items
--> 使用同 key 读回确认
+-> 用户修正
+-> 仍不写数据库
+-> 用户明确“记上”
+-> create_chatgpt_meal_record
+-> meals + meal_items
+-> get_chatgpt_meal_record 读回确认
 -> 成功后回复“已记上”
 ```
 
-关键产品行为：
+规则：
 
-- 没有明确确认时绝不保存；
-- 一次确认只有一个 idempotency key；
-- 工具调用结果不确定时先按同 key 查询，不换 key 盲目重试；
-- 保存时强制 `source=chatgpt`、`status=confirmed`；
-- 至少保存一个实际食物 item，而不是只存一个总 kcal 数字；
-- ChatGPT 餐食和 Web 手动餐食最终都进入同一个 meal domain；
-- 保存餐食不自动修改游戏 deficit、运动、体重、钱包或热力图。
+- 未明确确认不写；
+- 一次确认一个 `chatgpt:` 幂等键；
+- 同 key 重试，不换 key 盲写；
+- `source=chatgpt`、`status=confirmed`；
+- 至少一个食物 item；
+- 不自动改游戏 deficit / 运动 / 体重 / 钱包 / heatmap。
 
-如果一餐已经成功写入，之后用户只是补充“其实米饭更少”之类的事实，不自动覆盖数据库。需要明确表达修改意图；P2 首版 ChatGPT 自动入口负责新增，已保存餐食可以直接从 Web UI 编辑/删除。
+### 4.4 同日关联（P2.5 已上线）
 
-### 4.4 历史补录 / 编辑游戏记录
-
-```text
-成长日志
--> 选日期
--> 补录或编辑原始输入
--> service 重建该日结果
--> 重算相关派生状态
--> 保存本地并待云端同步
-```
-
-### 4.5 兑换
-
-```text
-商店选奖励
--> 检查当前资源余额
--> 建立 ExchangeRecord 快照
--> 重算钱包
--> 本地保存
--> 待云端同步
-```
-
-历史兑换记录保存当时的名称、价格、资源类型和图标，不依赖之后修改过的分类。
-
-### 4.6 新设备首次使用
-
-```text
-打开数据管理
--> 输入同步密码
--> “连接云端并下载数据”
--> 服务端验证密码并建立 HttpOnly cloud session
--> 下载 Supabase 当前游戏快照
--> 写入本机缓存
-```
-
-首次设备不能直接把空本地快照覆盖到云端。
-
-## 5. 四个健康数据域
-
-### 5.1 饮食摄入 Intake
-
-表示实际吃了什么。
-
-字段示例：
-
-- 餐型
-- 吃饭时间
-- 食物名称 / 份量 / 估重
-- kcal 估计值和上下限
-- 可选蛋白质、碳水、脂肪
-
-真相源：`meals / meal_items`。
-
-当前 Web UI 和 ChatGPT 明确确认后的写入都使用这套数据。
-
-### 5.2 游戏 deficit
-
-`deficit` 是已有游戏打卡字段，直接参与当前奖励和热力图规则。
-
-它**不是** `meals.total_calories_kcal`，也不会因为记录一餐就自动变化。
-
-### 5.3 体重 Weight
-
-- `weight_measurements`：真实时间序列，未来趋势图使用它。
-- `daily_record_sides.weight_kg`：游戏某日记录中的快照。
-
-### 5.4 运动 Exercise
-
-当前按每日记录中的运动分钟参与游戏规则。
-
-### 5.5 同日关联
-
-四个域在数据含义上继续独立，但产品展示应按：
+饮食和游戏记录继续是不同事实域，但现在产品层按：
 
 ```text
 partnerKey + date
 ```
 
-关联为同一天。这样可以同时看到某天三餐总摄入/明细和当天已有的 deficit、运动、体重快照，而不会混淆字段含义。
+放在一起展示。
 
-## 6. 饮食功能当前状态
+页面会同时给出：
 
-### 已完成
+- 当天餐数；
+- 当天总摄入 kcal；
+- 所有餐都有区间时，显示当天总摄入区间；
+- 游戏热量缺口；
+- 当天运动分钟；
+- 游戏体重快照。
 
-后端、Web 首版和 ChatGPT P2 已支持：
+缺失行为：
 
-- breakfast / lunch / dinner / snack / other
-- snack 时段
-- eaten_at
-- 整餐和单品 kcal 估计 / 上下限
-- optional macros 的读取展示
-- source = manual / chatgpt / import
-- idempotency key
-- CRUD + 软删除
-- 按日期 + fish/cat 查询
-- 当天餐数和 kcal 合计
-- food items 展开查看
-- Web 手动新增 / 编辑 / 删除
-- loading / empty / unauthorized / API error 状态
-- ChatGPT 明确保存确认后写入
-- ChatGPT `chatgpt:` 幂等重试
-- ChatGPT 写后按 key 读回确认
-- ChatGPT RPC service-role only
+- 有 meals、无 daily record → “当天游戏记录未填写”；
+- 有 daily record、无 meals → 实际摄入显示“未记录”；
+- Meal API 失败 → 显示“暂未加载”，不误显示 0 kcal。
 
-### 当前下一步
+这只是**关联展示**，不会自动让 intake 与 deficit 相互覆盖。
 
-- 按 `partnerKey + date` 把餐食汇总/明细与同日 daily record 关联展示；
-- 明确缺失状态，不自动伪造或补写 deficit；
-- 保持现有动森感 UI 和四 Tab 主导航。
+### 4.5 历史游戏记录
 
-### 后续可扩展
+```text
+成长日志
+-> 选日期
+-> 补录 / 编辑原始输入
+-> service 重建该日结果
+-> 重算派生状态
+-> 保存并同步
+```
 
-- 更完整的 canonical food / alias 使用体验；
-- ChatGPT 对已保存餐食的专用受限更新/删除 RPC；
-- 体重趋势；
-- 完整统一每日总览。
+### 4.6 新设备首次使用
 
-### ChatGPT 交互约定
+```text
+小窝 -> 数据管理
+-> 输入同步密码
+-> 建立 HttpOnly cloud session
+-> 先下载 Supabase 当前游戏快照
+-> 再允许后续写回
+```
 
-估算、讨论、纠正都不产生数据库写入。
+首次设备不能直接用空本地状态覆盖云端。
 
-只有用户明确确认 **“记上”** 或等价保存意图后才持久化，且只写饮食域，不直接影响游戏 deficit / 钱包 / 热力图。
+## 5. 四个健康数据域
 
-当前没有第二套“AI 饮食记录”，ChatGPT 写入和 Web UI 读取的是同一套 `meals / meal_items`。
+### Intake
 
-## 7. 饮食 UI 视觉边界
+真相源：`meals / meal_items`。
 
-当前饮食 UI 是现有“今日公告板”的扩展：
+记录实际吃了什么、份量、估算 kcal、上下限、可选 macros。
+
+### Deficit
+
+真相源：`daily_record_sides.deficit_kcal` / `DailyRecordSide.deficit`。
+
+它是现有游戏字段，不等于 meals 总摄入。
+
+### Weight
+
+- `weight_measurements`：真实体重趋势真相源；
+- `daily_record_sides.weight_kg`：游戏某日快照。
+
+### Exercise
+
+当前以 `daily_record_sides.exercise_minutes` 参与游戏规则。
+
+核心关系：
+
+```text
+intake ≠ deficit ≠ weight ≠ exercise
+```
+
+展示时按 `partnerKey + date` 关联。
+
+## 6. 饮食功能状态
+
+已支持：
+
+- breakfast / lunch / dinner / snack / other；
+- snack 时段；
+- eaten_at；
+- 单餐和单品 kcal / 上下限；
+- optional macros 展示；
+- source = manual / chatgpt / import；
+- idempotency key；
+- CRUD + 软删除；
+- 日期 + fish/cat 查询；
+- 当天餐数和 kcal 合计；
+- 食物明细展开；
+- Web 手动新增 / 编辑 / 删除；
+- ChatGPT 明确确认后写入；
+- ChatGPT 幂等重试和读回确认；
+- 同日游戏快照关联展示。
+
+下一阶段是 **P3 体重趋势**。
+
+## 7. UI 视觉边界
+
+饮食和同日关联都继续位于：
 
 ```text
 notice-board
 └─ AppSectionPanel「饮食小记」
-   ├─ 日期 / 角色切换
-   ├─ AppCard 餐食列表
-   └─ AppModal 新增 / 编辑 / 删除确认
+   ├─ 日期 / 角色
+   ├─ 当天合在一起看 AppCard
+   ├─ 餐食列表 AppCard
+   └─ AppModal 新增 / 编辑 / 删除
 ```
 
-它复用 `AppButton / AppCard / AppInput / AppModal / AppRoleAvatar` 和 animal-island-ui `Title`，不建立第二套视觉 primitive。
+继续复用 `AppButton / AppCard / AppInput / AppModal / AppRoleAvatar` 和 animal-island-ui `Title`，不建立第二套视觉 primitive。
 
-P2 没有新增独立 UI，因此没有改变现有动森感布局或四 Tab 主导航。
+## 8. 当前产品边界
 
-## 8. 备份与复盘
+目前仍没有：
 
-### 完整备份 JSON
-
-- 当前格式仍兼容 `schemaVersion: 1`。
-- 覆盖导入，不做自动 merge。
-- 导入失败不得提交部分 state。
-- currency semantics migration 用于兼容旧历史语义。
-- 当前这套 JSON 主要是游戏兼容快照；Supabase 中新增的规范化营养/体重数据不应被误解成完全包含在旧 snapshot 里。
-
-### 每周复盘 CSV
-
-- 只导出，不导入。
-- 按 `recordDate` 升序。
-- 业务周为周六到周五。
-
-## 9. 当前产品边界
-
-目前没有：
-
-- 完整用户账号 / 邀请 / CoupleSpace membership UI；
+- 完整用户账号 / membership；
 - 实时协同编辑；
 - 自动冲突合并；
-- 服务端重新计算所有游戏奖励；
-- ChatGPT 自动保存未确认的饮食；
-- ChatGPT 专用已保存餐食更新/删除入口；
+- 服务端独立重算所有游戏奖励；
+- ChatGPT 自动保存未确认饮食；
+- ChatGPT 专用已保存餐食更新 / 删除 RPC；
+- 真实体重趋势 UI；
 - 医疗或营养诊断功能。
-
-当前共享同步密码和 ChatGPT 连接能力都不应当成成熟的多用户身份系统。
