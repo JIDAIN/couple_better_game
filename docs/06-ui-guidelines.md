@@ -1,229 +1,169 @@
 # UI 与 animal-island-ui 维护规范
 
-## 1. 当前视觉定位
+## 1. 视觉规范优先级
 
-项目使用轻松的“动物岛 / 手账 / Nook 商店”视觉语言。
-
-当前依赖：
+V2 生活系统的唯一主视觉规范：
 
 ```text
-animal-island-ui ^1.0.1
+docs/12-island-life-design-system.md
 ```
 
-`app/layout.tsx` 全局引入：
+任何 V2 首页、饮食、日历、小窝、体重、小信箱、家庭药箱、游戏机或未来页面，必须先遵守该文档。
+
+`animal-island-ui` 仍是基础组件来源，但不是完整设计语言。组件不足时允许项目自己设计，只能通过统一 token / App* / Pattern 实现。
+
+## 2. V2 token
+
+V2 视觉 token 位于：
 
 ```text
-animal-island-ui/style
+app/island-life-tokens.css
 ```
 
-UI 全量迁移已经完成；当前工作是**维护和扩展**，不是继续执行历史 migration phase。
+统一使用 `--life-*`：
 
-## 2. UI 层级
+- 暖白 / 奶油白背景；
+- 薄荷 / 青绿主识别；
+- 柔黄 / 珊瑚 / 浅蓝辅助；
+- 深灰绿文字；
+- 统一圆角、阴影、间距和动效。
 
-### 官方库
+禁止在 V2 业务页面重新发明大面积棕色、页面专属色板、第二套阴影系统。
 
-提供基础视觉 primitive，如 Button / Card / Input / Modal / Icon / Title / Switch 等。
+Legacy Game 继续使用现有旧 token，V2 不要求顺手重做 `/game`。
 
-### `components/ui/App*`
-
-项目 adapter/wrapper，统一业务页面的常用交互与视觉语义。
-
-当前代表性组件：
+## 3. UI 分层
 
 ```text
-AppButton
-AppButtonLink
-AppCard
-AppDialog / AppModal
-AppInput
-AppTextarea
-AppSelect
-AppIcon / AppGameIcon
-AppProgressBar
-AppCurrencyChip
-AppRoleAvatar
-AppScene*
-AppBottomNavItem
-AppHeatmapMarker
+第三方 primitive / headless
+        ↓
+components/ui/App*
+        ↓
+跨域 Pattern
+        ↓
+components/life / nutrition / weight / medicine / games
 ```
 
-### 业务 UI
+当前已实现的 V2 Pattern：
 
 ```text
-components/home/*       游戏 UI
-components/nutrition/*  饮食 UI
+AppPageShell
+AppRoleSwitch
+AppRecordRow
+AppFeatureTile
+AppNutritionBar
 ```
 
-业务层优先组合 wrapper，不要在这里重新造一整套 primitive。
+业务页面优先组装这些 Pattern，禁止为了快在 JSX 中重新造同类样式。
 
-## 3. 使用优先级
+## 4. 双人切换
 
-新增可见 UI 时：
+V2 事实页统一：
 
 ```text
-已有 App* wrapper
--> 当前安装版本 animal-island-ui 官方组件
--> 确实无法承载时的项目 fallback
+我 / Ta
 ```
 
-不要因为“裸 div/CSS 更快”就绕过已有 wrapper。
+饮食、体重等单人查看页面使用 `AppRoleSwitch`。默认不做双人左右对照。
 
-当前代码确实还有少量直接使用官方 `Title` / `Switch` 等组件，这是允许的：前提是没有合适 wrapper，并且使用的是当前安装版本真实 API。
+## 5. 首页
 
-## 4. 不臆造 API
-
-实现前优先查看当前本地安装版本的：
+正式首页只允许：
 
 ```text
-node_modules/animal-island-ui/AI_USAGE.md
-node_modules/animal-island-ui/dist/types/index.d.ts
+心情
+睡眠
+活动
 ```
 
-本地安装版本高于旧 Git 历史中的 UI 设计说明。
+且三项都要有记录/编辑入口。
 
-禁止：
+- 心情继续用彩色情绪圆脸，不能替换成人物头像；
+- 睡眠只记入睡与起床；
+- 活动统一承载学习/运动/散步/游玩；
+- 饮食、体重、小信箱、药箱不放回首页；
+- 不使用金币/宝石/排名/streak 等 Legacy Game 语义。
 
-- 猜不存在的 props；
-- 把项目 wrapper variant 直接透传为官方 type；
-- 依赖未经确认的 `--animal-*` CSS variable。
+## 6. 饮食
 
-## 5. CSS 职责
+独立饮食页：
 
-项目 CSS 主要负责：
+- 顶部 `我 / Ta`；
+- 一次只看一人；
+- 早餐 / 午餐 / 晚餐 / 加餐；
+- 左侧真实照片；
+- 右侧碳水 / 蛋白质 / 脂肪 / 总热量；
+- 每餐编辑按钮；
+- 底部当日宏量营养 + 总热量；
+- 编辑进入「编辑一餐」子页面。
 
-- 页面布局
-- spacing / alignment
-- safe-area
-- responsive / mobile
-- 业务专有可视化（如热力图）
-- wrapper 必要 adapter
+必须复用现有 Meal CRUD / `DailyMealsPanelCore` 的数据逻辑，不重建第二套餐食体系。
 
-不应再创建第二套 Button/Card/Input/Modal 的完整视觉系统。
+## 7. 日历
 
-如果官方组件无法承载，需要 fallback：
+- 标准七列月历；
+- 同日显示双人心情圆脸；
+- 点击日期进入日历详情；
+- 详情回顾心情、睡眠、活动、饮食概览；
+- 不做打卡绩效。
 
-1. 明确写出原因；
-2. 视觉尽量从官方组件 / 官方设计值继承；
-3. 封装成复用的 `App*`，不要散落在业务 JSX。
+## 8. 小窝
 
-## 6. 场景映射
-
-当前页面语义：
-
-| 页面 | 场景 |
-|---|---|
-| 今日 | notice-board / 岛屿公告板 |
-| 地图 | growth-map / 成长地图 |
-| 商店 | shop / 小商店 |
-| 小窝 | nook-phone |
-| 成长日志 | notebook |
-| 数据管理 | toolbox |
-| 规则 | rules-board |
-
-场景是视觉组织方式，不改变业务组件边界。
-
-### 主导航稳定性
-
-当前主导航固定为四个 Tab：
+固定入口：
 
 ```text
-今日 / 地图 / 兑换 / 小窝
+体重 / 小信箱 / 家庭药箱 / 游戏机
 ```
 
-一般业务扩展应先判断能否自然落入现有场景，不要为一个新模块立即增加新的底部 Tab。
+### 体重
+`我 / Ta` + 当前值 + 周/月/年趋势 + 折线图 + 最近记录。
 
-只有明确的产品级信息架构改版，才重新评估主导航。
+### 小信箱
+信纸卡片；收到的 / 我写的；列表主体不用头像。
 
-## 7. 当前饮食 UI 约定
+### 家庭药箱
+搜索 / 筛选 / 药名 / 规格 / 数量 / 保质期 / 存放位置；高密度信息必须克制。
 
-饮食 UI 和 P2.5 同日关联都落在现有 `#today` notice-board，不新造“营养中心”页面：
+### 游戏机
+只做游戏列表。本轮当前游戏为宝石金币游戏并链接现有 `/game`；未来可扩展更多游戏，不开发新的旧游戏详情页。
+
+## 9. 开源复用
+
+新增 UI 优先级：
 
 ```text
-今日 notice-board
-└─ AppSectionPanel「饮食小记」
-   ├─ 日期
-   ├─ fish / cat 角色切换
-   ├─ 当天餐数 / kcal
-   ├─ AppCard「当天合在一起看」
-   │  ├─ 实际摄入
-   │  ├─ 游戏热量缺口
-   │  ├─ 运动分钟
-   │  └─ 游戏体重快照
-   ├─ AppCard 餐食记录
-   └─ AppModal 新增 / 编辑 / 删除确认
+已有 App*
+-> animal-island-ui 已验证组件
+-> 同风格、许可允许的成熟 GitHub Pattern
+-> 成熟 headless 交互
+-> 项目原创
 ```
 
-实现继续使用：
+异风格项目只借状态/逻辑/结构。颜色、圆角、阴影、Button、Card、Input 必须重新归一。
 
-```text
-AppSectionPanel
-AppCard
-AppButton
-AppInput
-AppTextarea
-AppModal
-AppRoleAvatar
-animal-island-ui Title
-```
+## 10. `/ui-lab`
 
-### “当天合在一起看”视觉规则
+`/ui-lab` 是 V2 视觉回归页：
 
-- 仍然是普通 `AppCard variant="soft"`，不是新页面或新视觉 primitive；
-- 左侧实际摄入、右侧游戏热量缺口并列，强调“同一天”而不是“同一字段”；
-- 文案必须出现“游戏热量缺口”或等价明确词，避免让用户误以为它由 meals 自动计算；
-- meals 未记录、Meal API 未加载、daily record 未填写必须是三个可区分状态；
-- 运动和体重快照作为次级信息，不抢过饮食明细本身；
-- P2.5 不引入新底部导航、不改 notice-board 场景。
+- 只用假数据；
+- 不读写 Supabase；
+- 不调用真实 Life API；
+- 不触发 Legacy Game settlement；
+- 新 Pattern 先在此校验，再进入业务页面。
 
-### 饮食 UI 不允许做的事
+## 11. 移动端和数据可读性
 
-- 为饮食单独创造一套与当前项目不同的色板、卡片、按钮、弹窗；
-- 因为“营养功能很多”就擅自添加第五个底部 Tab；
-- 用真实摄入的视觉文案暗示它会自动修改游戏 deficit；
-- 把 ChatGPT 来源记录做成另一套 UI / 数据结构；
-- 为了让“当天合在一起看”看起来完整而伪造缺失的 daily record。
-
-如果未来饮食功能明显超过今日公告板可承载范围，应先更新产品信息架构文档，再做页面迁移，而不是边开发边改导航。
-
-## 8. 移动端优先
-
-主要使用环境是手机浏览器，因此新增 UI 需要重点检查：
-
-- 触控目标尺寸；
-- safe-area；
-- 底部导航不遮挡内容；
-- Modal / sheet 在窄屏可滚动；
+- 触控目标清楚；
+- safe-area 不遮挡；
 - 长中文不溢出；
-- 数字列 tabular / 不抖动；
-- loading / disabled / error 有可见状态。
+- 数字使用稳定对齐；
+- loading / empty / error 可见；
+- 图表/药箱等高密度页面减少插画；
+- 可爱不能降低扫描效率。
 
-饮食首版和 P2.5 使用窄屏两列 summary、可滚动 AppModal、tabular kcal 和 loading/empty/error 状态；后续修改不能破坏这些基础可用性。
+## 12. 验证
 
-## 9. 热力图日期视觉
-
-成长地图：
-
-- 按自然月浏览；
-- 行为周六到周五；
-- 首尾行显示完整自然周；
-- 跨月日期仍读取真实 `recordDate`，但视觉弱化；
-- 不显示左侧“第 N 周”标签；
-- 改热力图布局不能顺手改变金币/宝石业务周规则。
-
-## 10. 资源 UI
-
-当前 currency semantics v2 下：
-
-- coin = 每日打卡主要资源；
-- gem = 周期规则奖励资源。
-
-业务 UI 必须通过语义明确的 label / icon 展示。由于底层仍有 legacy 字段名，页面不要直接用变量英文名当中文文案。
-
-饮食 kcal 不是 coin/gem，也不能复用资源奖励语义做展示。
-
-## 11. 视觉变更验证
-
-代码层最低要求：
+可见 UI 最低：
 
 ```text
 npm run test
@@ -231,32 +171,4 @@ npm run lint
 npm run build
 ```
 
-但这三项只能说明代码层通过，**不能代替真实视觉检查**。
-
-涉及布局、Modal、移动端可用性的改动，在条件允许时还应人工检查：
-
-- 常用手机窄屏；
-- 长食物名 / 长备注；
-- 多个 food items；
-- “当天合在一起看”的两列布局；
-- loading / empty / error；
-- 弹窗滚动与底部按钮；
-- 底部导航遮挡。
-
-未进行真实设备/浏览器视觉检查时，不要在文档或完成说明中写“视觉已验证”。
-
-## 12. 维护原则
-
-旧的：
-
-```text
-ui-migration-audit
-ui-migration-report
-ui-rollback-guide
-ui-wrapper-migration-plan
-animal-island-ui-full-migration Skill
-```
-
-都属于一次性迁移历史，不再作为当前维护流程。
-
-大型视觉改版如果未来再次发生，应新开短期 issue/PR checklist；稳定结论最终回写本文件，而不是永久新增一套迁移文档。
+并在 Vercel Preview 人工检查窄屏、长内容、交互状态和统一性。未做真实视觉检查时，不写“视觉已验证”。

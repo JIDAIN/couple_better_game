@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cursor } from "animal-island-ui";
 import "animal-island-ui/style";
 import "./globals.css";
+import "./island-life-tokens.css";
 
 export const metadata: Metadata = {
   applicationName: "🐟和🐱变美变瘦大作战",
