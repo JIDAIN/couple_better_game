@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isAuthorizedCloudRequest } from "./cloud-request-auth";
+import type { LifePartnerKey } from "@/lib/life/life-service";
+import { resolveFixedLifeIdentity } from "./fixed-life-auth";
 import { LifeCloudError } from "./supabase-life";
 import { hasCloudSyncConfig } from "./supabase-home-sync";
 
@@ -19,14 +20,25 @@ export function lifeCloudErrorResponse(error: LifeCloudError) {
 
 export async function authorizeLifeRequest(request: Request) {
   if (!hasCloudSyncConfig()) {
-    return lifeJsonError(
-      "Supabase 服务端环境变量未配置完整",
-      500,
-      "SERVER_CONFIG",
-    );
+    return lifeJsonError("Supabase 服务端环境变量未配置完整", 500, "SERVER_CONFIG");
   }
-  if (!(await isAuthorizedCloudRequest(request))) {
-    return lifeJsonError("同步密码不正确或云端会话无效", 401, "UNAUTHORIZED");
+  if (!resolveFixedLifeIdentity(request)) {
+    return lifeJsonError("请先选择自己的账号并登录", 401, "UNAUTHORIZED");
+  }
+  return null;
+}
+
+export async function authorizePersonalPartnerWrite(
+  request: Request,
+  requestedPartnerKey: LifePartnerKey,
+) {
+  if (!hasCloudSyncConfig()) {
+    return lifeJsonError("Supabase 服务端环境变量未配置完整", 500, "SERVER_CONFIG");
+  }
+  const identity = resolveFixedLifeIdentity(request);
+  if (!identity) return lifeJsonError("请先登录", 401, "UNAUTHORIZED");
+  if (identity.partnerKey !== requestedPartnerKey) {
+    return lifeJsonError("只能修改自己的个人记录", 403, "OWN_RECORD_ONLY");
   }
   return null;
 }

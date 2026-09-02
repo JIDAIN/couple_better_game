@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { parseMoodWritePayload } from "../../../../lib/life/life-service";
 import {
-  authorizeLifeRequest,
+  authorizePersonalPartnerWrite,
   LIFE_NO_STORE_HEADERS,
   lifeCloudErrorResponse,
   lifeJsonError,
@@ -13,9 +13,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PUT(request: Request) {
-  const authError = await authorizeLifeRequest(request);
-  if (authError) return authError;
-
   const body = await readJsonBody(request);
   if (!body.ok) return body.response;
 
@@ -27,6 +24,9 @@ export async function PUT(request: Request) {
   if (!parsed.ok) {
     return lifeJsonError(parsed.reason, 400, "INVALID_MOOD");
   }
+
+  const authError = await authorizePersonalPartnerWrite(request, parsed.value.partnerKey);
+  if (authError) return authError;
 
   try {
     const mood = await upsertMood(parsed.value);

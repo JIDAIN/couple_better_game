@@ -12,85 +12,87 @@
 
 ## R1：账户与导航基础
 
-目标：建立真正的用户身份与双人空间权限边界，并消除当前 Tab 重复导航造成的“刷新感”。
+### R1A ✅ 已完成
 
-### R1A（本提交）
+- 当前底部 Tab 再次点击自身不再触发同路由导航。
+- 曾为通用 Auth 方案加入 profile/membership 基础；R1B 产品复核后确认本项目只有两位固定使用者，因此这些未使用表已通过 cleanup migration 删除。
 
-- 新增 `life_user_profiles`。
-- 新增 `couple_space_members`，将 Supabase Auth 用户映射为某个双人空间中的 `cat` / `fish` 成员。
-- 每个双人空间最多一个 `cat` 和一个 `fish`。
-- 新用户创建时自动创建 profile。
-- 新增 `current_life_identity()` 和 `is_couple_space_member()`。
-- profile / membership 启用 RLS；membership 写入暂时仍保持 service-only，等待配对流程使用窄 RPC。
-- 现有生活业务表仍保持 server-only，不在本阶段开放浏览器直连。
-- 当前底部 Tab 不再渲染成可导航 Link；再次点击“今日”等当前 Tab 不触发同路由导航。
+### R1B ✅ 固定双账号方案
 
-### R1B
+最终采用：
 
-采用 Supabase 官方 Auth 客户端/SSR 方案，而不是自行实现 token 生命周期：
+```text
+我  -> cat
+Ta  -> fish
+```
 
-- 引入 Supabase 官方 JS/SSR 包。
-- 登录、注册、退出和 session refresh。
-- `/me` 改成真实账户页。
-- API 从共享 `DATA_EDIT_PASSWORD` 身份迁移到 Auth user + membership。
-- 旧 cloud-session 只作为迁移期兼容层，最终移除。
-- 建立双人配对/邀请窄 RPC。
+两个人继续共用旧程序同一个 `DATA_EDIT_PASSWORD`，不开放注册、不做邮箱验证、不做邀请码、不允许第三个账号。
 
-### R1C
+登录时选择“我 / Ta”并输入共享密码，服务端签发带 `partnerKey` 的 HMAC 签名 HttpOnly Cookie。业务 API 从该 Cookie 获取当前身份。
 
-采用成熟缓存库（优先 TanStack Query）：
+已完成：
 
-- LifeAppShell 持久 QueryClient。
-- 今日、饮食、日历、小窝资源使用稳定 query key。
-- mutation 后只更新/失效相关数据，不重新加载整页。
-- 页面切换优先显示缓存，后台 revalidate。
+- `/login` 固定双账号登录；
+- `/api/auth/login` / `session` / `logout`；
+- `/me` 改为真正的当前账号与同步页；
+- mood / sleep / weight 新增写入执行 `OWN_RECORD_ONLY`；
+- Supabase Auth 注册、bootstrap、邀请码、membership 流程全部撤销；
+- Production 中对应临时表当时均为空，cleanup migration 已安全删除；
+- 详细说明见 `docs/17-auth-and-pairing.md`。
+
+仍需继续收紧：
+
+- Meal 创建/修改/删除按当前登录身份限制；
+- 信箱发件人固定为当前登录身份；
+- 活动记录明确创建人/参与人语义；
+- 旧 game 同步继续保持独立稳定。
+
+### R1C 下一步：数据缓存与无闪烁切换
+
+优先采用 TanStack Query：
+
+- `LifeAppShell` 持久 QueryClient；
+- 今日、饮食、日历、小窝使用稳定 query key；
+- mutation 后只更新/失效相关数据；
+- 页面切换优先显示缓存，后台 revalidate；
+- 消除实机“点一下就整块重新 loading”的刷新感。
 
 ## R2：首页心情
 
-- 首页只展示两人的心情。
-- “记录/修改”只能写当前登录用户。
-- Ta 的心情只读。
-- 点击记录弹出独立情绪选择层，视觉参考已确认的毛绒情绪图布局。
-- 移除当前文字字符模拟的情绪图标。
+- 首页只展示双方心情；
+- “记录/修改”只能写当前登录账号；
+- 另一方只读；
+- 点击记录弹出独立毛绒情绪选择层；
+- 移除字符模拟情绪图标。
 
 ## R3：饮食餐次
 
-- 早餐/午餐/晚餐为固定槽，进入后不能改餐次。
-- 加餐为 0..N 条独立记录。
-- 点击“新增加餐”先选上午/下午/晚上，再进入统一编辑页。
-- 已有加餐以一条记录为单位编辑。
+- 早餐/午餐/晚餐为固定槽，进入后不能改餐次；
+- 加餐为 0..N；
+- 新增加餐先选上午/下午/晚上；
+- 已有加餐按具体记录编辑。
 
 ## R4：情绪日历
 
-- 重做为情绪直接散落在月历中的布局。
-- 无心情为空。
-- 今天使用单独的“小太阳”视觉状态。
-- 有心情时显示双方各自情绪图。
-- 日期排布与 mood mapping 优先复用已筛选成熟 MIT 项目的逻辑，视觉全部重新适配。
+- 情绪直接散落在月历中；
+- 无心情为空；
+- 今天使用小太阳特殊状态；
+- 有心情显示双方各自情绪图；
+- 日期排布优先复用成熟 MIT 项目逻辑，视觉统一重做。
 
 ## R5：小窝 / 我的职责重分
 
-- 小窝：两人共同拥有的生活内容（体重、信箱、药箱、游戏机）。
-- 我的：当前账户、另一半绑定、同步状态、数据管理、设置、退出登录。
-- 删除重复的产品说明式内容。
+- 小窝：两人共同拥有的内容（体重、信箱、药箱、游戏机）；
+- 我的：当前账号、同步状态、数据管理、设置、退出登录；
+- 删除重复产品说明。
 
 ## R6：全站视觉还原
 
-- 以已批准“岛屿生活视觉语言 V2 · 方案B”为验收基线。
-- 减少标准 SaaS 卡片堆叠感。
-- 场景页增加插画和空间构图；数据密集页保持克制。
-- 第三方库只复用逻辑/结构，必须通过统一视觉适配层。
+- 以“岛屿生活视觉语言 V2 · 方案B”为验收基线；
+- 减少标准 SaaS 卡片堆叠；
+- 场景页加强插画和空间构图；
+- 第三方库只复用逻辑/结构，统一通过视觉适配层。
 
 ## 部署约束
 
-仓库 `vercel.json` 必须默认保持：
-
-```json
-{
-  "git": {
-    "deploymentEnabled": false
-  }
-}
-```
-
-任何 Preview / Production 部署必须再次获得用户明确授权。
+`vercel.json` 默认保持 `git.deploymentEnabled: false`。任何 Preview / Production 部署必须再次获得用户明确授权。
