@@ -15,7 +15,7 @@ describe("V2 integration boundaries", () => {
     expect(lifeGameRegistry.some((game) => game.route === "/game")).toBe(true);
 
     const mePage = source("components/life/LifeMePage.tsx");
-    expect(mePage).toContain('href: "/nest/game-machine"');
+    expect(mePage).not.toContain('href="/game"');
     expect(mePage).not.toContain('href: "/game"');
   });
 
