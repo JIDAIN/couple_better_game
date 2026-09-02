@@ -4,7 +4,7 @@ import { AppPageShell } from "@/components/ui/AppPageShell";
 const shortcuts = [
   { href: "/nest", icon: "🏠", title: "小窝", note: "体重、信箱、药箱和游戏机" },
   { href: "/calendar", icon: "📅", title: "生活日历", note: "回看每天的心情与生活记录" },
-  { href: "/game", icon: "💎", title: "变美变瘦大作战", note: "进入原来的宝石金币游戏" },
+  { href: "/nest/game-machine", icon: "🎮", title: "游戏机", note: "从这里进入变美变瘦大作战和以后新增的小游戏" },
 ] as const;
 
 export function LifeMePage() {
@@ -48,7 +48,7 @@ export function LifeMePage() {
       </section>
 
       <section className="mt-3 rounded-[var(--life-radius-card)] bg-[var(--life-surface-warm)] px-4 py-3">
-        <p className="text-xs leading-5 text-[var(--life-text-body)]">生活系统和旧游戏是两层：生活层负责记录事实；旧游戏继续保留自己的金币、宝石、兑换和结算规则。</p>
+        <p className="text-xs leading-5 text-[var(--life-text-body)]">生活系统和旧游戏是两层：生活层负责记录事实；旧游戏只从「小窝 → 游戏机」进入，并继续保留自己的金币、宝石、兑换和结算规则。</p>
       </section>
     </AppPageShell>
   );
