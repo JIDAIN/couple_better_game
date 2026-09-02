@@ -4,7 +4,7 @@
 
 ## Rules
 
-1. Business screens prefer `App*` components over importing third-party visual components directly.
+1. Business screens prefer `App*` components over importing a third-party visual component directly.
 2. `animal-island-ui` may be upgraded or supplemented, but external visual APIs are normalized here first.
 3. External GitHub code with a different design language may contribute interaction/state/layout logic, not its color/shadow/button/card system.
 4. V2 business pages use the approved `--life-*` tokens from `app/island-life-tokens.css`; do not create per-page palettes.
@@ -21,7 +21,7 @@ AppFeatureTile     Nest / secondary feature entry
 AppNutritionBar    carbs / protein / fat / kcal summary bar
 ```
 
-These components are not allowed to invent game reward semantics in the Life recorder.
+These patterns are the V2-UI1 foundation. They are not allowed to invent game reward semantics in the Life recorder.
 
 ## Approved token source
 
