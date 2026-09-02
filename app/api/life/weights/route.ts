@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeLifeRequest, LIFE_NO_STORE_HEADERS, lifeJsonError, readJsonBody } from "../../../../lib/server/life-api";
+import { authorizeLifeRequest, authorizePersonalPartnerWrite, LIFE_NO_STORE_HEADERS, lifeJsonError, readJsonBody } from "../../../../lib/server/life-api";
 import { parseWeightPartner, parseWeightWritePayload } from "../../../../lib/life/weight-service";
 import { createWeight, listWeights, WeightCloudError } from "../../../../lib/server/supabase-weight";
 
@@ -25,12 +25,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = await authorizeLifeRequest(request);
-  if (auth) return auth;
   const body = await readJsonBody(request);
   if (!body.ok) return body.response;
   const parsed = parseWeightWritePayload(body.value);
   if (!parsed.ok) return lifeJsonError(parsed.reason, 400, "INVALID_WEIGHT");
+  const auth = await authorizePersonalPartnerWrite(request, parsed.value.partnerKey);
+  if (auth) return auth;
   try {
     const weight = await createWeight(parsed.value);
     return NextResponse.json({ ok: true, weight }, { status: 201, headers: LIFE_NO_STORE_HEADERS });
