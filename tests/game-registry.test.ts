@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableLifeGames, lifeGameRegistry } from "@/lib/life/game-registry";
+import { availableLifeGames, lifeGameRegistry } from "../lib/life/game-registry";
 
 describe("life game registry", () => {
   it("keeps the legacy game as the only currently available entry", () => {
