@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import type { LifePartnerKey } from "@/lib/life/life-service";
 import { isAuthorizedCloudRequest } from "./cloud-request-auth";
+import { resolveLifeAuth } from "./supabase-auth-http";
 import { LifeCloudError } from "./supabase-life";
 import { hasCloudSyncConfig } from "./supabase-home-sync";
 
@@ -25,8 +27,47 @@ export async function authorizeLifeRequest(request: Request) {
       "SERVER_CONFIG",
     );
   }
+
+  const accountAuth = await resolveLifeAuth(request);
+  if (accountAuth) {
+    if (!accountAuth.identity.coupleSpaceId || !accountAuth.identity.partnerKey) {
+      return lifeJsonError("账号尚未绑定双人空间", 403, "PAIRING_REQUIRED");
+    }
+    return null;
+  }
+
+  // Migration compatibility only. New accounts should use Supabase Auth; the old
+  // shared cloud session remains temporarily so existing data is not locked out
+  // before the two real accounts have been created and paired.
   if (!(await isAuthorizedCloudRequest(request))) {
-    return lifeJsonError("同步密码不正确或云端会话无效", 401, "UNAUTHORIZED");
+    return lifeJsonError("请登录，或使用迁移期旧云端会话", 401, "UNAUTHORIZED");
+  }
+  return null;
+}
+
+export async function authorizePersonalPartnerWrite(
+  request: Request,
+  requestedPartnerKey: LifePartnerKey,
+) {
+  if (!hasCloudSyncConfig()) {
+    return lifeJsonError("Supabase 服务端环境变量未配置完整", 500, "SERVER_CONFIG");
+  }
+
+  const accountAuth = await resolveLifeAuth(request);
+  if (accountAuth) {
+    if (!accountAuth.identity.coupleSpaceId || !accountAuth.identity.partnerKey) {
+      return lifeJsonError("账号尚未绑定双人空间", 403, "PAIRING_REQUIRED");
+    }
+    if (accountAuth.identity.partnerKey !== requestedPartnerKey) {
+      return lifeJsonError("只能修改自己的个人记录", 403, "OWN_RECORD_ONLY");
+    }
+    return null;
+  }
+
+  // Legacy fallback is intentionally temporary and will be removed after account
+  // migration. It preserves the current production workflow during R1B.
+  if (!(await isAuthorizedCloudRequest(request))) {
+    return lifeJsonError("请登录，或使用迁移期旧云端会话", 401, "UNAUTHORIZED");
   }
   return null;
 }
