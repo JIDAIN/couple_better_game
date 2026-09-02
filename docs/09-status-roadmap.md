@@ -52,11 +52,7 @@ Life UI / future ChatGPT / future import
               Supabase
 ```
 
-详细产品边界见：
-
-```text
-docs/10-v2-life-redesign.md
-```
+详细产品边界见 `docs/10-v2-life-redesign.md`，AI 写入设计见 `docs/11-ai-write-architecture.md`。
 
 ## 3. V2-P1 当前实施内容
 
@@ -66,7 +62,7 @@ docs/10-v2-life-redesign.md
 v2/life-records
 ```
 
-已完成代码：
+已完成：
 
 - [x] `mood_entries` schema；
 - [x] `sleep_records` schema；
@@ -83,10 +79,13 @@ v2/life-records
 - [x] `lib/life/life-client.ts` 浏览器 client；
 - [x] `lib/ai/record-write-protocol.ts` 通用 AI 写入协议基础；
 - [x] life / AI protocol 单元测试；
+- [x] GitHub CI Test / Lint / Build 全部通过；
 - [x] Vercel Preview build READY；
-- [ ] GitHub CI 最终通过；
-- [ ] migration 在 production Supabase 应用并 smoke test；
+- [x] additive migration 已应用到 production Supabase；
+- [x] production RPC transaction smoke test 通过并 rollback，未留下测试数据；
 - [ ] 合并 V2-P1。
+
+Supabase smoke test 在事务内临时写入 mood / sleep / activity，并由 `get_life_day` 成功读回，随后 `ROLLBACK`。复查新表均为 0 行，未污染真实数据。
 
 本阶段仍不切换根 `/`，不开发最终首页视觉。
 
@@ -134,7 +133,7 @@ sleep_records
 activity_entries
 ```
 
-生活系统中的“活动”是统一用户概念，不在首页拆成学习 / 运动 / 散步等多个任务；数据库保留 `activity_type` / `duration_minutes` 作为可选结构化字段，手动 UI 不强迫填写，未来 AI 可以在明确事实基础上填充。
+生活系统中的“活动”是统一用户概念，不在首页拆成学习 / 运动 / 散步等多个任务；数据库保留 `activity_type / duration_minutes` 作为可选结构化字段，手动 UI 不强迫填写，未来 AI 可以在明确事实基础上填充。
 
 `record_write_receipts` 不是生活事实本身，而是外部写入幂等/审计基础。它预留 domain：
 
@@ -166,16 +165,7 @@ read-back
 
 `lib/ai/record-write-protocol.ts` 已定义统一 domain 与幂等键格式，但**没有提供任意 SQL 写入口**。
 
-未来可逐步接入：
-
-- 饮食；
-- 心情；
-- 睡眠；
-- 活动；
-- 体重；
-- 家庭药箱。
-
-每个领域仍拥有自己的字段校验、权限和写入规则。
+未来可逐步接入：饮食、心情、睡眠、活动、体重、家庭药箱。每个领域仍拥有自己的字段校验、权限和写入规则。
 
 ## 7. 旧游戏边界
 
@@ -233,18 +223,9 @@ NULL = 没有估算
 
 家庭药箱作为独立数据域；收到真实 Excel 后再确定最终 schema 和导入字段。
 
-未来目标包括：
+未来目标包括：药名 / 规格 / 数量 / 存放位置、保质期 / 开封后有效期、状态与软删除、source / idempotency、AI 受限查询与确认后修改、change log / audit。
 
-- 药名 / 规格 / 数量 / 存放位置；
-- 保质期 / 开封后有效期；
-- 状态与软删除；
-- source / idempotency；
-- AI 受限查询与确认后修改；
-- change log / audit。
-
-药箱 AI 写入将复用通用 AI 写入协议和 `record_write_receipts` 思路，而不是获得通用数据库写权限。
-
-真实 Excel 和真实家庭库存数据不得提交到 GitHub migration。
+药箱 AI 写入将复用通用 AI 写入协议和 `record_write_receipts` 思路，而不是获得通用数据库写权限。真实 Excel 和真实家庭库存数据不得提交到 GitHub migration。
 
 ## 10. 后续顺序
 
@@ -289,6 +270,8 @@ ChatGPT 路径继续是受授权的非浏览器路径，必须受限到领域写
 - 结果不确定时先 read-back / 查回执，再用同 key 重试；
 - 每个阶段至少执行 Test / Lint / Build，并通过 Vercel Preview 检查。
 
+Supabase Advisor 对新表只出现项目既有的 `RLS enabled, no policy` INFO；这是 server-only/service-role 架构的预期结果。没有出现新的高等级安全告警。参考：https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
+
 ## 12. 旧兼容债
 
 以下继续保留为 Later：
@@ -301,9 +284,7 @@ ChatGPT 路径继续是受授权的非浏览器路径，必须受限到领域写
 
 ## 13. 下一步是什么
 
-先完成 V2-P1 的 CI、Supabase additive migration 和 smoke test。
-
-通过后进入：
+V2-P1 合并后进入：
 
 ```text
 V2-P2
