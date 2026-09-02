@@ -3,6 +3,7 @@ import type { LifePartnerKey } from "@/lib/life/life-service";
 
 export const LIFE_ACCOUNT_COOKIE = "life-account-session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const DEFAULT_SUPABASE_URL = "https://bfhntnzngozdqsmgfvjk.supabase.co";
 
 type SessionPayload = {
   partnerKey: LifePartnerKey;
@@ -20,20 +21,7 @@ function env(name: string) {
 
 function signingSecret() {
   const serverSecret = env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
-  return serverSecret ? `${serverSecret}\u0000life-account-v2` : "";
-}
-
-function accountPassword(partnerKey: LifePartnerKey) {
-  const specific = partnerKey === "cat" ? env("LIFE_CAT_PASSWORD") : env("LIFE_FISH_PASSWORD");
-  return specific || env("LIFE_ACCOUNT_PASSWORD") || env("DATA_EDIT_PASSWORD");
-}
-
-function partnerKeyFromUsername(value: unknown): LifePartnerKey | null {
-  if (typeof value !== "string") return null;
-  const username = value.trim().toLowerCase();
-  if (username === "cat" || username === "猫猫") return "cat";
-  if (username === "fish" || username === "鱼鱼") return "fish";
-  return null;
+  return serverSecret ? `${serverSecret}\u0000life-account-v3` : "";
 }
 
 function encode(value: string) {
@@ -65,14 +53,32 @@ function readCookie(request: Request, name: string) {
   return "";
 }
 
-export function authenticateFixedLifeAccount(username: unknown, password: unknown) {
-  const partnerKey = partnerKeyFromUsername(username);
-  if (!partnerKey || typeof password !== "string") return null;
-  const expected = accountPassword(partnerKey);
-  if (!expected) return null;
-  const actual = password.trim();
-  if (!safeEqual(actual, expected)) return null;
-  return partnerKey;
+export async function authenticateFixedLifeAccount(username: unknown, password: unknown) {
+  if (typeof username !== "string" || typeof password !== "string") return null;
+  const normalizedUsername = username.trim();
+  if (!normalizedUsername || !password) return null;
+
+  const url = env("SUPABASE_URL") || DEFAULT_SUPABASE_URL;
+  const secret = env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !secret) throw new Error("LIFE_ACCOUNT_CONFIG_MISSING");
+
+  const response = await fetch(`${url}/rest/v1/rpc/authenticate_fixed_life_account`, {
+    method: "POST",
+    headers: {
+      apikey: secret,
+      Authorization: `Bearer ${secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      p_username: normalizedUsername,
+      p_password: password,
+    }),
+    cache: "no-store",
+  });
+
+  if (!response.ok) throw new Error("LIFE_ACCOUNT_LOOKUP_FAILED");
+  const partnerKey = (await response.json()) as unknown;
+  return partnerKey === "cat" || partnerKey === "fish" ? partnerKey : null;
 }
 
 export function createFixedLifeSession(partnerKey: LifePartnerKey) {

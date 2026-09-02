@@ -37,7 +37,7 @@ PR #35 最终统一 Test / Lint / Build 均通过后已合并。
 
 Production 复查发现此前把“账号登录”和“同步密码”混在了一起，导致流程复杂且旧账号密码不能按正常登录方式使用。
 
-修复目标：
+当前登录目标：
 
 ```text
 /login
@@ -46,23 +46,27 @@ Production 复查发现此前把“账号登录”和“同步密码”混在了
 登录
 ```
 
-已调整：
+已完成：
 
 - 删除登录页猫猫 / 鱼鱼账号选择卡；
-- 登录 API 改为接收 `username + password`；
-- `cat / fish` 作为固定账号名，并兼容 `猫猫 / 鱼鱼`；
-- 账号密码与 sync gate 解耦；
-- session HMAC 不再依赖同步密码；
+- 登录 API 接收 `username + password`；
 - Today 不再显示“连接云端 / 同步密码”，401 直接回 `/login`；
-- Life API 的 Supabase 配置检查不再要求 `DATA_EDIT_PASSWORD`。
+- session HMAC 与同步密码解耦；
+- Production Supabase 新增 `life_fixed_accounts`；
+- 两个真实固定账号已经写入 Production，并分别绑定 `cat / fish`；
+- 密码只保存 bcrypt hash，不保存明文；
+- server-only RPC `authenticate_fixed_life_account` 负责账号密码校验；
+- RPC 只授予 `service_role` 调用，浏览器不能读取凭据表；
+- 真实账号数据不写入公开 GitHub migration/seed。
 
-账号密码配置优先级见 `docs/17-auth-and-pairing.md`。旧 `DATA_EDIT_PASSWORD` 仅保留为兼容兜底，不能再出现在新版生活系统的正常 UI 流程中。
+详细边界见 `docs/17-auth-and-pairing.md`。
 
 ## 4. 安全与数据边界
 
 ```text
 Browser
   -> same-origin Next.js API
+  -> server-only Supabase credential RPC
   -> fixed account signed session
   -> server-only domain service / RPC
   -> Supabase PostgreSQL
@@ -81,4 +85,4 @@ Browser
 
 R1-R6 已于本日完成一次明确授权的 Production 部署，随后 Git 自动部署已经重新关闭。
 
-当前 `vercel.json` 必须继续保持 `git.deploymentEnabled: false`。本次登录修复尚未获得新的部署授权，因此只能提交、测试、合并，不能触发 Vercel Preview / Production。
+当前 `vercel.json` 必须继续保持 `git.deploymentEnabled: false`。本次 Supabase 账号修复尚未获得新的部署授权，因此只能提交、测试、合并，不能触发 Vercel Preview / Production。
