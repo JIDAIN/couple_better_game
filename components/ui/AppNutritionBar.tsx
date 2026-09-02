@@ -3,12 +3,14 @@ export function AppNutritionBar({
   value,
   unit,
   percent,
+  max,
   tone = "teal",
 }: {
   label: string;
-  value: number | string;
+  value: number | string | null;
   unit?: string;
-  percent: number;
+  percent?: number;
+  max?: number;
   tone?: "teal" | "yellow" | "coral" | "blue";
 }) {
   const color = {
@@ -18,7 +20,11 @@ export function AppNutritionBar({
     blue: "var(--life-blue)",
   }[tone];
 
-  const width = `${Math.max(0, Math.min(100, percent))}%`;
+  const derivedPercent =
+    percent ??
+    (typeof value === "number" && max && max > 0 ? (value / max) * 100 : 0);
+  const width = `${Math.max(0, Math.min(100, derivedPercent))}%`;
+  const displayValue = value == null ? "—" : `${value}${unit ?? ""}`;
 
   return (
     <div className="life-nutrition-bar">
@@ -27,7 +33,7 @@ export function AppNutritionBar({
         <span className="life-nutrition-fill block" style={{ width, background: color }} />
       </span>
       <strong className="font-semibold text-[var(--life-text)] tabular-nums">
-        {value}{unit ?? ""}
+        {displayValue}
       </strong>
     </div>
   );
