@@ -11,6 +11,19 @@ import { useStaleQuery } from "@/lib/client/use-stale-query";
 type Tab = "received" | "sent";
 const EMPTY_LETTERS: MailboxLetter[] = [];
 
+function monthKey(value: string) {
+  return value.slice(0, 7);
+}
+
+function monthText(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  return `${year}年${month}月`;
+}
+
+function monthShortText(value: string) {
+  return `${Number(value.slice(5, 7))}月`;
+}
+
 function dateText(value: string) {
   const d = new Date(value);
   return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(d);
@@ -19,6 +32,7 @@ function dateText(value: string) {
 export function LifeMailboxPage() {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [tab, setTab] = useState<Tab>("received");
+  const [month, setMonth] = useState("all");
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<MailboxLetter | null | undefined>(undefined);
   const [form, setForm] = useState<MailboxWritePayload | null>(null);
@@ -29,10 +43,12 @@ export function LifeMailboxPage() {
   const letters = lettersQuery.data ?? EMPTY_LETTERS;
   const visibleError = error ?? lettersQuery.error?.message ?? null;
 
-  const visible = useMemo(() => {
+  const tabLetters = useMemo(() => {
     if (!mePartnerKey) return [];
     return letters.filter((letter) => tab === "received" ? letter.recipientKey === mePartnerKey : letter.senderKey === mePartnerKey);
   }, [letters, mePartnerKey, tab]);
+  const months = useMemo(() => Array.from(new Set(tabLetters.map((letter) => monthKey(letter.sentAt)))).sort((a, b) => b.localeCompare(a)), [tabLetters]);
+  const visible = useMemo(() => month === "all" ? tabLetters : tabLetters.filter((letter) => monthKey(letter.sentAt) === month), [month, tabLetters]);
 
   function roleLabel(key: MailboxPartnerKey) {
     return key === mePartnerKey ? "我" : "Ta";
@@ -73,20 +89,34 @@ export function LifeMailboxPage() {
     <section className="life-surface life-section-card life-toolbar">
       <div className="flex items-center justify-between gap-3">
         <div className="grid flex-1 grid-cols-2 rounded-full bg-[var(--life-surface-soft)] p-1 text-xs font-extrabold">
-          <button onClick={() => setTab("received")} className={`rounded-full px-3 py-2 ${tab === "received" ? "bg-white text-[var(--life-teal-strong)] shadow-[var(--life-shadow-soft)]" : "text-[var(--life-text-muted)]"}`}>收到的</button>
-          <button onClick={() => setTab("sent")} className={`rounded-full px-3 py-2 ${tab === "sent" ? "bg-white text-[var(--life-teal-strong)] shadow-[var(--life-shadow-soft)]" : "text-[var(--life-text-muted)]"}`}>寄出的</button>
+          <button onClick={() => { setTab("received"); setMonth("all"); }} className={`rounded-full px-3 py-2 ${tab === "received" ? "bg-white text-[var(--life-teal-strong)] shadow-[var(--life-shadow-soft)]" : "text-[var(--life-text-muted)]"}`}>收到的</button>
+          <button onClick={() => { setTab("sent"); setMonth("all"); }} className={`rounded-full px-3 py-2 ${tab === "sent" ? "bg-white text-[var(--life-teal-strong)] shadow-[var(--life-shadow-soft)]" : "text-[var(--life-text-muted)]"}`}>寄出的</button>
         </div>
         <button onClick={openCreate} className="shrink-0 rounded-full bg-[var(--life-teal)] px-4 py-2.5 text-xs font-extrabold text-white">写一封</button>
+      </div>
+      <div className="life-mailbox-filter mt-3 flex items-center justify-between gap-3">
+        <div><p className="text-xs font-extrabold text-[var(--life-text)]">信件归档</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">按寄出月份慢慢翻看</p></div>
+        <label className="relative shrink-0">
+          <span className="sr-only">筛选信件月份</span>
+          <select value={month} onChange={(event) => setMonth(event.target.value)} className="life-mailbox-month-select appearance-none rounded-full border border-[var(--life-border-soft)] bg-white/80 py-2 pl-3 pr-8 text-xs font-extrabold text-[var(--life-teal-strong)] outline-none">
+            <option value="all">全部信件</option>
+            {months.map((value) => <option key={value} value={value}>{monthText(value)}</option>)}
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--life-teal-strong)]">⌄</span>
+        </label>
       </div>
     </section>
 
     {visibleError ? <div className="mt-3 rounded-2xl bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{visibleError}</div> : null}
     <div className="mt-3 grid gap-3">
       {!lettersQuery.loading && visible.length === 0 ? <div className="life-surface life-section-card text-center"><div className="text-3xl">💌</div><p className="mt-2 text-sm font-bold text-[var(--life-text-body)]">这里还没有信</p><p className="mt-1 text-xs text-[var(--life-text-muted)]">想说的话可以慢慢写下来。</p></div> : null}
-      {visible.map((letter, index) => <article key={letter.id} className={`life-letter-card relative overflow-hidden rounded-[var(--life-radius-card)] border border-[var(--life-border-soft)] p-4 ${letter.format === "postcard" ? "bg-[color:color-mix(in_srgb,var(--life-blue)_18%,white)]" : index % 2 ? "bg-[color:color-mix(in_srgb,var(--life-yellow)_15%,white)]" : "bg-[var(--life-surface)]"}`}>
-        <div className="absolute right-4 top-4 rotate-6 rounded-md border border-[var(--life-border)] bg-white/70 px-2 py-1 text-[10px]">{letter.format === "postcard" ? "POSTCARD" : "LETTER"}</div>
-        <p className="pr-20 text-[11px] font-extrabold text-[var(--life-text-muted)]">{roleLabel(letter.senderKey)} → {roleLabel(letter.recipientKey)} · {dateText(letter.sentAt)}</p>
-        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--life-text-body)]">{letter.body}</p>
+      {visible.map((letter, index) => <article key={letter.id} className={`life-letter-card life-letter-card--${index % 3} relative overflow-hidden ${letter.format === "postcard" ? "is-postcard" : "is-letter"}`}>
+        <div className="life-letter-date"><span>{new Date(letter.sentAt).getDate()}</span><small>{monthShortText(monthKey(letter.sentAt))}</small></div>
+        <div className="life-letter-content">
+          <div className="flex items-center justify-between gap-3"><p className="text-[11px] font-extrabold text-[var(--life-text-muted)]">{roleLabel(letter.senderKey)} 写给 {roleLabel(letter.recipientKey)}</p><span className="life-letter-stamp">{letter.format === "postcard" ? "明信片" : "信笺"}</span></div>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--life-text-body)]">{letter.body}</p>
+          <p className="mt-3 text-[10px] text-[var(--life-text-muted)]">{dateText(letter.sentAt)}</p>
+        </div>
         {letter.senderKey === mePartnerKey ? <div className="mt-4 flex justify-end gap-2"><button onClick={() => openEdit(letter)} className="rounded-full bg-white/65 px-3 py-1.5 text-xs font-extrabold text-[var(--life-teal-strong)]">编辑</button><button onClick={() => void remove(letter)} className="rounded-full px-3 py-1.5 text-xs font-bold text-[var(--life-danger)]">删除</button></div> : null}
       </article>)}
     </div>
