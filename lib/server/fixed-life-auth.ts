@@ -1,6 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { LifePartnerKey } from "@/lib/life/life-service";
-import { isValidSyncPassword } from "./supabase-home-sync";
 
 export const LIFE_ACCOUNT_COOKIE = "life-account-session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
@@ -20,9 +19,21 @@ function env(name: string) {
 }
 
 function signingSecret() {
-  const password = env("DATA_EDIT_PASSWORD");
   const serverSecret = env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
-  return password && serverSecret ? `${password}\u0000${serverSecret}\u0000life-account-v1` : "";
+  return serverSecret ? `${serverSecret}\u0000life-account-v2` : "";
+}
+
+function accountPassword(partnerKey: LifePartnerKey) {
+  const specific = partnerKey === "cat" ? env("LIFE_CAT_PASSWORD") : env("LIFE_FISH_PASSWORD");
+  return specific || env("LIFE_ACCOUNT_PASSWORD") || env("DATA_EDIT_PASSWORD");
+}
+
+function partnerKeyFromUsername(value: unknown): LifePartnerKey | null {
+  if (typeof value !== "string") return null;
+  const username = value.trim().toLowerCase();
+  if (username === "cat" || username === "猫猫") return "cat";
+  if (username === "fish" || username === "鱼鱼") return "fish";
+  return null;
 }
 
 function encode(value: string) {
@@ -54,10 +65,14 @@ function readCookie(request: Request, name: string) {
   return "";
 }
 
-export function authenticateFixedLifeAccount(partnerKey: unknown, password: unknown) {
-  if (partnerKey !== "cat" && partnerKey !== "fish") return null;
-  if (typeof password !== "string" || !isValidSyncPassword(password)) return null;
-  return partnerKey as LifePartnerKey;
+export function authenticateFixedLifeAccount(username: unknown, password: unknown) {
+  const partnerKey = partnerKeyFromUsername(username);
+  if (!partnerKey || typeof password !== "string") return null;
+  const expected = accountPassword(partnerKey);
+  if (!expected) return null;
+  const actual = password.trim();
+  if (!safeEqual(actual, expected)) return null;
+  return partnerKey;
 }
 
 export function createFixedLifeSession(partnerKey: LifePartnerKey) {

@@ -17,11 +17,11 @@ const cookieBase = {
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
-    partnerKey?: unknown;
+    username?: unknown;
     password?: unknown;
   } | null;
 
-  const partnerKey = authenticateFixedLifeAccount(body?.partnerKey, body?.password);
+  const partnerKey = authenticateFixedLifeAccount(body?.username, body?.password);
   if (!partnerKey) {
     return NextResponse.json({ ok: false, error: "账号或密码不正确" }, { status: 401 });
   }
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       ok: true,
       identity: {
         partnerKey,
-        displayName: partnerKey === "cat" ? "我" : "Ta",
+        displayName: partnerKey === "cat" ? "猫猫" : "鱼鱼",
       },
     });
     response.cookies.set(LIFE_ACCOUNT_COOKIE, session.token, {

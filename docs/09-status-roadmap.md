@@ -18,97 +18,47 @@ V2-P6  家庭药箱                                ✅
 V2-P7  小信箱                                  ✅
 V2-P8  游戏机列表 -> /game                     ✅
 V2-P11 全站代码边界联调                         ✅
-
-R1 账户 / 权限 / 导航 / 缓存                   ✅
-R2 首页心情 / 睡眠                             ✅
-R3 饮食餐次 / 多加餐 / Meal 写权限              ✅
-R4 情绪月历                                   ✅
-R5 小窝 / 我的职责重分                         ✅
-R6 全站视觉还原                               ✅
+R1-R6 重构                                    ✅
 ```
-
-旧“变美变瘦大作战”继续保持在 `/game`，只从「小窝 → 游戏机」进入；旧游戏不展示新版 Meal 明细，旧金币/宝石/兑换/结算边界未纳入本轮生活系统视觉重构。
 
 ## 2. R1-R6 最终结果
 
-### R1：账户、权限、导航、缓存
-- 固定 `cat / fish` 两个账号，共享旧 `DATA_EDIT_PASSWORD`。
-- HMAC 签名 HttpOnly Cookie；前端“我 / Ta”相对当前登录身份动态解释。
-- 当前 Tab 重复点击不再触发同路由导航。
-- 根 `LifeIdentityProvider` 持久化身份上下文。
-- stale-while-revalidate 查询缓存用于今日、饮食、日历等页面，返回页面优先显示缓存并后台刷新。
+- 固定 `cat / fish` 两个底层身份；登录后“我 / Ta”相对当前账号动态解释。
+- 当前 Tab 重复点击不再同路由导航；Life identity 与 query cache 跨页面保持。
+- 心情 / 睡眠只编辑自己；Ta 只读。
+- 三餐固定餐次；加餐 `0..N`；Meal/照片写入按 session + owner 校验。
+- 日历空日期留白、今天小太阳、双人心情直接落在日期下方。
+- 小窝只放共同生活内容；我的只放当前账号 / 数据 / 设置 / 退出。
+- 全站采用岛屿生活视觉语言 V2 · 方案B。
 
-### R2：首页心情 / 睡眠
-- 心情只允许当前登录者修改自己的记录，Ta 只读。
-- 心情使用独立 bottom sheet，不再使用 ASCII 字符脸。
-- 睡眠 UI 只编辑“我”的入睡 / 起床，Ta 只读。
+PR #35 最终统一 Test / Lint / Build 均通过后已合并。
 
-### R3：饮食
-- 早餐 / 午餐 / 晚餐固定槽，编辑器不能改成其他餐次。
-- 加餐支持 `0..N`；新增时先选上午 / 下午 / 晚上。
-- 每次加餐按独立 `mealId` 编辑。
-- Meal create/update/delete/photo write 均增加当前 session + meal owner 服务端校验。
-- Ta 饮食只读。
-- 保存后只失效对应饮食 query，不再 `router.refresh()` 整页刷新。
+## 3. Production 实机验收后的登录修复
 
-### R4：日历
-- 无心情日期下方留空。
-- 今天显示小太阳特殊状态。
-- 一人有心情显示一枚图，两人都有显示两枚轻微错位图。
-- 显示顺序按当前 `mePartnerKey / taPartnerKey`。
-- 月历使用缓存，布局模式参考成熟 MIT 情绪日历项目思路，视觉全部使用本项目适配层。
+Production 复查发现此前把“账号登录”和“同步密码”混在了一起，导致流程复杂且旧账号密码不能按正常登录方式使用。
 
-### R5：小窝 / 我的
-- 小窝只承担共同生活内容：体重 / 小信箱 / 家庭药箱 / 游戏机。
-- 我的只承担当前账号、同步、数据边界、设置和退出。
-- 删除“我的”里重复的小窝/日历/游戏入口说明。
-- 小信箱新信固定为当前登录者 `我 -> Ta`；收到的只读；自己寄出的可编辑/删除。
-- Mailbox POST/PUT/DELETE 增加 sender ownership 服务端校验。
-
-### R6：视觉
-- 统一采用“岛屿生活视觉语言 V2 · 方案B”。
-- 新增统一页面级 visual adapter，减少标准 SaaS 卡片堆叠。
-- 统一背景、标题、底部导航、弹层、surface 材质。
-- 日历改为更轻的纸质稀疏月历。
-- 小窝改为房间场景 + 2×2 四入口。
-- 我的改为账号 Hero + 设置/同步列表。
-- 数据密集页保持克制；Legacy Game 不随 R6 改视觉。
-
-## 3. 最终统一测试与修复
-
-PR #35 首轮统一 CI：
+修复目标：
 
 ```text
-Test   ✅
-Build  ✅
-Lint   ❌
+/login
+账号
+密码
+登录
 ```
 
-首轮 Lint 失败原因：
+已调整：
 
-1. `TodayLifePage.tsx` 在 effect 内同步 `setState` 处理 query error；
-2. `use-stale-query.ts` 在 effect 内同步把缓存写回 React state。
+- 删除登录页猫猫 / 鱼鱼账号选择卡；
+- 登录 API 改为接收 `username + password`；
+- `cat / fish` 作为固定账号名，并兼容 `猫猫 / 鱼鱼`；
+- 账号密码与 sync gate 解耦；
+- session HMAC 不再依赖同步密码；
+- Today 不再显示“连接云端 / 同步密码”，401 直接回 `/login`；
+- Life API 的 Supabase 配置检查不再要求 `DATA_EDIT_PASSWORD`。
 
-修复：
+账号密码配置优先级见 `docs/17-auth-and-pairing.md`。旧 `DATA_EDIT_PASSWORD` 仅保留为兼容兜底，不能再出现在新版生活系统的正常 UI 流程中。
 
-- Today 页改为从 `query.error` 派生登录/错误显示状态，不再为了 query error 额外 effect setState；
-- stale query 的 key 切换同步改为 microtask 中恢复缓存并后台 refresh，避免 effect 同步级联渲染。
-
-修复后的统一 CI run `33656830449`：
-
-```text
-Test   ✅
-Lint   ✅
-Build  ✅
-```
-
-因此 R1-R6 代码级统一验收已通过。
-
-### 依赖安装提示
-
-CI 的 `npm ci` 仍报告 npm audit 摘要：`9 vulnerabilities (1 low, 8 high)`。这不是本次 Test/Lint/Build 的失败项，也没有在本轮中用 `npm audit fix --force` 自动升级依赖，以避免未经审查的破坏性依赖变更。后续如处理，应单独做 dependency-audit PR，逐项确认受影响包和实际可达性。
-
-## 4. 数据与安全边界
+## 4. 安全与数据边界
 
 ```text
 Browser
@@ -120,11 +70,15 @@ Browser
 
 - service secret 永不进入浏览器；
 - 业务数据继续以 Supabase 为准；
-- DDL 只新增 migration，不修改已执行 migration；
-- 真实用户数据不提交公开 GitHub。
+- 真实用户数据不提交公开 GitHub；
+- 个人写操作继续强制 owner 校验。
 
-## 5. 部署状态
+## 5. 依赖提示
 
-`vercel.json` 继续保持 `git.deploymentEnabled: false`。
+最近 CI 的 `npm ci` 仍报告 `9 vulnerabilities (1 low, 8 high)`。本轮没有使用 `npm audit fix --force` 做破坏性升级；应单独做 dependency-audit。
 
-本轮 R1C-R6 **没有执行任何 Vercel Preview 或 Production 部署**。下一次 Preview / Production 必须重新取得用户针对该次部署的明确授权。
+## 6. 部署状态
+
+R1-R6 已于本日完成一次明确授权的 Production 部署，随后 Git 自动部署已经重新关闭。
+
+当前 `vercel.json` 必须继续保持 `git.deploymentEnabled: false`。本次登录修复尚未获得新的部署授权，因此只能提交、测试、合并，不能触发 Vercel Preview / Production。
