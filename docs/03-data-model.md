@@ -1,185 +1,176 @@
 # 数据模型与 Source of Truth
 
-## 1. 目标
-
-这份文档描述**当前生产 Supabase schema + 当前前端模型**，不再描述“未来可能使用的数据库草案”。
-
-最重要的原则：
+## 1. 核心原则
 
 ```text
 事实数据优先保存
 派生数据允许缓存，但必须可从事实重算
-饮食 / deficit / 体重 / 运动不混域
+不同业务域不互相覆盖
+UI 可以很轻，数据结构不能贫瘠
 ```
 
-## 2. 四个领域
+当前项目同时存在 legacy game 和新 V2 life system。二者可以按日期展示在一起，但不混成同一个事实字段。
+
+## 2. 领域划分
 
 ### 2.1 饮食摄入
 
 真相源：
 
-- `meals`
-- `meal_items`
+```text
+meals
+meal_items
+```
 
-可选知识层：
+可选知识层：`foods / food_aliases`。
 
-- `foods`
-- `food_aliases`
-
-`meal_items.raw_name` 必须保留。没有 canonical food 时 `food_id` 可以为空。
-
-### 2.2 游戏 deficit 与运动
+### 2.2 Legacy Game
 
 真相源：
 
-- `daily_records`
-- `daily_record_sides`
+```text
+daily_records
+daily_record_sides
+exchange_records
+wallet_ledger
+```
 
-`daily_record_sides` 中：
+`daily_record_sides.deficit_kcal / exercise_minutes / weight_kg` 仍属于旧游戏语义。
 
-- `deficit_kcal`：现有游戏 deficit
-- `exercise_minutes`：游戏当天运动分钟
-- `weight_kg`：当天游戏体重快照
-
-### 2.3 体重趋势
+### 2.3 真实体重
 
 真相源：
 
-- `weight_measurements`
+```text
+weight_measurements
+```
 
-它允许按实际测量时间保存多条记录，是未来趋势图的主要来源。
+它与旧游戏 `daily_record_sides.weight_kg` 不是同一个事实。
 
-### 2.4 目标周期
+### 2.4 V2 Life
 
-- `partner_goal_periods`
+V2-P1 新事实域：
 
-保存有效期内的目标体重、目标摄入、maintenance kcal 等配置。当前只有 schema，尚无产品 UI。
+```text
+mood_entries
+sleep_records
+activity_entries
+```
 
-## 3. 游戏核心表
+首页未来只消费这三个轻量领域。
 
-### `couple_spaces`
+### 2.5 Future Medicine
 
-一个情侣空间。当前生产使用固定 slug；包含 `home_sync_updated_at` 作为兼容快照更新时间。
+家庭药箱将是独立 domain，不塞进 life entry 大表。最终 schema 等真实 Excel 字段确认后建立。
 
-关键字段：
+## 3. `mood_entries`
+
+一天每个角色一条当前心情：
 
 ```text
 id
-slug
-name
-archived_at
-home_sync_updated_at
+couple_space_id
+partner_key       fish / cat
+mood_date
+mood_key          happy / calm / neutral / anxious / sad / angry / tired
+source            manual / chatgpt / import
+created_at
+updated_at
 ```
 
-### `partner_profiles`
-
-空间内的 `fish / cat` 两个角色：
+唯一键：
 
 ```text
+couple_space_id + partner_key + mood_date
+```
+
+不保存 `mood_score`。心情 key 是分类事实，不存在“开心分数更高”。
+
+这个结构可以直接支持后续小窝中的月度双人心情日历。
+
+## 4. `sleep_records`
+
+一天每个角色一条简单睡眠记录：
+
+```text
+id
 couple_space_id
 partner_key
-nickname
-emoji
-auth_user_id nullable
+sleep_date
+fell_asleep_at
+woke_at
+source
+created_at
+updated_at
 ```
 
-`auth_user_id` 目前没有形成完整账号系统。
+约束：`woke_at > fell_asleep_at`。
 
-### `app_configs`
-
-空间级游戏配置：
+睡眠时长是派生值：
 
 ```text
-heatmap_start_date
-coin_week_start_day
-coin_deficit_streak_days
-visual_rules jsonb
+woke_at - fell_asleep_at
 ```
 
-**已知 drift：**数据库列 `coin_deficit_streak_days` 的 schema default 仍为 7，而当前代码默认和生产配置均为 5。新空间功能上线前必须通过 migration 统一这个默认值。
+数据库不保存“睡眠评分 / 达标 / 早睡成功”。
 
-### `daily_records`
+## 5. `activity_entries`
 
-一天一条双人主记录：
+活动是一对多事件流：
 
 ```text
-record_date
-bonus_gems
-coin_delta
-note
+id
+couple_space_id
+activity_date
+occurred_at nullable
+text
+participant_scope   both / fish / cat
+activity_type nullable
+duration_minutes nullable
+source
+created_at
+updated_at
 deleted_at
-legacy_id
 ```
 
-这里部分列名来自旧 currency semantics，不能只看名称判断用户可见币种，见 `05-business-rules.md`。
+产品首版只要求用户写一句 `text`；`participant_scope` 默认 `both`。
 
-### `daily_record_sides`
+`activity_type / duration_minutes / occurred_at` 是可选结构化字段，未来 AI 在事实明确时可以补充，但 UI 不强迫用户选择“学习 / 运动 / 散步”等分类。
 
-每天两个角色各一条：
+删除活动使用 soft delete。
+
+## 6. `record_write_receipts`
+
+V2-P1 新增跨领域外部写入回执：
 
 ```text
-partner_key
-weight_kg
-deficit_kcal
-exercise_minutes
-gems
-heat_level
-exercise_tag
+id
+couple_space_id
+source            chatgpt / import
+domain            meal / mood / sleep / activity / weight / medicine
+idempotency_key
+entity_id
+created_at
 ```
 
-原始事实主要是 `weight_kg / deficit_kcal / exercise_minutes`；奖励和 heat 字段是当前规则下的结果快照。
-
-### `exchange_categories`
-
-当前奖励模板：标题、图标、说明、资源类型、价格、active 状态。
-
-### `exchange_records`
-
-兑换历史事实。保存兑换当时快照：
+唯一键：
 
 ```text
-category_title
-icon
-resource_kind
-price
-remark
-occurred_at
+couple_space_id + idempotency_key
 ```
 
-即使分类以后改名或删除，历史记录仍独立成立。
+它不是生活事实，而是写入控制事实，解决两个问题：
 
-## 4. 钱包
+1. ChatGPT / import 重试需要稳定幂等；
+2. 实体后来被手动编辑后，不能因为实体自身 idempotency 字段被覆盖而忘记“某次外部写入已经执行过”。
 
-### `wallet_ledger`
+当前 meal 已经有自己的 `meals.idempotency_key`，暂时不强行迁移。未来新的 AI domain 优先复用 receipt 模式。
 
-资源变动审计事实：
+`entity_id` 不设跨表 FK，因为它可能指向不同 domain 的实体；domain-specific service 负责解释。
 
-```text
-resource_kind
-delta
-balance_after
-reason_type
-reason_id
-description
-occurred_at
-```
-
-### `wallets`
-
-当前余额快照：
-
-```text
-gems
-coins
-```
-
-余额是可派生状态，不应成为唯一事实来源。兼容快照导入时数据库会根据游戏记录/兑换重建钱包。
-
-## 5. 营养表
+## 7. 营养表
 
 ### `meals`
-
-一餐的头记录：
 
 ```text
 partner_key
@@ -197,17 +188,7 @@ idempotency_key
 deleted_at
 ```
 
-约束：
-
-- partner 只能 fish/cat；
-- meal type：breakfast/lunch/dinner/snack/other；
-- snack_period 只允许 snack；
-- calorie estimate 必须位于 min/max 内；
-- `idempotency_key` 在同一 space 唯一。
-
 ### `meal_items`
-
-一餐内食物明细：
 
 ```text
 meal_id
@@ -225,19 +206,14 @@ fat_g
 sort_order
 ```
 
-删除 meal 时 items 级联删除。
+当前 production kcal 仍为必填。后续单独 migration 改为 nullable，必须保持：
 
-### `foods`
+```text
+NULL = 未估算
+0 = 确实为 0 kcal
+```
 
-空间级 canonical food：名称、category、默认每 100g 热量和 macros。
-
-### `food_aliases`
-
-把自然语言别名指向 canonical food；可以是空间共享 alias，也可以按 partner 个性化。
-
-别名解析失败不能阻止 meal 保存。
-
-## 6. 体重表
+## 8. 体重表
 
 ### `weight_measurements`
 
@@ -253,23 +229,41 @@ linked_daily_record_side_id nullable
 idempotency_key nullable
 ```
 
-设计目标：
+未来 AI 记体重必须写这里，不自动覆盖旧游戏体重快照。
 
-- 保留真实测量时间；
-- 可以关联旧游戏记录；
-- 不因为更新每日快照而删除独立测量历史。
+## 9. 游戏核心表
 
-## 7. Views
+继续保留：
 
-当前生产有：
+```text
+couple_spaces
+partner_profiles
+app_configs
+daily_records
+daily_record_sides
+exchange_categories
+exchange_records
+wallets
+wallet_ledger
+```
 
-- `daily_nutrition_summary`
-- `daily_weight_summary`
-- `partner_daily_overview`
+兑换机制、金币宝石和历史数据都继续属于 legacy game module。
 
-它们用于把规范化事实聚合为按天读取的视图。当前 Web UI 尚未全面消费这些 view。
+## 10. Views
 
-## 8. 当前 RPC
+production 当前已有：
+
+```text
+daily_nutrition_summary
+daily_weight_summary
+partner_daily_overview
+```
+
+V2-P1 的 Life 日读取先使用 `get_life_day` RPC，不急着增加额外 view。
+
+## 11. RPC
+
+### Existing Game / Nutrition
 
 ```text
 export_home_sync_snapshot
@@ -278,65 +272,88 @@ list_meals
 create_meal_record
 update_meal_record
 delete_meal_record
+create_chatgpt_meal_record
+get_chatgpt_meal_record
 ```
 
-游戏 RPC 负责 legacy snapshot 与规范化表之间转换；meal 写入 RPC 负责事务一致性。
-
-## 9. 前端兼容模型
-
-`lib/home/types.ts` 仍保留：
+### V2 Life
 
 ```text
-HomeResourcesState
-UserRuntimeData
-AppConfigData
-AppDataSnapshot v1
-DailyRecord
-ExchangeRecord
+get_life_day
+upsert_mood_record
+upsert_sleep_record
+create_activity_record
+update_activity_record
+delete_activity_record
 ```
 
-原因是当前 UI、localStorage 备份和云端兼容接口仍围绕这套 shape 工作。
+Life RPC 和私有 JSON helper 均只开放给 service-role 路径，不授权 `anon / authenticated`。
 
-因此当前系统同时有两层数据模型：
+## 12. Source / AI 写入
+
+统一来源词汇：
 
 ```text
-Browser compatibility snapshot
-           ⇅ RPC mapping
-Normalized Supabase schema
+manual
+chatgpt
+import
 ```
 
-不要把这理解成数据库重复设计；这是迁移期的兼容边界。
+AI 写入 domain 统一预留：
 
-## 10. Fact vs Derived
+```text
+meal
+mood
+sleep
+activity
+weight
+medicine
+```
 
-### 事实 / 用户配置
+通用层只负责：
 
-- daily record 原始输入
-- exchange history
-- meal / meal item
-- weight measurement
-- exchange category / app config / goal period
-- wallet ledger 事件
+```text
+source
+idempotency key
+confirmation boundary
+write receipt
+```
+
+具体字段验证仍由各 domain service 负责。不存在一个可以任意修改所有表的“AI 数据表”或“AI SQL API”。
+
+## 13. Fact vs Derived
+
+### 事实
+
+- daily record 原始游戏输入；
+- exchange history；
+- meal / meal item；
+- weight measurement；
+- mood entry；
+- sleep record；
+- activity entry；
+- wallet ledger 事件；
+- external write receipt。
 
 ### 派生 / 快照
 
-- wallet current balance
-- heatmap overrides
-- week totals
-- success days / streak
-- today / yesterday summary
-- daily nutrition/weight overview views
+- wallet current balance；
+- heatmap overrides；
+- week totals / streak；
+- today / yesterday 游戏奖励汇总；
+- nutrition / weight daily summary；
+- sleep duration；
+- 月度心情展示。
 
-历史事实发生变化后，派生数据必须重建。
+## 14. 权限与迁移
 
-## 11. Schema 版本控制现状
+所有新表：
 
-生产数据库已经完成规范化 schema 和 RPC 建设，但**早期创建这些结构的 migration SQL 没有完整保存在当前仓库**。
+- RLS enabled；
+- `anon / authenticated` 不直接获得表权限；
+- Browser 必须经过 Next.js API；
+- service-role 才能执行 canonical RPC；
+- 新 DDL 必须新增 migration；
+- 已执行历史 migration 不回改。
 
-这意味着当前数据库是可运行的，但从空数据库完全复现 production schema 的能力不够清晰。
-
-因此 roadmap P0 是：
-
-1. 将当前 production schema / functions / grants 回填为版本化 migration；
-2. 从此所有 DDL 都先形成 migration；
-3. 建立“新环境可复现”验证流程。
+V2-P1 schema 对现有 production 表是 additive，不修改旧游戏和现有 meal/weight 数据。

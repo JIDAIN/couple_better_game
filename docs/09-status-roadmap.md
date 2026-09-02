@@ -6,7 +6,9 @@
 
 ## 1. 当前生产状态
 
-当前 `main` / production 仍然是成熟的双人健康游戏：
+`main` 已完成 V2-P0 基础边界，但生产根 `/` 仍显示成熟的双人健康游戏；旧游戏没有被删除。
+
+当前生产能力包括：
 
 ```text
 双人游戏前端
@@ -16,54 +18,76 @@
 + 今日饮食 Web UI
 + ChatGPT 明确确认后的餐食持久化
 + P2.5 同日饮食 / 游戏记录关联展示
++ /game 旧游戏稳定入口
++ provider-free DailyMealsPanelCore
 ```
 
-截至 V2 重构开始前：
+已完成：
 
 ```text
 P0 工程治理                 ✅
 P1 今日饮食 UI              ✅
 P2 ChatGPT “记上”           ✅
 P2.5 同日饮食 + 游戏记录    ✅
+V2-P0 新旧系统边界          ✅
 ```
-
-旧 roadmap 中的“P3 体重趋势”不再作为当前直接下一步；用户已经明确改变产品优先级，进入 V2 生活系统重构。
 
 ## 2. V2 当前阶段
 
 当前里程碑：
 
 ```text
-V2-P0 — Life foundation / 新旧模块边界
+V2-P1 — Life records / 心情、睡眠、活动数据与 API
 ```
 
-目标不是删除旧游戏，而是改变它在整个产品中的位置：
+目标不是先画新首页，而是先建立可长期复用的事实层：
 
 ```text
-生活系统成为主产品
-└─ 小窝 / 游戏机
-   └─ 变美变瘦大作战（完整保留）
+Life UI / future ChatGPT / future import
+                 ↓
+        canonical domain validation
+                 ↓
+       Next.js API / restricted RPC
+                 ↓
+              Supabase
 ```
 
-详细设计见：
+详细产品边界见 `docs/10-v2-life-redesign.md`，AI 写入设计见 `docs/11-ai-write-architecture.md`。
+
+## 3. V2-P1 当前实施内容
+
+当前开发分支：
 
 ```text
-docs/10-v2-life-redesign.md
+v2/life-records
 ```
 
-## 3. V2-P0 — 当前实施内容
+已完成：
 
-- [x] 从稳定生产 HEAD 建立 `v2/life-foundation` 分支；
-- [x] 新增 `/game` 路由，继续渲染现有完整 `HomeScreen`；
-- [x] 根 `/` 暂时不切换，避免在新生活首页未完成前影响生产逻辑；
-- [x] 建立 `components/life/LifeAppShell.tsx` 作为新生活系统代码边界；
-- [x] GitHub CI Node 版本由 20 对齐到 Vercel production 的 Node 24；
-- [x] 把纯饮食 UI 从 `HomeResourcesProvider` 中抽成 `DailyMealsPanelCore`，旧 `DailyMealsPanel` 只保留游戏关联适配；
-- [x] GitHub CI Test / Lint / Build 在 Node 24 下全部通过；
-- [x] Vercel Preview 为 READY，构建产物同时生成 `/` 与 `/game`；
-- [ ] 在带 Vercel Preview 身份的真实浏览器中人工点开 `/game` 做最终视觉/交互验收。
+- [x] `mood_entries` schema；
+- [x] `sleep_records` schema；
+- [x] `activity_entries` schema；
+- [x] `record_write_receipts`：为 ChatGPT / import 等外部写入提供跨领域幂等回执基础；
+- [x] Life RPC：按日读取、心情 upsert、睡眠 upsert、活动新增/修改/软删除；
+- [x] `lib/life/life-service.ts` 类型与输入校验；
+- [x] `lib/server/supabase-life.ts` 服务端 Supabase 边界；
+- [x] `/api/life/day`；
+- [x] `/api/life/mood`；
+- [x] `/api/life/sleep`；
+- [x] `/api/life/activities`；
+- [x] `/api/life/activities/[id]`；
+- [x] `lib/life/life-client.ts` 浏览器 client；
+- [x] `lib/ai/record-write-protocol.ts` 通用 AI 写入协议基础；
+- [x] life / AI protocol 单元测试；
+- [x] GitHub CI Test / Lint / Build 全部通过；
+- [x] Vercel Preview build READY；
+- [x] additive migration 已应用到 production Supabase；
+- [x] production RPC transaction smoke test 通过并 rollback，未留下测试数据；
+- [ ] 合并 V2-P1。
 
-V2-P0 不改 Supabase schema，不改游戏规则，不改兑换机制。
+Supabase smoke test 在事务内临时写入 mood / sleep / activity，并由 `get_life_day` 成功读回，随后 `ROLLBACK`。复查新表均为 0 行，未污染真实数据。
+
+本阶段仍不切换根 `/`，不开发最终首页视觉。
 
 ## 4. V2 目标信息架构
 
@@ -92,7 +116,7 @@ V2-P0 不改 Supabase schema，不改游戏规则，不改兑换机制。
 
 ## 5. 数据边界
 
-当前已有事实域继续保持：
+已有事实域继续保持：
 
 ```text
 intake    -> meals / meal_items
@@ -101,7 +125,7 @@ weight    -> weight_measurements
 exercise  -> daily_record_sides.exercise_minutes（旧游戏）
 ```
 
-V2 预计新增：
+V2 Life 新事实域：
 
 ```text
 mood_entries
@@ -109,9 +133,41 @@ sleep_records
 activity_entries
 ```
 
-生活系统中的“活动”是统一用户概念，不在首页拆成学习 / 运动 / 散步等多个任务；数据库可为未来 AI 结构化保留可选类型和时长字段。
+生活系统中的“活动”是统一用户概念，不在首页拆成学习 / 运动 / 散步等多个任务；数据库保留 `activity_type / duration_minutes` 作为可选结构化字段，手动 UI 不强迫填写，未来 AI 可以在明确事实基础上填充。
 
-## 6. 旧游戏边界
+`record_write_receipts` 不是生活事实本身，而是外部写入幂等/审计基础。它预留 domain：
+
+```text
+meal / mood / sleep / activity / weight / medicine
+```
+
+## 6. AI 写入架构原则
+
+以后不是“饮食单独接一个 AI、药箱再单独造一个 AI”。统一遵循：
+
+```text
+用户自然语言 / 图片
+↓
+对话层理解与草稿
+↓
+用户明确确认保存/修改
+↓
+通用 ChatGPT idempotency key
+↓
+领域专属 prepare + validation
+↓
+领域专属 canonical write service / restricted RPC
+↓
+read-back
+↓
+确认成功
+```
+
+`lib/ai/record-write-protocol.ts` 已定义统一 domain 与幂等键格式，但**没有提供任意 SQL 写入口**。
+
+未来可逐步接入：饮食、心情、睡眠、活动、体重、家庭药箱。每个领域仍拥有自己的字段校验、权限和写入规则。
+
+## 7. 旧游戏边界
 
 旧游戏继续完整保留：
 
@@ -124,7 +180,7 @@ activity_entries
 - 成长日志；
 - 原有同步 / 备份机制。
 
-当前代码仍位于：
+代码仍主要位于：
 
 ```text
 components/home
@@ -134,16 +190,16 @@ HomeResourcesProvider
 
 V2 不把 `HomeResourcesProvider` 扩大为生活系统全局 Provider。
 
-饮食边界当前已经调整为：
+饮食已经完成代码级拆分：
 
 ```text
 DailyMealsPanel            旧游戏适配层；读取 HomeResourcesProvider
 └─ DailyMealsPanelCore     纯饮食 UI；不读取 HomeResourcesProvider
 ```
 
-未来独立“饮食”主页面直接复用 `DailyMealsPanelCore`，不需要挂载旧游戏 Provider。
+因此“饮食已经从旧游戏 Provider 中拆出来”，但**产品层目前仍在旧游戏今日页展示**；未来独立饮食页直接复用 `DailyMealsPanelCore`。
 
-## 7. 饮食后续
+## 8. 饮食后续
 
 现有 Meal CRUD / ChatGPT “记上”继续有效。
 
@@ -163,29 +219,20 @@ NULL = 没有估算
 0    = 确实为 0 kcal
 ```
 
-这项数据库修改不与 V2-P0 混在一起。
+## 9. 家庭药箱后续
 
-## 8. 家庭药箱后续
+家庭药箱作为独立数据域；收到真实 Excel 后再确定最终 schema 和导入字段。
 
-家庭药箱将作为独立数据域；收到真实 Excel 后再确定最终 schema 和导入字段。
+未来目标包括：药名 / 规格 / 数量 / 存放位置、保质期 / 开封后有效期、状态与软删除、source / idempotency、AI 受限查询与确认后修改、change log / audit。
 
-未来目标包括：
+药箱 AI 写入将复用通用 AI 写入协议和 `record_write_receipts` 思路，而不是获得通用数据库写权限。真实 Excel 和真实家庭库存数据不得提交到 GitHub migration。
 
-- 药名 / 规格 / 数量 / 存放位置；
-- 保质期 / 开封后有效期；
-- 状态与软删除；
-- `source` / `idempotency_key`；
-- AI 受限查询与确认后修改；
-- 必要的 change log / audit。
-
-真实 Excel 和真实家庭库存数据不得提交到 GitHub migration。
-
-## 9. 后续顺序
+## 10. 后续顺序
 
 ```text
-V2-P0  新旧边界 + /game + 解耦
+V2-P0  新旧边界 + /game + 解耦          ✅
 ↓
-V2-P1  心情 / 睡眠 / 活动 schema + API
+V2-P1  心情 / 睡眠 / 活动 schema + API   🚧
 ↓
 V2-P2  新生活首页
 ↓
@@ -202,7 +249,9 @@ V2-P7  日记 / 小信箱
 Later   月度双人心情图 / Mini Games / 动物岛生活可视化
 ```
 
-## 10. 工程和安全规则
+AI 不单独作为一个“最后阶段”；每个事实域具备稳定 canonical API 后，可按需要逐步增加 AI adapter。
+
+## 11. 工程和安全规则
 
 继续保持：
 
@@ -210,16 +259,22 @@ Later   月度双人心情图 / Mini Games / 动物岛生活可视化
 Browser -> Next.js API -> server-only Supabase -> PostgreSQL
 ```
 
+ChatGPT 路径继续是受授权的非浏览器路径，必须受限到领域写入接口。
+
 - Supabase secret 不进入浏览器；
 - 生产 DDL 只通过新 migration；
 - 旧 migration 不回改；
-- Web / ChatGPT / import 最终应复用同一领域事实和受限写入逻辑；
+- Web / ChatGPT / import 最终复用同一领域事实；
 - AI 不获得通用 SQL 修改游戏 / 钱包 / 药箱的权限；
+- 外部写入必须使用稳定幂等键；
+- 结果不确定时先 read-back / 查回执，再用同 key 重试；
 - 每个阶段至少执行 Test / Lint / Build，并通过 Vercel Preview 检查。
 
-## 11. 旧兼容债
+Supabase Advisor 对新表只出现项目既有的 `RLS enabled, no policy` INFO；这是 server-only/service-role 架构的预期结果。没有出现新的高等级安全告警。参考：https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
 
-以下继续保留为 Later，不在普通 V2 业务开发中顺手清理：
+## 12. 旧兼容债
+
+以下继续保留为 Later：
 
 - `reloadFromGitHub / syncToGitHub` legacy 命名；
 - `/data/couple-data.json` proxy shim；
@@ -227,17 +282,13 @@ Browser -> Next.js API -> server-only Supabase -> PostgreSQL
 - 完整 Supabase Auth / membership；
 - server-authoritative 游戏结算。
 
-## 12. 下一步是什么
+## 13. 下一步是什么
 
-V2-P0 的代码边界和自动验证已经完成；在合并前只剩一次人工 Preview 验收。
-
-通过后进入：
+V2-P1 合并后进入：
 
 ```text
-V2-P1
--> 设计 mood_entries / sleep_records / activity_entries
--> 新增 migration / RPC / Next.js API
--> 暂时不切换根首页
+V2-P2
+-> 新生活主框架
+-> 今日只显示心情 / 睡眠 / 活动
+-> 暂时不把饮食、体重、药箱、信箱塞回首页
 ```
-
-Supabase 当前保持不变。
