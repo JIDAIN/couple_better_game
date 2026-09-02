@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
+import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { saveMood } from "@/lib/life/life-client";
 import type { LifeDayRecord, LifePartnerKey, MoodKey } from "@/lib/life/life-service";
-import { MOODS, SELF_KEY, TA_KEY, moodVisual } from "./today-life-model";
+import { MOODS, moodVisual } from "./today-life-model";
 
 export function TodayMoodCard({
   date,
@@ -17,6 +18,7 @@ export function TodayMoodCard({
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
 }) {
+  const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState<LifePartnerKey | null>(null);
   const moodByRole = useMemo(() => {
@@ -25,10 +27,11 @@ export function TodayMoodCard({
     return map;
   }, [day.moods]);
 
-  async function choose(partnerKey: LifePartnerKey, moodKey: MoodKey) {
-    setSaving(partnerKey);
+  async function choose(moodKey: MoodKey) {
+    if (!mePartnerKey) return;
+    setSaving(mePartnerKey);
     try {
-      await saveMood({ partnerKey, moodDate: date, moodKey });
+      await saveMood({ partnerKey: mePartnerKey, moodDate: date, moodKey });
       await onChanged();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : "保存心情失败");
@@ -37,27 +40,30 @@ export function TodayMoodCard({
     }
   }
 
+  if (!mePartnerKey || !taPartnerKey) {
+    return <section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section>;
+  }
+
   return (
     <section className="life-surface life-section-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-extrabold text-[var(--life-text)]">🍃 心情</p>
-          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">点一下就记好，不需要解释。</p>
+          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">“我”永远是当前登录的人，Ta 是另一方。</p>
         </div>
         <AppButton variant="ghost" onClick={() => setEditing((value) => !value)}>
-          {editing ? "完成" : day.moods.length ? "修改" : "+ 记录"}
+          {editing ? "完成" : moodByRole.has(mePartnerKey) ? "修改" : "+ 记录"}
         </AppButton>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <MoodFace label="我" moodKey={moodByRole.get(SELF_KEY)} />
-        <MoodFace label="Ta" moodKey={moodByRole.get(TA_KEY)} />
+        <MoodFace label="我" moodKey={moodByRole.get(mePartnerKey)} />
+        <MoodFace label="Ta" moodKey={moodByRole.get(taPartnerKey)} />
       </div>
 
       {editing ? (
-        <div className="mt-4 grid gap-3 border-t border-[var(--life-border-soft)] pt-4">
-          <MoodEditor label="我" value={moodByRole.get(SELF_KEY)} disabled={saving === SELF_KEY} onChange={(key) => void choose(SELF_KEY, key)} />
-          <MoodEditor label="Ta" value={moodByRole.get(TA_KEY)} disabled={saving === TA_KEY} onChange={(key) => void choose(TA_KEY, key)} />
+        <div className="mt-4 border-t border-[var(--life-border-soft)] pt-4">
+          <MoodEditor label="我的心情" value={moodByRole.get(mePartnerKey)} disabled={saving === mePartnerKey} onChange={(key) => void choose(key)} />
         </div>
       ) : null}
     </section>
