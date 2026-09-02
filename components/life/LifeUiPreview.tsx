@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppCard } from "@/components/ui/AppCard";
-import { AppGameIcon } from "@/components/ui/AppGameIcon";
+import { AppIcon } from "@/components/ui/AppIcon";
 import { AppInput } from "@/components/ui/AppInput";
 import { AppRoleAvatar } from "@/components/ui/AppRoleAvatar";
 
@@ -43,8 +43,8 @@ function MoodRoleRow({
       <div className="mb-3 flex items-center gap-2">
         <AppRoleAvatar role={role} size={30} />
         <div>
-          <p className="font-semibold text-[#6f5b43]">{role === "fish" ? "鱼鱼" : "猫猫"}</p>
-          <p className="text-xs text-[#9a876f]">今天感觉怎么样？</p>
+          <p className="font-semibold text-[var(--text-main)]">{role === "fish" ? "鱼鱼" : "猫猫"}</p>
+          <p className="text-xs text-[var(--text-muted)]">今天感觉怎么样？</p>
         </div>
       </div>
       <div className="grid grid-cols-7 gap-1.5" role="radiogroup" aria-label={`${role} 今日心情`}>
@@ -58,16 +58,16 @@ function MoodRoleRow({
               aria-checked={selected}
               aria-label={mood.label}
               onClick={() => onChange(mood.key)}
-              className={`flex min-h-14 flex-col items-center justify-center rounded-[18px] border px-1 py-2 transition duration-150 active:translate-y-0.5 ${
+              className={`flex min-h-14 flex-col items-center justify-center rounded-[var(--radius-control)] border px-1 py-2 transition duration-150 active:translate-y-0.5 ${
                 selected
-                  ? "border-[#53b9aa] bg-[#e5f6f1] shadow-[0_3px_0_rgba(91,155,143,0.28)]"
-                  : "border-[#ded5c4] bg-[#fffdf7] hover:bg-[#f8f3e7]"
+                  ? "border-[var(--animal-accent)] bg-[var(--animal-accent-soft)] shadow-[var(--shadow-soft)]"
+                  : "border-[var(--card-border-soft)] bg-[var(--card-bg-strong)] hover:bg-[var(--bg-soft)]"
               }`}
             >
               <span className={`text-xl transition-transform ${selected ? "scale-110" : ""}`} aria-hidden>
                 {mood.emoji}
               </span>
-              <span className="mt-1 hidden text-[10px] text-[#79664f] sm:block">{mood.label}</span>
+              <span className="mt-1 hidden text-[10px] text-[var(--text-body)] sm:block">{mood.label}</span>
             </button>
           );
         })}
@@ -83,25 +83,25 @@ export function SleepRecordPreview() {
 
   return (
     <AppCard variant="soft" className="!p-4">
-      <div className="mb-3 flex items-center gap-2 text-[#6f5b43]">
-        <AppGameIcon name="sparkle" size={18} />
+      <div className="mb-3 flex items-center gap-2 text-[var(--text-main)]">
+        <span aria-hidden>🌙</span>
         <strong>睡眠</strong>
-        <span className="ml-auto text-xs text-[#9a876f]">只记入睡和起床</span>
+        <span className="ml-auto text-xs text-[var(--text-muted)]">只记入睡和起床</span>
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
-        <label className="grid gap-1.5 text-xs text-[#826e55]">
+        <label className="grid gap-1.5 text-xs text-[var(--text-body)]">
           <span>🌙 入睡</span>
           <AppInput type="time" value={sleepAt} onChange={(event) => setSleepAt(event.target.value)} />
         </label>
-        <span className="pb-3 text-lg text-[#b5a58f]" aria-hidden>
+        <span className="pb-3 text-lg text-[var(--text-placeholder)]" aria-hidden>
           →
         </span>
-        <label className="grid gap-1.5 text-xs text-[#826e55]">
+        <label className="grid gap-1.5 text-xs text-[var(--text-body)]">
           <span>☀️ 起床</span>
           <AppInput type="time" value={wakeAt} onChange={(event) => setWakeAt(event.target.value)} />
         </label>
       </div>
-      <p className="mt-3 rounded-full bg-[#f5eedf] px-3 py-2 text-center text-sm text-[#725e45]">
+      <p className="mt-3 rounded-full bg-[var(--bg-warm)] px-3 py-2 text-center text-sm text-[var(--text-body)]">
         {duration ? `约 ${duration}` : "选择时间后自动计算时长"}
       </p>
     </AppCard>
@@ -132,17 +132,17 @@ export function ActivityNotePreview() {
 
   return (
     <AppCard variant="soft" className="!p-4">
-      <div className="mb-3 flex items-center gap-2 text-[#6f5b43]">
-        <AppGameIcon name="notebook" size={18} />
+      <div className="mb-3 flex items-center gap-2 text-[var(--text-main)]">
+        <AppIcon name="icon-design" size={18} />
         <strong>今天做了什么</strong>
       </div>
       <div className="grid gap-2">
         {items.map((item, index) => (
           <div
             key={`${item}-${index}`}
-            className="flex items-start gap-2 rounded-[18px] border border-[#e5ddcf] bg-[#fffdf8] px-3 py-2.5 text-sm text-[#725e45]"
+            className="flex items-start gap-2 rounded-[var(--radius-control)] border border-[var(--card-border-soft)] bg-[var(--card-bg-strong)] px-3 py-2.5 text-sm text-[var(--text-body)]"
           >
-            <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[#67b9a8]" aria-hidden />
+            <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[var(--animal-accent)]" aria-hidden />
             <span>{item}</span>
           </div>
         ))}
@@ -171,21 +171,21 @@ export function FeatureTilePreview({
   title,
   description,
 }: {
-  icon: "data" | "nest" | "notebook" | "gift";
+  icon: string;
   title: string;
   description: string;
 }) {
   return (
     <button
       type="button"
-      className="flex w-full items-center gap-3 rounded-[24px] border border-[#dfd4c0] bg-[#fffdf7] p-3 text-left shadow-[0_4px_0_rgba(199,184,157,0.35)] transition hover:-translate-y-0.5 active:translate-y-0"
+      className="flex w-full items-center gap-3 rounded-[var(--radius-card)] border border-[var(--card-border-soft)] bg-[var(--card-bg-strong)] p-3 text-left shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 active:translate-y-0"
     >
-      <span className="grid h-11 w-11 place-items-center rounded-[16px] bg-[#e7f5ee]">
-        <AppGameIcon name={icon} size={22} />
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-control)] bg-[var(--animal-accent-soft)] text-xl" aria-hidden>
+        {icon}
       </span>
       <span className="min-w-0">
-        <strong className="block text-sm text-[#6d5941]">{title}</strong>
-        <span className="mt-0.5 block text-xs leading-5 text-[#9a876f]">{description}</span>
+        <strong className="block text-sm text-[var(--text-main)]">{title}</strong>
+        <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">{description}</span>
       </span>
     </button>
   );
