@@ -3,240 +3,176 @@
 ## 1. 当前生产架构
 
 ```text
-GitHub repository
-    │ code push
-    ▼
-Vercel
-├─ Next.js frontend
-├─ API Routes
-└─ server environment variables
-    │
-    ▼
-Supabase PostgreSQL
+Browser
+  -> Next.js / Vercel same-origin API
+  -> Supabase Auth identity + server authorization
+  -> server-only domain service / restricted RPC
+  -> Supabase PostgreSQL / Storage
 ```
 
-生产站点当前由 Vercel 托管；Supabase 是云端主数据源。
+浏览器不持有 Supabase service/secret key。ChatGPT 写入也只能通过已经定义的领域协议与受限 RPC，不能把任意 SQL 当作日常产品写入接口。
 
-ChatGPT P2 额外存在一条**非浏览器**路径：
-
-```text
-ChatGPT
--> 用户已授权的 Supabase 连接能力
--> service-only ChatGPT meal RPC
--> meals / meal_items
-```
-
-这条路径不改变浏览器安全边界，也不要求把数据库 secret 复制到聊天里。
+账户与配对的详细设计见 `docs/17-auth-and-pairing.md`。
 
 ## 2. 环境变量
 
-服务端相关：
+服务端 secret：
 
 ```text
-DATA_EDIT_PASSWORD
 SUPABASE_SECRET_KEY
+# 或兼容：SUPABASE_SERVICE_ROLE_KEY
+DATA_EDIT_PASSWORD      # 仅迁移期/旧系统兼容
 ```
 
-兼容 / 可选：
+Supabase 地址：
 
 ```text
-SUPABASE_SERVICE_ROLE_KEY
 SUPABASE_URL
-COUPLE_SPACE_SLUG
+# 或兼容：NEXT_PUBLIC_SUPABASE_URL
+```
+
+R1B Auth 还需要一个 Supabase 可发布 key，支持以下任一变量名：
+
+```text
+SUPABASE_PUBLISHABLE_KEY
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+SUPABASE_ANON_KEY
+NEXT_PUBLIC_SUPABASE_ANON_KEY
 ```
 
 规则：
 
-- secret key 不得写 Git；
-- secret key 不得出现在客户端 bundle；
-- secret key 不得复制到普通聊天内容作为 ChatGPT 持久化凭证；
-- **禁止** `NEXT_PUBLIC_SUPABASE_SECRET_KEY`；
-- `.env*` 已被 gitignore；
-- 文档只写变量名，不写真实值。
+- secret/service-role key 不得进入 Git；
+- 禁止 `NEXT_PUBLIC_SUPABASE_SECRET_KEY`；
+- 文档只写变量名，不写真实值；
+- `.env*` 保持 gitignore；
+- 下一次 Vercel 部署前必须确认 Production 已配置 Auth 可发布 key，否则 `/api/auth/*` 无法工作。
 
-旧 GitHub JSON 同步需要的 `GITHUB_TOKEN / GITHUB_DATA_FILE_PATH` 等不再是当前业务同步依赖。
+## 3. Supabase Auth 与 Cookie
 
-## 3. Supabase 权限模型
+R1B 的密码验证、账号创建、access token、refresh token 均由 Supabase Auth 完成。
 
-当前 production base tables 均开启 RLS。
-
-当前模式刻意不配置 anon/authenticated 业务 policy，因为浏览器不直接访问数据库；服务端使用 secret/service-role 权限。
-
-当前 server-only meal RPC 已验证：
+浏览器只访问本站：
 
 ```text
-service_role: execute
-anon: no execute
-authenticated: no execute
+/api/auth/signup
+/api/auth/login
+/api/auth/session
+/api/auth/logout
+/api/auth/bootstrap
+/api/auth/pairing/invite
+/api/auth/pairing/accept
 ```
 
-ChatGPT P2 新增：
+access/refresh token 由 Next.js 写入 HttpOnly、SameSite=Lax Cookie；不要求页面 JavaScript 保存 token 到 localStorage。
+
+当前实现为服务端薄 HTTP adapter。正式引入 `@supabase/ssr` 后，应切换到 Supabase 官方 SSR client/proxy session refresh 方案，而不是发展自定义 token 协议。
+
+## 4. 双人空间权限
 
 ```text
-create_chatgpt_meal_record
-get_chatgpt_meal_record
+Auth user
+-> couple_space_members
+-> couple_space_id + partner_key(cat|fish)
 ```
 
-同样只允许 service-role 级调用，不向 `anon` / `authenticated` 开放。
+个人数据写入不能仅相信客户端传入的 `partnerKey`。
 
-`create_chatgpt_meal_record` 还额外要求：
-
-- `chatgpt:` 前缀 idempotency key；
-- 至少 1 个、最多 50 个 item；
-- item 名称存在；
-- kcal 为非负整数；
-- item 热量区间合法；
-- 整餐中心热量等于 item kcal 之和；
-- RPC 强制 `source=chatgpt`、`status=confirmed`；
-- 同 key 使用事务 advisory lock，降低并发重复写入风险。
-
-以后如果加入 Supabase Auth，不要简单“给 authenticated 全开”，必须按 CoupleSpace membership 重做 policy。
-
-## 4. Cloud session
-
-cloud session 是共享同步密码验证后的 HttpOnly cookie。
-
-安全目的：
-
-- 避免每次读取都把 password 放 JS 请求体；
-- 防止新设备未经读取就直接覆盖云端；
-- 将浏览器和 Supabase secret 隔离。
-
-它不等价于：
-
-- 独立用户账号；
-- 多角色权限；
-- 可撤销设备 session 数据库；
-- MFA。
-
-ChatGPT P2 不复用或读取浏览器 HttpOnly cookie；它走用户已授权的连接器能力。
-
-## 5. ChatGPT 持久化安全规则
-
-### 未确认不写
-
-讨论、图片分析、热量估算、修改估算都不允许触发数据库写入。只有明确保存意图，例如“记上”“把这餐记下来”，才进入写入路径。
-
-### 不把 connector 变成通用数据库写入口
-
-日常餐食聊天只调用受限的 ChatGPT meal RPC，不使用任意 SQL 去改游戏、钱包或其他表。
-
-开发/排障时可以使用数据库管理工具，但必须区分“维护数据库”和“用户说记上”的产品路径。
-
-### 重试必须复用幂等键
-
-一次确认只生成一个 `chatgpt:` key。工具调用超时或返回不确定时：
-
-1. 先按同 key 查询；
-2. 已存在则视为成功；
-3. 不存在才用同 key 重试；
-4. 不允许换新 key 盲目重发。
-
-### 角色不能猜
-
-当前约定用户饮食聊天为 `fish`，伴侣专用饮食聊天为 `cat`。上下文不明确时不能猜角色后写入。
-
-### 数据域隔离
-
-ChatGPT meal RPC 只写饮食事实，不自动修改：
-
-- deficit；
-- 运动；
-- 体重；
-- wallet / ledger；
-- coin / gem / heatmap。
-
-## 6. 数据同步安全
-
-### 当前主数据源
-
-Supabase。
-
-### 本地
-
-localStorage 是运行缓存。同步失败时不应清空本地可用数据。
-
-### 新设备
-
-首次必须下载后才能上传。
-
-### 本地 dirty
-
-有未同步修改时，远端重新加载需要显式确认覆盖。
-
-## 7. GitHub public JSON 历史
-
-旧方案曾把完整兼容快照提交到：
+当前已开始执行：
 
 ```text
-public/data/couple-data.json
+登录身份 == payload.partnerKey -> 允许
+登录身份 != payload.partnerKey -> 403 OWN_RECORD_ONLY
 ```
 
-该方案已经退出：
+已接入 mood / sleep / weight 新增写入。Meal、Mailbox、Activity 继续逐域迁移。
 
-- 当前文件已删除；
-- `/api/save-data` 不再写 GitHub；
-- main 和旧 UI 分支的可达历史已重写；
-- `.gitignore` 防止文件再次提交；
-- 当前生产访问旧 `/data/couple-data.json` 无有效 cloud session 不再得到公开数据。
+## 5. 首次迁移与邀请码
 
-### 仍在跟进
+第一个真实账号的历史数据迁移绑定只能通过 `/api/auth/bootstrap`：
 
-GitHub 对失去分支引用的旧对象/cached views 不会立刻物理清除。
+- 必须已经 Supabase Auth 登录；
+- 必须提供旧系统同步密码；
+- membership 表必须仍为空；
+- 只能绑定一次。
 
-截至 2026-09-01：
+数据库中曾存在的 `bootstrap_couple_space_membership` SECURITY DEFINER RPC 已撤销 `authenticated` 执行权，防止绕过 Next.js 的迁移密码验证。
 
-- GitHub Support `Clear Cached Views` 工单已创建并处于 open；
-- 等 Support 完成后需要再次验证旧 SHA URL 是否不可访问。
+第二个账号只能使用一次性邀请码加入：
 
-这属于外部平台清理，不应恢复代码层 GitHub 数据同步来“解决”。
+- 12 位随机十六进制码；
+- 24 小时有效；
+- 数据库只存 SHA-256 摘要；
+- 使用后立即失效；
+- 目标 `cat/fish` 槽必须为空。
 
-## 8. 历史 Vercel 部署
+`create_couple_space_invite` / `accept_couple_space_invite` 是**有意暴露给 authenticated 的窄 SECURITY DEFINER RPC**：它们都基于 `auth.uid()`、成员身份、角色槽、过期时间和一次性状态限制能力，不向 `anon` 开放。Supabase Security Advisor 因此会对这两个函数报告 lint 0029；这是已审查的有意例外，而不是未发现的开放权限。参考：https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0029_authenticated_security_definer_function_executable
 
-Vercel 的旧 immutable deployment 可能对应历史代码版本。当前生产 alias 已指向安全版本，但仍应在后续安全巡检中确认：
+## 6. RLS / server-only 表
 
-- 旧部署是否受 Vercel Authentication 保护；
-- 是否存在仍能匿名访问历史 JSON 的 deployment URL；
-- 如平台支持，清理不需要的历史敏感 deployment。
+大量现有业务表启用了 RLS 但没有 anon/authenticated policy，这是当前 server-only 架构的刻意结果，而不是要求立刻“补一个开放 policy”。
 
-当前不要把“production 已安全”自动等价为“所有历史 deployment 已物理删除”。
+Security Advisor 会显示 `RLS Enabled No Policy` INFO：
+https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
 
-## 9. 备份与恢复
+不要为了消掉 INFO 而允许浏览器直接读写业务表。
 
-即使有 Supabase，也保留完整 JSON 导出：
+## 7. 旧 cloud-session
 
-- 是用户可控备份；
-- 云端故障时可恢复；
-- migration 前可做 checkpoint。
+`DATA_EDIT_PASSWORD` + `couple-cloud-session` 不再是目标账户系统，只保留为迁移兼容：
 
-恢复是覆盖式导入，必须先确认；失败不能产生部分 state。
+- 两个真实 Auth 账号尚未创建前，不能突然锁死现有生产数据；
+- 第一个账号迁移绑定仍需要旧同步密码证明；
+- `/game` 旧游戏的稳定同步路径暂不在 R1B 强制重写。
 
-CSV 是复盘导出，不是恢复格式。
+删除条件见 `docs/17-auth-and-pairing.md`。完成双账号迁移和各领域权限迁移后必须删除这条兼容路径。
 
-## 10. 部署前安全检查
+## 8. ChatGPT / AI 写入
+
+继续坚持：
 
 ```text
-[ ] env 没进 Git
-[ ] secret 没有 NEXT_PUBLIC 前缀
-[ ] ChatGPT 流程没有把 secret/token 复制进聊天
-[ ] data API 有 auth/session guard
-[ ] RLS/grants 无意外开放
-[ ] ChatGPT meal RPC 仍仅 service_role execute
-[ ] 新设备保护仍存在
-[ ] public/data/couple-data.json 不存在
+讨论 / 估算 -> 不写
+用户明确确认 -> 领域 validation -> restricted write -> read-back
+```
+
+AI 不获得任意数据库管理能力；Meal 等领域继续使用幂等键，不能因超时换新 key 盲目重复写入。
+
+## 9. 数据同步与恢复
+
+- Supabase 是生产事实源；
+- localStorage 仅运行缓存/旧游戏兼容；
+- 同步失败不能清空本地可用状态；
+- 新设备保护、dirty reload guard、JSON 备份继续保留；
+- CSV 仅用于复盘，不作为恢复格式。
+
+## 10. Vercel 部署审批
+
+仓库默认必须保持：
+
+```json
+{
+  "git": {
+    "deploymentEnabled": false
+  }
+}
+```
+
+任何 Preview 或 Production 都需要用户针对该次部署明确授权。此前一次 Production 授权已经使用完毕，不自动延续到本轮重构。
+
+## 11. 下一次部署前检查
+
+```text
+[ ] Git 自动部署仍关闭
+[ ] Test / Lint / Build 全部通过
+[ ] Production 已配置 Supabase publishable/anon key
+[ ] secret/service-role key 未进入浏览器
+[ ] Auth 未登录 -> session 为 unauthenticated
+[ ] 已登录未绑定 -> 业务 API 返回 PAIRING_REQUIRED
+[ ] 已绑定账号不能写 Ta 的个人记录
+[ ] bootstrap 不能被 authenticated 直接 RPC 绕过
+[ ] invite RPC anon 无 execute
 [ ] migration 不包含真实个人数据
-[ ] smoke test 数据已清理
+[ ] Security Advisor 没有新增意外高权限入口
+[ ] 部署本身已获得本次明确授权
 ```
-
-## 11. 部署验证
-
-对于影响 API / 数据库的变更，应验证：
-
-1. Vercel deployment `READY`；
-2. Next build / TypeScript 通过；
-3. 未授权 API 返回 401；
-4. 授权路径能正常读写；
-5. Supabase 数据没有重复 / 丢失；
-6. server-only RPC grants 正确；
-7. smoke test 数据已清理；
-8. 必要时检查 runtime logs。
