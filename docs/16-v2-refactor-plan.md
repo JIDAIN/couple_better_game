@@ -14,36 +14,56 @@
 
 目标：建立真正的用户身份与双人空间权限边界，并消除当前 Tab 重复导航造成的“刷新感”。
 
-### R1A（本提交）
+### R1A ✅ 已完成
 
 - 新增 `life_user_profiles`。
 - 新增 `couple_space_members`，将 Supabase Auth 用户映射为某个双人空间中的 `cat` / `fish` 成员。
 - 每个双人空间最多一个 `cat` 和一个 `fish`。
 - 新用户创建时自动创建 profile。
-- 新增 `current_life_identity()` 和 `is_couple_space_member()`。
-- profile / membership 启用 RLS；membership 写入暂时仍保持 service-only，等待配对流程使用窄 RPC。
-- 现有生活业务表仍保持 server-only，不在本阶段开放浏览器直连。
-- 当前底部 Tab 不再渲染成可导航 Link；再次点击“今日”等当前 Tab 不触发同路由导航。
+- 新增当前身份查询和成员判断基础。
+- profile / membership 启用 RLS；生活业务表继续保持 server-only。
+- 当前底部 Tab 不再渲染成可导航 Link，再次点击当前 Tab 不触发同路由导航。
 
-### R1B
+### R1B ✅ 账户/配对主链路已完成
 
-采用 Supabase 官方 Auth 客户端/SSR 方案，而不是自行实现 token 生命周期：
+本阶段不自建密码系统，认证本身使用 Supabase Auth。当前实现先采用**服务端薄适配器调用 Supabase 官方 Auth HTTP API**，浏览器只调用本站同源 `/api/auth/*`，access/refresh token 仅放在 HttpOnly Cookie 中，不暴露 service key。
 
-- 引入 Supabase 官方 JS/SSR 包。
-- 登录、注册、退出和 session refresh。
-- `/me` 改成真实账户页。
-- API 从共享 `DATA_EDIT_PASSWORD` 身份迁移到 Auth user + membership。
-- 旧 cloud-session 只作为迁移期兼容层，最终移除。
-- 建立双人配对/邀请窄 RPC。
+已完成：
 
-### R1C
+- 邮箱 + 密码注册、登录、退出。
+- Auth session 查询；access token 失效时可使用 refresh token 更新会话。
+- `/login` 岛屿生活登录/注册页。
+- `/me` 改为真实账户页，不再重复介绍“小窝”。
+- 第一个真实账号通过旧系统同步密码执行**一次性迁移绑定**，选择自己的 `cat` / `fish` 身份并成为 owner。
+- 第二个账号必须通过邀请码加入，不允许再次使用共享迁移密码建立成员。
+- 邀请码 24 小时有效；数据库只保存 SHA-256 摘要，不保存邀请码明文；使用后立即失效。
+- `couple_space_members` 继续保证同一空间 `cat` / `fish` 各只有一个成员。
+- Life API 已优先接受真实 Auth + membership；旧 `cloud-session` 仅作为迁移期兼容层，避免账号尚未建立时锁死现有生产数据。
+- 心情、睡眠、体重等个人记录写入开始执行服务端“只能写自己的 `partnerKey`”规则；不能仅靠前端隐藏 Ta 的编辑按钮。
 
-采用成熟缓存库（优先 TanStack Query）：
+迁移期说明：
 
-- LifeAppShell 持久 QueryClient。
+- 当前 Supabase Auth 仍没有人为创建的假账号；实际账号由用户在登录页自行注册。
+- 现有业务数据没有重新归属或复制，仍留在原来的 couple space。
+- 旧共享 `DATA_EDIT_PASSWORD` 只用于第一个真实账户迁移以及旧系统兼容，后续完成账户迁移后删除。
+- 当前没有为了引入 Auth 强行修改 `package-lock.json`。后续如引入 `@supabase/ssr`，应直接采用 Supabase 官方 Next.js SSR client/proxy 模式替换薄 HTTP 适配器，而不是自己维护第二套 token 协议。
+
+仍需继续收紧的账户边界：
+
+- Meal 创建/修改/删除按当前登录身份限制。
+- 信箱发件人固定为当前登录身份。
+- 活动记录明确参与人/创建人权限。
+- 完成真实双账号迁移后删除旧 cloud-session 兼容路径。
+
+### R1C 下一步：数据缓存与无闪烁切换
+
+采用成熟缓存库，优先 TanStack Query：
+
+- `LifeAppShell` 持久 QueryClient。
 - 今日、饮食、日历、小窝资源使用稳定 query key。
 - mutation 后只更新/失效相关数据，不重新加载整页。
 - 页面切换优先显示缓存，后台 revalidate。
+- 目标是解决实机中“点一下就重新加载整块页面”的刷新感，而不是单纯缩短 loading 动画。
 
 ## R2：首页心情
 
