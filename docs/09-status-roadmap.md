@@ -1,8 +1,8 @@
 # 当前状态与 Roadmap
 
-**状态日期：2026-09-02**
+**状态日期：2026-09-03**
 
-详细重构计划见 `docs/16-v2-refactor-plan.md`；固定双账号与权限边界见 `docs/17-auth-and-pairing.md`。
+详细重构计划见 `docs/16-v2-refactor-plan.md`；固定双账号与权限边界见 `docs/17-auth-and-pairing.md`；导航缓存见 `docs/18-r1c-navigation-cache.md`。
 
 ## 1. 已完成的 V2 主功能
 
@@ -25,8 +25,8 @@ V2-P11 全站代码边界联调                         ✅
 ## 2. Production 实机验收后的重构
 
 ```text
-R1 账户 / 权限 / 导航 / 缓存
-R2 首页心情
+R1 账户 / 权限 / 导航 / 缓存        ✅ 基础完成
+R2 首页心情                         ▶ 下一阶段
 R3 饮食餐次与多加餐
 R4 情绪月历
 R5 小窝 / 我的职责重分
@@ -35,60 +35,37 @@ R6 全站视觉还原
 
 ## 3. R1 当前状态
 
-### R1A ✅
-
+### R1A ✅ 导航
 - 当前底部 Tab 再次点击自身不触发同路由导航。
-- 曾加入通用 Supabase Auth membership 基础；产品复核后确定本项目只有两个固定账号，相关空表已在 R1B cleanup migration 中移除。
 
-### R1B ✅ 固定双账号
+### R1B ✅ 固定双账号与相对“我 / Ta”
+- 底层账号固定 `cat / fish`；共享旧 `DATA_EDIT_PASSWORD`。
+- 登录后签发 HMAC 签名 HttpOnly 身份 Cookie。
+- 前端 `我 / Ta` 相对当前会话动态解释。
+- 不开放注册、邮箱验证、邀请码或第三账号。
+- mood / sleep / weight 新增写入强制 `OWN_RECORD_ONLY`。
 
-```text
-我 -> cat
-Ta -> fish
-共享旧 DATA_EDIT_PASSWORD
-```
-
-已完成：
-
-- `/login` 只允许选择“我 / Ta”并输入旧密码；
-- 不开放注册、邮箱验证、邀请码、第三账号；
-- 登录后签发 HMAC 签名 HttpOnly 身份 Cookie；
-- `/me` 展示当前账号和同步边界；
-- mood / sleep / weight 新增写入强制 `OWN_RECORD_ONLY`；
-- 临时 Supabase Auth / membership / invite schema 已安全清理，当时生产表均为空；
-- 历史生活数据不迁移、不重写，继续使用原 `cat / fish` partnerKey。
-
-后续继续收紧：
-
-```text
-Meal create/update/delete -> 当前账号归属
-Mailbox sender            -> 当前账号身份
-Activity ownership        -> 明确创建人与参与人
-```
-
-### R1C 下一步
-
-优先引入 **TanStack Query**：
-
-- `LifeAppShell` 持久 QueryClient；
-- 今日、饮食、日历、小窝使用稳定 query key；
-- mutation 后局部更新/失效；
-- 页面切换优先展示缓存，后台 revalidate；
-- 解决实机切 Tab / 回首页 loading 闪烁。
+### R1C ✅ 持久身份与缓存基础
+- `LifeIdentityProvider` 上移根 layout，路由切换不重新创建身份边界。
+- 新增 stale-while-revalidate query cache，支持稳定 query key、TTL、并发合并、后台刷新、force refresh、局部 update/invalidate。
+- 今日页已接入 `life-day:YYYY-MM-DD`，返回首页优先显示缓存，不再先清空为整块 loading。
+- 饮食、日历、小窝资源在 R3-R5 重构时按同一模式接入。
 
 ## 4. 后续页面重构
 
-### R2 心情
+### R2 心情 / 睡眠
 - 只允许当前登录账号记录/修改自己的心情；
 - 另一方只读；
-- 弹出独立毛绒情绪选择层；
-- 删除字符模拟脸。
+- 弹出独立情绪选择层；
+- 删除字符模拟脸；
+- 睡眠 UI 也从双人编辑改为“我可编辑、Ta 只读”。
 
 ### R3 饮食
 - 早餐 / 午餐 / 晚餐固定槽；
 - 加餐为 0..N；
 - 新增加餐先选上午 / 下午 / 晚上；
-- 每条加餐独立编辑。
+- 每条加餐独立编辑；
+- Meal create/update/delete 接入当前账号所有权校验。
 
 ### R4 日历
 - 无心情留空；
@@ -103,11 +80,17 @@ Activity ownership        -> 明确创建人与参与人
 我的 = 当前账号 / 同步 / 数据管理 / 设置 / 退出
 ```
 
+并把小信箱 sender 固定为当前登录身份。
+
 ### R6 视觉
 
 以 `docs/12-island-life-design-system.md` 为唯一视觉基线；成熟 GitHub 项目和组件库优先复用逻辑/结构，但必须经过 App* / 岛屿视觉适配。
 
-## 5. 数据与安全边界
+## 5. 最终统一验收
+
+R6 完成且文档更新后统一运行 Test / Lint / Build；发现问题先修复，再重新执行并把结果回写文档。
+
+## 6. 数据与安全边界
 
 ```text
 Browser
@@ -122,6 +105,6 @@ Browser
 - DDL 只新增 migration，不修改已执行 migration；
 - 真实用户数据不提交公开 GitHub。
 
-## 6. 部署状态
+## 7. 部署状态
 
 `vercel.json` 默认保持 `git.deploymentEnabled: false`。此前 Production 单次授权已经结束；下一次 Preview / Production 必须重新取得明确授权。
