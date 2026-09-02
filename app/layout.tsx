@@ -4,6 +4,7 @@ import { LifeIdentityProvider } from "@/components/life/LifeIdentityContext";
 import "animal-island-ui/style";
 import "./globals.css";
 import "./island-life-tokens.css";
+import "./island-life-refactor.css";
 
 export const metadata: Metadata = {
   applicationName: "岛屿生活",
@@ -29,11 +30,7 @@ export const viewport: Viewport = {
   themeColor: "#aedcc8",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
