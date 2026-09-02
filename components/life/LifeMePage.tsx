@@ -25,7 +25,6 @@ export function LifeMePage() {
   const [message, setMessage] = useState("");
 
   async function loadSession() {
-    setLoading(true);
     try {
       const response = await fetch("/api/auth/session", { cache: "no-store" });
       const data = (await response.json()) as { authenticated?: boolean; identity?: Identity };
