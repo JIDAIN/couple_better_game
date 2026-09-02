@@ -2,6 +2,15 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-02 — 角色映射纠正与 P2.5 同日关联
+
+- 根据真实使用反馈纠正 ChatGPT 饮食角色映射：**用户自己的饮食聊天 = `cat`（猫猫），鱼鱼的饮食聊天 = `fish`（鱼鱼）**。
+- 修正此前因错误映射写到 `fish` 的旧照片餐食记录，并同步修正对应 `chatgpt:` 幂等键前缀。
+- 明确新的 P2.5：按 `partnerKey + date` 把同一天的餐食总摄入/明细与已有 daily record（deficit / exercise / weight snapshot）关联展示。
+- P2.5 只做读取/展示关联，不根据 meals 自动覆盖游戏 deficit；任一侧缺失时明确显示“未记录”。
+- 根据用户长期饮食语境补充估算规则：食堂甜绿豆汤按加糖版本估算，不按无糖绿豆水默认处理；具体摄入仍结合吃前/吃后照片和实际饮用量判断。
+- Roadmap 调整为 P2.5 → P3 体重趋势 → P4 完整每日总览。
+
 ## 2026-09-02 — ChatGPT “记上”持久化流程
 
 - 完成 P2：ChatGPT 只有在用户明确表达“记上”或等价保存意图后才持久化餐食；讨论、估算、修正不会自动写库。
@@ -12,8 +21,8 @@
 - ChatGPT 使用用户已授权的 Supabase 连接能力调用受限 meal RPC，不把 `SUPABASE_SECRET_KEY`、service role key 或同步密码复制到聊天，也不新增公开写 API。
 - 新增 `lib/nutrition/chatgpt-meal-protocol.ts` 与对应 Vitest，固化 `chatgpt:` key、source/status 和 item-total 约束。
 - production smoke test 验证：首次创建成功、同 key 重试返回同一 meal ID、按 key 读回成功、service_role 可执行、anon/authenticated 不可执行；测试 meal 已硬删除，剩余 0 条。
-- 当前约定用户饮食聊天映射 `fish`，伴侣专用饮食聊天映射 `cat`；上下文不明确时不得猜测后写入。
-- P2 不改变游戏 deficit、运动、体重、钱包、金币、宝石或热力图；下一阶段为 P3 体重趋势。
+- 角色映射现已纠正为：用户饮食聊天映射 `cat`，鱼鱼饮食聊天映射 `fish`；上下文不明确时不得猜测后写入。
+- P2 不改变游戏 deficit、运动、体重、钱包、金币、宝石或热力图。
 
 ## 2026-09-01 — 今日饮食 Web UI
 
