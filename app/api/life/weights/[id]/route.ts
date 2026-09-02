@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { authorizeLifeRequest, LIFE_NO_STORE_HEADERS, lifeJsonError, readJsonBody } from "../../../../../lib/server/life-api";
+import { LIFE_NO_STORE_HEADERS, lifeJsonError, readJsonBody, requireLifeIdentity } from "../../../../../lib/server/life-api";
 import { parseWeightWritePayload } from "../../../../../lib/life/weight-service";
+import { weightOwnerKey } from "../../../../../lib/server/life-record-owner";
 import { deleteWeight, updateWeight, WeightCloudError } from "../../../../../lib/server/supabase-weight";
 import { isUuid } from "../../../../../lib/nutrition/meal-service";
 
@@ -19,14 +20,29 @@ async function readId(context: Context) {
   return isUuid(id) ? id : null;
 }
 
+async function authorizeWeightOwner(request: Request, id: string) {
+  const auth = await requireLifeIdentity(request);
+  if (auth.response) return { identity: null, response: auth.response };
+  const owner = await weightOwnerKey(id);
+  if (!owner) return { identity: null, response: lifeJsonError("体重记录不存在", 404, "NOT_FOUND") };
+  if (owner !== auth.identity.partnerKey) {
+    return { identity: null, response: lifeJsonError("只能修改自己的体重记录", 403, "FORBIDDEN") };
+  }
+  return { identity: auth.identity, response: null };
+}
+
 export async function PUT(request: Request, context: Context) {
-  const auth = await authorizeLifeRequest(request);
-  if (auth) return auth;
   const id = await readId(context);
   if (!id) return lifeJsonError("体重记录 ID 格式不正确", 400, "BAD_REQUEST");
+  const auth = await authorizeWeightOwner(request, id);
+  if (auth.response) return auth.response;
+
   const body = await readJsonBody(request);
   if (!body.ok) return body.response;
-  const parsed = parseWeightWritePayload(body.value);
+  const raw = typeof body.value === "object" && body.value !== null && !Array.isArray(body.value)
+    ? { ...body.value, partnerKey: auth.identity!.partnerKey }
+    : body.value;
+  const parsed = parseWeightWritePayload(raw);
   if (!parsed.ok) return lifeJsonError(parsed.reason, 400, "INVALID_WEIGHT");
   try {
     const weight = await updateWeight(id, parsed.value);
@@ -38,10 +54,10 @@ export async function PUT(request: Request, context: Context) {
 }
 
 export async function DELETE(request: Request, context: Context) {
-  const auth = await authorizeLifeRequest(request);
-  if (auth) return auth;
   const id = await readId(context);
   if (!id) return lifeJsonError("体重记录 ID 格式不正确", 400, "BAD_REQUEST");
+  const auth = await authorizeWeightOwner(request, id);
+  if (auth.response) return auth.response;
   try {
     const weight = await deleteWeight(id);
     return NextResponse.json({ ok: true, weight }, { headers: LIFE_NO_STORE_HEADERS });
