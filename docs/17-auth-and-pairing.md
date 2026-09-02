@@ -38,19 +38,37 @@ fish 登录：我 = fish，Ta = cat
 - 注册；
 - 邀请码。
 
-当前固定账号名为 `cat / fish`，同时兼容输入 `猫猫 / 鱼鱼`。
+账号和密码由 Supabase 中的固定双账号凭据校验；真实账号值和密码不写入公开 GitHub。
 
-登录密码读取顺序：
+## 3. Supabase 固定账号凭据
+
+Production Supabase 使用 `public.life_fixed_accounts` 保存两条固定账号记录：
 
 ```text
-LIFE_CAT_PASSWORD / LIFE_FISH_PASSWORD   # 如需两账号分别配置
-LIFE_ACCOUNT_PASSWORD                    # 两账号共用账号密码
-DATA_EDIT_PASSWORD                       # 旧配置兼容兜底
+partner_key = cat / fish
+username    = 登录账号
+password_hash = bcrypt hash
 ```
 
-`DATA_EDIT_PASSWORD` 只作为旧部署兼容，不再代表产品上需要用户额外输入一次“同步密码”。
+密码只保存 bcrypt hash，不保存明文。
 
-## 3. Session
+登录 API 调用 server-only RPC：
+
+```text
+public.authenticate_fixed_life_account(username, password)
+```
+
+该 RPC：
+
+- 使用 `extensions.crypt()` 校验密码；
+- 只返回 `cat / fish / null`；
+- `anon`、`authenticated` 无执行权；
+- 只有 `service_role` 可以调用；
+- 浏览器不能直接读取凭据表。
+
+真实凭据通过 Production 数据写入维护，不进入 migration seed 和公开仓库。
+
+## 4. Session
 
 登录成功后服务器生成 `life-account-session` HttpOnly Cookie：
 
@@ -59,9 +77,10 @@ DATA_EDIT_PASSWORD                       # 旧配置兼容兜底
 - Production 下 Secure；
 - 30 天有效；
 - payload 只保存 `partnerKey` 和到期时间；
-- HMAC-SHA256 只使用 Supabase server secret + 固定域分隔符签名，不再依赖同步密码。
+- HMAC-SHA256 使用 Supabase server secret + 固定域分隔符签名；
+- Session 签名不依赖用户密码或旧同步密码。
 
-## 4. 云端数据
+## 5. 云端数据
 
 生活系统登录成功后直接访问 Supabase-backed Life API，不再经过 `LifeCloudGate`。
 
@@ -76,7 +95,7 @@ Life API -> 401
 
 旧 `/game` 的历史同步兼容代码可以暂时保留，但不能再出现在新版生活系统的正常使用路径里。
 
-## 5. 权限
+## 6. 权限
 
 个人数据写入仍由服务器按当前 session 限制：
 
@@ -94,7 +113,7 @@ current partnerKey != record partnerKey -> 403 OWN_RECORD_ONLY
 
 共享数据仍属于同一个 couple space。
 
-## 6. 不允许重新引入的复杂流程
+## 7. 不允许重新引入的复杂流程
 
 - 登录前账号卡片选择；
 - 第二次同步密码；
@@ -102,6 +121,6 @@ current partnerKey != record partnerKey -> 403 OWN_RECORD_ONLY
 - 邀请码 / 配对流程；
 - 第三个账号。
 
-## 7. 部署规则
+## 8. 部署规则
 
 `vercel.json` 默认必须保持 `git.deploymentEnabled: false`。任何 Preview / Production 仍需单次明确授权。
