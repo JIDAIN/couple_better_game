@@ -108,7 +108,7 @@ function MoodFace({ label, moodKey, emphasized = false }: { label: string; moodK
   const visual = moodVisual(moodKey);
   return (
     <div className={`life-person-state ${emphasized ? "is-me" : ""}`}>
-      <div className="life-person-state-orb" style={{ background: visual?.softTone ?? "var(--life-surface-soft)" }}>
+      <div className="life-person-state-orb">
         {visual ? <MoodIcon moodKey={visual.key} label={visual.label} /> : <span aria-hidden>○</span>}
       </div>
       <p className="mt-2 text-xs font-bold text-[var(--life-text-muted)]">{label}</p>
