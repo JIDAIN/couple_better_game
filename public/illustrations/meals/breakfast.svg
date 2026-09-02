@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" role="img" aria-labelledby="title desc">
+  <title id="title">早餐卡通插图</title><desc id="desc">奶油色餐桌上的吐司、煎蛋和水果</desc>
+  <rect width="480" height="360" rx="36" fill="#FFF7EA"/>
+  <circle cx="410" cy="58" r="34" fill="#FFE28A"/>
+  <path d="M45 272c71-57 146-57 221 0s139 54 190 6v82H24v-69c7-7 14-13 21-19z" fill="#BFE4D0"/>
+  <ellipse cx="236" cy="221" rx="139" ry="68" fill="#F8E6CD"/>
+  <ellipse cx="236" cy="215" rx="123" ry="55" fill="#FFFDF8"/>
+  <path d="M156 182c7-25 22-40 45-40h28c24 0 40 16 45 40l7 43H150l6-43z" fill="#D79B65"/>
+  <path d="M169 184c4-17 15-26 32-26h27c18 0 29 10 33 26l4 27h-101l5-27z" fill="#F5C98C"/>
+  <ellipse cx="305" cy="198" rx="40" ry="31" fill="#FFFFFF"/>
+  <circle cx="310" cy="198" r="15" fill="#F8C64D"/>
+  <circle cx="126" cy="216" r="18" fill="#FF8F86"/><circle cx="143" cy="198" r="14" fill="#FFB05B"/><circle cx="112" cy="193" r="12" fill="#9FD5A9"/>
+  <path d="M107 191l-8-13m43 17l11-13" stroke="#5F7B63" stroke-width="6" stroke-linecap="round"/>
+  <path d="M332 136c0-17 11-27 27-27h25c18 0 29 12 29 29v54h-81v-56z" fill="#8FD3E6"/>
+  <path d="M413 132h14c16 0 24 11 24 25s-8 25-24 25h-14" fill="none" stroke="#6CB7CF" stroke-width="10"/>
+  <path d="M351 107c0-17 17-20 17-35m24 35c0-17 17-20 17-35" fill="none" stroke="#B7A594" stroke-width="6" stroke-linecap="round" opacity=".55"/>
+</svg>
