@@ -24,6 +24,7 @@ describe("relative me / Ta identity", () => {
   it("uses relative identity on key life pages", () => {
     for (const path of [
       "components/life/today/TodayMoodCard.tsx",
+      "components/life/today/TodaySleepCard.tsx",
       "components/life/LifeFoodPage.tsx",
       "components/life/LifeWeightPage.tsx",
       "components/life/LifeCalendarPage.tsx",
