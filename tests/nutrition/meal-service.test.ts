@@ -64,6 +64,43 @@ describe("nutrition meal service", () => {
     });
   });
 
+  it("keeps unestimated food calories as null instead of zero", () => {
+    const result = parseMealWritePayload({
+      partnerKey: "cat",
+      mealDate: "2026-09-01",
+      mealType: "breakfast",
+      items: [
+        { rawName: "鸡蛋", caloriesKcal: null, proteinG: 7 },
+        { rawName: "牛奶", carbsG: 10 },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.totalCaloriesKcal).toBeNull();
+    expect(result.value.items[0].caloriesKcal).toBeNull();
+    expect(result.value.items[1].caloriesKcal).toBeNull();
+    expect(result.value.items[0].proteinG).toBe(7);
+    expect(result.value.items[1].carbsG).toBe(10);
+  });
+
+  it("keeps an actual zero calorie value distinct from unknown", () => {
+    const result = parseMealWritePayload({
+      partnerKey: "fish",
+      mealDate: "2026-09-01",
+      mealType: "other",
+      items: [{ rawName: "无糖饮料", caloriesKcal: 0 }],
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        totalCaloriesKcal: 0,
+        items: [{ caloriesKcal: 0 }],
+      },
+    });
+  });
+
   it("rejects snack periods on non-snack meals", () => {
     expect(
       parseMealWritePayload({
