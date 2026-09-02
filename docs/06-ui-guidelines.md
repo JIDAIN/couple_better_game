@@ -1,32 +1,28 @@
-# UI 与 animal-island-ui 维护规范
+# UI 与 island-life Design System 维护规范
 
-## 1. 当前视觉定位
+## 1. 视觉规范源
 
-项目使用轻松的“动物岛 / 手账 / Nook 商店”视觉语言。
-
-当前依赖：
+V2 生活系统的**唯一主视觉规范**是：
 
 ```text
-animal-island-ui ^1.0.1
+docs/12-island-life-design-system.md
 ```
 
-`app/layout.tsx` 全局引入：
+所有首页、饮食、日历、小窝、体重、小信箱、家庭药箱、游戏机及未来新增页面，在开始编码前都必须先阅读并遵守该文件。
 
-```text
-animal-island-ui/style
-```
+`animal-island-ui` 是基础组件来源，不等于完整视觉语言。
 
-UI 全量迁移已经完成；当前工作是**维护和扩展**，不是继续执行历史 migration phase。
+如果组件库不足，可以新增项目组件，但不得绕开统一视觉语言。
 
 ## 2. UI 层级
 
-### 官方库
+### 基础库
 
-提供基础视觉 primitive，如 Button / Card / Input / Modal / Icon / Title / Switch 等。
+当前项目继续使用 `animal-island-ui` 及必要的成熟 headless / 通用交互能力。
 
 ### `components/ui/App*`
 
-项目 adapter/wrapper，统一业务页面的常用交互与视觉语义。
+项目 adapter/wrapper，负责把底层 UI 能力归一到岛屿生活视觉语言。
 
 当前代表性组件：
 
@@ -47,14 +43,31 @@ AppBottomNavItem
 AppHeatmapMarker
 ```
 
+V2 后续应补充：
+
+```text
+AppPageShell
+AppRecordRow
+AppEmptyState
+AppPopover
+AppToast
+AppFeatureTile
+AppMonthCalendar
+AppRoleSwitch
+```
+
 ### 业务 UI
 
 ```text
-components/home/*       游戏 UI
-components/nutrition/*  饮食 UI
+components/life/*       生活事实
+components/nutrition/*  饮食
+components/weight/*     体重
+components/medicine/*   家庭药箱
+components/games/*      游戏入口/未来小游戏
+components/home/*       Legacy Game
 ```
 
-业务层优先组合 wrapper，不要在这里重新造一整套 primitive。
+业务页面优先组合 App* / Project Pattern，不在页面 JSX 中重新创造一套 primitive。
 
 ## 3. 使用优先级
 
@@ -62,168 +75,261 @@ components/nutrition/*  饮食 UI
 
 ```text
 已有 App* wrapper
--> 当前安装版本 animal-island-ui 官方组件
--> 确实无法承载时的项目 fallback
+-> 已确认可用的 animal-island-ui 组件
+-> 同视觉语言、许可允许的成熟 GitHub Pattern
+-> 成熟 headless / 通用库交互能力
+-> 项目原创组件
 ```
 
-不要因为“裸 div/CSS 更快”就绕过已有 wrapper。
+从 0 写不是默认方案。
 
-当前代码确实还有少量直接使用官方 `Title` / `Switch` 等组件，这是允许的：前提是没有合适 wrapper，并且使用的是当前安装版本真实 API。
+外部项目与本项目视觉不同，只允许借：
 
-## 4. 不臆造 API
+- 交互；
+- 状态；
+- 日期算法；
+- accessibility；
+- 响应式布局；
+- Timeline / Popover / Toast / Drawer 等成熟 Pattern。
 
-实现前优先查看当前本地安装版本的：
+不能直接复制其色板、阴影、按钮、Card 或整包 CSS。
+
+## 4. 统一视觉底线
+
+以下规则为强制：
+
+- 背景以暖白/奶油白为主，不回到大面积棕色；
+- 主识别为薄荷/青绿，黄/珊瑚粉/浅蓝作辅助；
+- 暖感来自暖白、奶油、柔黄和珊瑚色，而不是木棕铺满页面；
+- 高信息密度页面减少插画，数据优先；
+- 圆角、阴影、字体、状态色必须由统一 token / App* 管理；
+- 页面不能因为来源不同而看起来像不同 App；
+- 生活系统不复用 Legacy Game 的金币/宝石/排名/热力图视觉语义。
+
+视觉细节和具体页面结构见 `docs/12-island-life-design-system.md`。
+
+## 5. 主导航（V2 定稿）
+
+V2 生活系统主导航：
 
 ```text
-node_modules/animal-island-ui/AI_USAGE.md
-node_modules/animal-island-ui/dist/types/index.d.ts
+今日 / 饮食 / 日历 / 小窝 / 我的
 ```
 
-本地安装版本高于旧 Git 历史中的 UI 设计说明。
+旧游戏的 `今日 / 地图 / 兑换 / 小窝` 只属于 Legacy Game，不再作为 V2 生活系统主导航。
 
-禁止：
+旧游戏从：
 
-- 猜不存在的 props；
-- 把项目 wrapper variant 直接透传为官方 type；
-- 依赖未经确认的 `--animal-*` CSS variable。
+```text
+小窝 -> 游戏机 -> 宝石金币游戏
+```
 
-## 5. CSS 职责
+进入。
+
+## 6. 今日页规则
+
+只显示：
+
+```text
+心情
+睡眠
+活动
+```
+
+每块都必须有明确记录/编辑入口。
+
+- 心情继续使用彩色情绪圆脸，不用人物头像替代；
+- 睡眠只记录入睡/起床及派生时长，不评分；
+- 活动是统一概念，不在首页拆成学习/运动/散步任务；
+- 活动临时人物只使用女性动森风角色，待用户提供双方真实角色素材后统一替换；
+- 首页不放饮食、体重、药箱、小信箱或旧游戏资源。
+
+## 7. 饮食页规则
+
+饮食已从旧游戏 Provider 代码层解耦，V2 产品层改为独立主页面。
+
+顶部统一切换：
+
+```text
+我 / Ta
+```
+
+不是双人同屏对照。
+
+按早餐 / 午餐 / 晚餐 / 加餐展示，每餐固定信息层级：
+
+```text
+左侧  实际餐食照片
+右侧  碳水 / 蛋白质 / 脂肪 / 总热量
+右上  编辑入口
+```
+
+底部显示当天总摄入：
+
+```text
+碳水 / 蛋白质 / 脂肪 / 总热量
+```
+
+禁止恢复：
+
+- 本周饭历；
+- 印章墙；
+- 打卡收集；
+- 我和 Ta 同屏摄入对照；
+- 固定食物插画冒充真实餐食照片。
+
+编辑一餐是饮食子页面，新增和编辑共用同一结构。
+
+## 8. 日历规则
+
+主日历采用标准七列月历，每天显示双方心情小圆脸。
+
+点击日期进入日历详情页，按当天事实回顾：
+
+```text
+心情
+睡眠
+活动
+饮食概览
+```
+
+日历不做成绩、连续打卡、成功率等评价。
+
+## 9. 小窝与子页面
+
+小窝固定四个入口：
+
+```text
+体重
+小信箱
+家庭药箱
+游戏机
+```
+
+### 体重
+
+- 顶部 `我 / Ta` 切换；
+- 当前体重；
+- 周/月/年趋势；
+- 折线图；
+- 近期记录；
+- 记录体重入口。
+
+### 小信箱
+
+- `收到的 / 我写的`；
+- 使用信纸卡片，不用人物头像列表；
+- 不做写信次数/连续记录评价。
+
+### 家庭药箱
+
+- 搜索 + 轻筛选；
+- 药名 / 规格 / 数量 / 有效期 / 存放位置必须清晰；
+- 提供添加/编辑药品页面；
+- 不做复杂游戏卡牌。
+
+### 游戏机
+
+本轮只做游戏列表。
+
+当前唯一实际游戏：
+
+```text
+宝石金币游戏
+```
+
+即现有旧版金币/宝石/兑换机制。
+
+游戏列表必须保留未来新增游戏的接口，但**本轮不设计游戏详情页**。
+
+## 10. 双人文案统一
+
+所有需要切换角色的页面统一使用：
+
+```text
+我 / Ta
+```
+
+不得在不同页面混用：
+
+```text
+我 / 她
+我 / 对方
+鱼鱼 / 猫猫（除 Legacy Game 自己的旧语义）
+```
+
+## 11. CSS 与 Token 职责
+
+新增视觉值优先进入全局 token，不允许在多个页面散落新的 hex 色值、shadow、radius。
 
 项目 CSS 主要负责：
 
-- 页面布局
-- spacing / alignment
-- safe-area
-- responsive / mobile
-- 业务专有可视化（如热力图）
-- wrapper 必要 adapter
-
-不应再创建第二套 Button/Card/Input/Modal 的完整视觉系统。
-
-如果官方组件无法承载，需要 fallback：
-
-1. 明确写出原因；
-2. 视觉尽量从官方组件 / 官方设计值继承；
-3. 封装成复用的 `App*`，不要散落在业务 JSX。
-
-## 6. 场景映射
-
-当前页面语义：
-
-| 页面 | 场景 |
-|---|---|
-| 今日 | notice-board / 岛屿公告板 |
-| 地图 | growth-map / 成长地图 |
-| 商店 | shop / 小商店 |
-| 小窝 | nook-phone |
-| 成长日志 | notebook |
-| 数据管理 | toolbox |
-| 规则 | rules-board |
-
-场景是视觉组织方式，不改变业务组件边界。
-
-### 主导航稳定性
-
-当前主导航固定为四个 Tab：
-
-```text
-今日 / 地图 / 兑换 / 小窝
-```
-
-一般业务扩展应先判断能否自然落入现有场景，不要为一个新模块立即增加新的底部 Tab。
-
-只有明确的产品级信息架构改版，才重新评估主导航。
-
-## 7. 当前饮食 UI 约定
-
-饮食 UI 和 P2.5 同日关联都落在现有 `#today` notice-board，不新造“营养中心”页面：
-
-```text
-今日 notice-board
-└─ AppSectionPanel「饮食小记」
-   ├─ 日期
-   ├─ fish / cat 角色切换
-   ├─ 当天餐数 / kcal
-   ├─ AppCard「当天合在一起看」
-   │  ├─ 实际摄入
-   │  ├─ 游戏热量缺口
-   │  ├─ 运动分钟
-   │  └─ 游戏体重快照
-   ├─ AppCard 餐食记录
-   └─ AppModal 新增 / 编辑 / 删除确认
-```
-
-实现继续使用：
-
-```text
-AppSectionPanel
-AppCard
-AppButton
-AppInput
-AppTextarea
-AppModal
-AppRoleAvatar
-animal-island-ui Title
-```
-
-### “当天合在一起看”视觉规则
-
-- 仍然是普通 `AppCard variant="soft"`，不是新页面或新视觉 primitive；
-- 左侧实际摄入、右侧游戏热量缺口并列，强调“同一天”而不是“同一字段”；
-- 文案必须出现“游戏热量缺口”或等价明确词，避免让用户误以为它由 meals 自动计算；
-- meals 未记录、Meal API 未加载、daily record 未填写必须是三个可区分状态；
-- 运动和体重快照作为次级信息，不抢过饮食明细本身；
-- P2.5 不引入新底部导航、不改 notice-board 场景。
-
-### 饮食 UI 不允许做的事
-
-- 为饮食单独创造一套与当前项目不同的色板、卡片、按钮、弹窗；
-- 因为“营养功能很多”就擅自添加第五个底部 Tab；
-- 用真实摄入的视觉文案暗示它会自动修改游戏 deficit；
-- 把 ChatGPT 来源记录做成另一套 UI / 数据结构；
-- 为了让“当天合在一起看”看起来完整而伪造缺失的 daily record。
-
-如果未来饮食功能明显超过今日公告板可承载范围，应先更新产品信息架构文档，再做页面迁移，而不是边开发边改导航。
-
-## 8. 移动端优先
-
-主要使用环境是手机浏览器，因此新增 UI 需要重点检查：
-
-- 触控目标尺寸；
+- 页面布局；
+- spacing/alignment；
 - safe-area；
-- 底部导航不遮挡内容；
-- Modal / sheet 在窄屏可滚动；
-- 长中文不溢出；
-- 数字列 tabular / 不抖动；
-- loading / disabled / error 有可见状态。
+- responsive；
+- 业务专有可视化；
+- wrapper adapter。
 
-饮食首版和 P2.5 使用窄屏两列 summary、可滚动 AppModal、tabular kcal 和 loading/empty/error 状态；后续修改不能破坏这些基础可用性。
+如果需要新视觉 Pattern：
 
-## 9. 热力图日期视觉
+1. 先确认 `docs/12-island-life-design-system.md`；
+2. 优先检查现有 App* / animal-island-ui / 可复用 GitHub Pattern；
+3. 在 `/ui-lab` 用假数据验证；
+4. 稳定后封装；
+5. 再接真实 API。
 
-成长地图：
+## 12. `/ui-lab`
 
-- 按自然月浏览；
-- 行为周六到周五；
-- 首尾行显示完整自然周；
-- 跨月日期仍读取真实 `recordDate`，但视觉弱化；
-- 不显示左侧“第 N 周”标签；
-- 改热力图布局不能顺手改变金币/宝石业务周规则。
+`/ui-lab` 是开发实验室，不是视觉规范源。
 
-## 10. 资源 UI
+- 不写真实 Supabase facts；
+- 不触发 Legacy Game settlement；
+- 用于新组件视觉回归和屏宽检查；
+- 若 UI Lab 与 `docs/12-island-life-design-system.md` 冲突，以后者为准。
 
-当前 currency semantics v2 下：
+## 13. 移动端优先
 
-- coin = 每日打卡主要资源；
-- gem = 周期规则奖励资源。
+新增 UI 必须检查：
 
-业务 UI 必须通过语义明确的 label / icon 展示。由于底层仍有 legacy 字段名，页面不要直接用变量英文名当中文文案。
+- 触控目标；
+- safe-area；
+- 底部导航；
+- 长中文；
+- 数字 tabular；
+- loading/empty/error；
+- Modal/Drawer/页面表单滚动；
+- 饮食有/无图片；
+- 月历跨月；
+- 药名和到期日过长；
+- 图表小屏可读性。
 
-饮食 kcal 不是 coin/gem，也不能复用资源奖励语义做展示。
+## 14. Legacy Game 视觉边界
 
-## 11. 视觉变更验证
+旧游戏的地图、兑换、金币、宝石、热力图、成长记录继续维护其现有语义。
 
-代码层最低要求：
+V2 视觉改版不能顺手重写旧游戏，也不能把旧游戏视觉语义带回生活首页。
+
+## 15. 视觉变更流程
+
+涉及以下任一项：
+
+```text
+主导航
+主页面信息架构
+基础色板
+核心卡片形态
+双人切换规则
+页面新增一级入口
+```
+
+必须先更新 `docs/12-island-life-design-system.md` 并完成人工确认，再开发代码。
+
+普通实现不得自行删减/改写已经确认的页面结构。
+
+## 16. 验证
+
+代码最低要求：
 
 ```text
 npm run test
@@ -231,32 +337,6 @@ npm run lint
 npm run build
 ```
 
-但这三项只能说明代码层通过，**不能代替真实视觉检查**。
+但代码通过不等于视觉通过。
 
-涉及布局、Modal、移动端可用性的改动，在条件允许时还应人工检查：
-
-- 常用手机窄屏；
-- 长食物名 / 长备注；
-- 多个 food items；
-- “当天合在一起看”的两列布局；
-- loading / empty / error；
-- 弹窗滚动与底部按钮；
-- 底部导航遮挡。
-
-未进行真实设备/浏览器视觉检查时，不要在文档或完成说明中写“视觉已验证”。
-
-## 12. 维护原则
-
-旧的：
-
-```text
-ui-migration-audit
-ui-migration-report
-ui-rollback-guide
-ui-wrapper-migration-plan
-animal-island-ui-full-migration Skill
-```
-
-都属于一次性迁移历史，不再作为当前维护流程。
-
-大型视觉改版如果未来再次发生，应新开短期 issue/PR checklist；稳定结论最终回写本文件，而不是永久新增一套迁移文档。
+需要人工视觉检查后，才能声称 UI 已验证。
