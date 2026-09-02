@@ -53,11 +53,11 @@ export function TodaySleepCard({
   }
 
   return (
-    <section className="life-surface life-section-card">
+    <section className="life-surface life-section-card life-today-card">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-extrabold text-[var(--life-text)]">🌙 睡眠</p>
-          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">我可以记录自己的睡眠，Ta 的记录由 Ta 登录后填写。</p>
+          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">只记录入睡和起床。</p>
         </div>
         <AppButton variant="ghost" onClick={() => setEditing((value) => !value)}>
           {editing ? "收起" : sleepByRole.has(mePartnerKey) ? "修改" : "+ 记录"}

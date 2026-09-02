@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppInput } from "@/components/ui/AppInput";
 import { AppPageShell } from "@/components/ui/AppPageShell";
@@ -10,6 +10,7 @@ import { AppTextarea } from "@/components/ui/AppTextarea";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { createWeightRecord, deleteWeightRecord, fetchWeights, updateWeightRecord, WeightApiError } from "@/lib/life/weight-client";
 import type { WeightRecord, WeightWritePayload } from "@/lib/life/weight-service";
+import { useStaleQuery } from "@/lib/client/use-stale-query";
 
 const RANGES = [
   { days: 7, label: "7天" },
@@ -17,6 +18,7 @@ const RANGES = [
   { days: 90, label: "90天" },
   { days: 0, label: "全部" },
 ] as const;
+const EMPTY_WEIGHTS: WeightRecord[] = [];
 
 function localDate(date = new Date()) {
   const y = date.getFullYear();
@@ -63,9 +65,7 @@ function WeightChart({ records }: { records: WeightRecord[] }) {
 export function LifeWeightPage() {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [role, setRole] = useState<AppRoleSwitchValue>("me");
-  const [records, setRecords] = useState<WeightRecord[]>([]);
   const [range, setRange] = useState(30);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<WeightRecord | null>(null);
@@ -74,16 +74,10 @@ export function LifeWeightPage() {
   const [note, setNote] = useState("");
   const partnerKey = role === "me" ? mePartnerKey : taPartnerKey;
   const canEdit = role === "me";
-
-  useEffect(() => {
-    if (!partnerKey) return;
-    let cancelled = false;
-    fetchWeights(partnerKey)
-      .then((data) => { if (!cancelled) { setRecords(data); setError(null); } })
-      .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof WeightApiError ? cause.message : "体重记录暂时没有加载出来"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [partnerKey]);
+  const fetcher = useCallback(() => partnerKey ? fetchWeights(partnerKey) : Promise.resolve([]), [partnerKey]);
+  const recordsQuery = useStaleQuery<WeightRecord[]>({ key: `weights:${partnerKey ?? "pending"}`, fetcher, staleMs: 30_000 });
+  const records = recordsQuery.data ?? EMPTY_WEIGHTS;
+  const visibleError = error ?? recordsQuery.error?.message ?? null;
 
   const filtered = useMemo(() => {
     if (!range) return records;
@@ -99,7 +93,6 @@ export function LifeWeightPage() {
 
   function switchRole(next: AppRoleSwitchValue) {
     if (next === role) return;
-    setLoading(true);
     setEditing(null);
     setWeight("");
     setNote("");
@@ -138,10 +131,8 @@ export function LifeWeightPage() {
     setSaving(true);
     setError(null);
     try {
-      if (editing) await updateWeightRecord(editing.id, payload);
-      else await createWeightRecord(payload);
-      const next = await fetchWeights(partnerKey);
-      setRecords(next);
+      const saved = editing ? await updateWeightRecord(editing.id, payload) : await createWeightRecord(payload);
+      recordsQuery.update((current) => [saved, ...(current ?? []).filter((item) => item.id !== saved.id)].sort((a, b) => b.measurementDate.localeCompare(a.measurementDate)));
       resetForm();
     } catch (cause) {
       setError(cause instanceof WeightApiError ? cause.message : "体重记录暂时没有保存成功");
@@ -156,7 +147,7 @@ export function LifeWeightPage() {
     setError(null);
     try {
       await deleteWeightRecord(record.id);
-      setRecords((current) => current.filter((item) => item.id !== record.id));
+      recordsQuery.update((current) => (current ?? []).filter((item) => item.id !== record.id));
       if (editing?.id === record.id) resetForm();
     } catch (cause) {
       setError(cause instanceof WeightApiError ? cause.message : "这条记录暂时没有删除成功");
@@ -170,11 +161,11 @@ export function LifeWeightPage() {
   }
 
   return (
-    <AppPageShell title="体重" subtitle="“我”是当前登录的人；Ta 只用于查看另一方。" actions={<Link href="/nest" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回小窝</Link>}>
+    <AppPageShell title="体重" subtitle="记录变化，不评价数字。" actions={<Link href="/nest" className="life-back-link">返回小窝</Link>}>
       <div className="grid gap-3">
         <AppRoleSwitch value={role} onChange={switchRole} />
 
-        <section className="life-surface life-section-card">
+        <section className="life-surface life-section-card life-weight-hero">
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-xs font-bold text-[var(--life-text-muted)]">最近一次记录</p>
@@ -190,7 +181,7 @@ export function LifeWeightPage() {
           </div>
         </section>
 
-        <section className="life-surface life-section-card">
+        <section className="life-surface life-section-card life-data-section">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-extrabold text-[var(--life-text)]">最近趋势</p>
             <div className="flex gap-1 rounded-full bg-[var(--life-surface-soft)] p-1">
@@ -201,7 +192,7 @@ export function LifeWeightPage() {
           <p className="mt-2 text-[10px] leading-5 text-[var(--life-text-muted)]">折线只描述测量事实，不设置目标线、排名或“达标”评价。</p>
         </section>
 
-        {canEdit ? <section className="life-surface life-section-card">
+        {canEdit ? <section className="life-surface life-section-card life-data-section">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-extrabold text-[var(--life-text)]">{editing ? "修改记录" : "记一次体重"}</p>
@@ -217,11 +208,10 @@ export function LifeWeightPage() {
           <div className="mt-3"><AppButton variant="primary" disabled={saving} onClick={() => void save()}>{saving ? "保存中…" : editing ? "保存修改" : "保存体重"}</AppButton></div>
         </section> : <section className="life-surface life-section-card text-xs leading-5 text-[var(--life-text-muted)]">Ta 的体重在这里仅查看；Ta 登录自己的账号后，这一栏会自动变成“我”并可以记录。</section>}
 
-        <section className="life-surface life-section-card">
+        <section className="life-surface life-section-card life-data-section">
           <div className="mb-3 flex items-center justify-between gap-3"><p className="text-sm font-extrabold text-[var(--life-text)]">历史记录</p><span className="text-[10px] font-bold text-[var(--life-text-muted)]">{records.length} 条</span></div>
           <div className="grid gap-2">
-            {loading ? <p className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-3 py-3 text-xs font-bold text-[var(--life-text-muted)]">正在读取记录…</p> : null}
-            {!loading && records.length === 0 ? <p className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-3 py-3 text-xs font-bold text-[var(--life-text-muted)]">还没有体重记录</p> : null}
+            {!recordsQuery.loading && records.length === 0 ? <p className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-3 py-3 text-xs font-bold text-[var(--life-text-muted)]">还没有体重记录</p> : null}
             {records.map((record) => (
               <div key={record.id} className="flex items-center justify-between gap-3 rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-3 py-2.5">
                 <div className="min-w-0">
@@ -234,7 +224,7 @@ export function LifeWeightPage() {
           </div>
         </section>
 
-        {error ? <div className="rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_16%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
+        {visibleError ? <div className="rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_16%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{visibleError}</div> : null}
       </div>
     </AppPageShell>
   );

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
+import { MoodIcon } from "@/components/ui/MoodIcon";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { saveMood } from "@/lib/life/life-client";
 import type { LifeDayRecord, MoodKey } from "@/lib/life/life-service";
@@ -49,11 +50,11 @@ export function TodayMoodCard({
 
   return (
     <>
-      <section className="life-surface life-section-card life-home-feature">
+      <section className="life-surface life-section-card life-home-feature life-today-card">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-extrabold text-[var(--life-text)]">🍃 心情</p>
-            <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">今天的感受，各自记录自己的。</p>
+            <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">各自记录，彼此看见。</p>
           </div>
           <AppButton variant="ghost" onClick={() => setPickerOpen(true)}>
             {myMood ? "修改我的" : "+ 记录我的"}
@@ -87,7 +88,7 @@ export function TodayMoodCard({
                     onClick={() => void choose(mood.key)}
                     className={`life-mood-choice ${active ? "is-active" : ""}`}
                   >
-                    <span className="life-mood-orb" style={{ background: mood.softTone }} aria-hidden>{mood.emoji}</span>
+                    <span className="life-mood-orb" style={{ background: mood.softTone }} aria-hidden><MoodIcon moodKey={mood.key} label="" /></span>
                     <span>{mood.label}</span>
                   </button>
                 );
@@ -108,7 +109,7 @@ function MoodFace({ label, moodKey, emphasized = false }: { label: string; moodK
   return (
     <div className={`life-person-state ${emphasized ? "is-me" : ""}`}>
       <div className="life-person-state-orb" style={{ background: visual?.softTone ?? "var(--life-surface-soft)" }}>
-        <span aria-hidden>{visual?.emoji ?? "○"}</span>
+        {visual ? <MoodIcon moodKey={visual.key} label={visual.label} /> : <span aria-hidden>○</span>}
       </div>
       <p className="mt-2 text-xs font-bold text-[var(--life-text-muted)]">{label}</p>
       <p className="mt-0.5 text-sm font-extrabold text-[var(--life-text)]">{visual?.label ?? "未记录"}</p>

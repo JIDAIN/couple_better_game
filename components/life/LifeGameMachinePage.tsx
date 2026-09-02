@@ -6,8 +6,8 @@ export function LifeGameMachinePage() {
   return (
     <AppPageShell
       title="游戏机"
-      subtitle="这里放明确的小游戏；生活记录本身不做排名和竞技。"
-      actions={<Link href="/nest" className="rounded-full bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-extrabold text-[var(--life-teal-strong)]">返回小窝</Link>}
+      subtitle="小游戏都从这里进入。"
+      actions={<Link href="/nest" className="life-back-link">返回小窝</Link>}
     >
       <section className="life-surface life-section-card overflow-hidden">
         <div className="rounded-[var(--life-radius-card)] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--life-yellow)_22%,white),color-mix(in_srgb,var(--life-blue)_16%,white))] px-4 py-4">
@@ -45,7 +45,7 @@ export function LifeGameMachinePage() {
           if (available && game.route) {
             return <Link key={game.gameKey} href={game.route} className="life-surface rounded-[var(--life-radius-card)] p-4 transition active:scale-[0.99]">{body}</Link>;
           }
-          return <article key={game.gameKey} aria-disabled="true" className="life-surface rounded-[var(--life-radius-card)] p-4 opacity-85">{body}</article>;
+          return <article key={game.gameKey} className="life-surface rounded-[var(--life-radius-card)] p-4 opacity-85">{body}</article>;
         })}
       </div>
 

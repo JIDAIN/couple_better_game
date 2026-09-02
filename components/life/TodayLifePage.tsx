@@ -9,7 +9,12 @@ import { useStaleQuery } from "@/lib/client/use-stale-query";
 import { TodayActivityCard } from "./today/TodayActivityCard";
 import { TodayMoodCard } from "./today/TodayMoodCard";
 import { TodaySleepCard } from "./today/TodaySleepCard";
-import { displayDate, localIsoDate } from "./today/today-life-model";
+import { localIsoDate } from "./today/today-life-model";
+
+function dayHeading(date: string) {
+  const value = new Date(`${date}T12:00:00`);
+  return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(value);
+}
 
 export function TodayLifePage() {
   const router = useRouter();
@@ -54,11 +59,10 @@ export function TodayLifePage() {
   }
 
   return (
-    <AppPageShell title={displayDate(date)} subtitle="只记重要的小日常，照顾好彼此。">
+    <AppPageShell title={dayHeading(date)} subtitle="把普通日子里的小事，轻轻收好。">
       {visibleError ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_18%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{visibleError}</div> : null}
       {query.data ? (
         <div className="grid gap-3">
-          {query.refreshing ? <div className="life-sync-pill" aria-live="polite">正在同步最新记录…</div> : null}
           <TodayMoodCard date={date} day={query.data} onChanged={reload} onError={setActionError} />
           <TodaySleepCard date={date} day={query.data} onChanged={reload} onError={setActionError} />
           <TodayActivityCard date={date} day={query.data} onChanged={reload} onError={setActionError} />

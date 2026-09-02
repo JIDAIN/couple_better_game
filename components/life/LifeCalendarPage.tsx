@@ -9,6 +9,7 @@ import { fetchLifeMonth, LifeApiError } from "@/lib/life/life-client";
 import type { LifeMonthMoodRecord } from "@/lib/life/calendar-service";
 import type { MoodKey } from "@/lib/life/life-service";
 import { moodVisual } from "@/components/life/today/today-life-model";
+import { MoodIcon } from "@/components/ui/MoodIcon";
 
 const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
 
@@ -45,10 +46,9 @@ function MoodStamp({ moodKey, label, offset = false }: { moodKey?: MoodKey; labe
     <span
       title={`${label} · ${visual.label}`}
       className={`life-calendar-mood ${offset ? "is-offset" : ""}`}
-      style={{ background: visual.softTone }}
       aria-label={`${label}：${visual.label}`}
     >
-      {visual.emoji}
+      <MoodIcon moodKey={visual.key} label="" />
     </span>
   );
 }
@@ -68,19 +68,18 @@ export function LifeCalendarPage() {
   }
 
   return (
-    <AppPageShell title="日历" subtitle="没有心情就留白，有记录时让它自然落在日期下面。">
-      <section className="life-calendar-paper">
+    <AppPageShell>
+      <section className="life-calendar-paper life-calendar-page">
         <div className="flex items-center justify-between gap-3 px-2">
           <button type="button" aria-label="上个月" onClick={() => setMonth((value) => shiftMonth(value, -1))} className="life-round-button">‹</button>
           <div className="text-center">
-            <p className="text-xl font-black tracking-tight text-[var(--life-text)]">{monthTitle(month)}</p>
+            <p className="text-lg font-black tracking-tight text-[var(--life-text)]">{monthTitle(month)}</p>
             <p className="mt-1 text-[10px] font-bold text-[var(--life-text-muted)]">我 · Ta</p>
           </div>
           <button type="button" aria-label="下个月" onClick={() => setMonth((value) => shiftMonth(value, 1))} className="life-round-button">›</button>
         </div>
 
-        {query.refreshing ? <div className="life-sync-pill mx-auto mt-3 w-fit">正在同步这个月…</div> : null}
-        <div className="mt-5 grid grid-cols-7 text-center text-[10px] font-extrabold text-[var(--life-text-muted)]">
+        <div className="mt-4 grid grid-cols-7 text-center text-[10px] font-extrabold text-[var(--life-text-muted)]">
           {WEEKDAYS.map((day) => <div key={day} className="py-1">{day}</div>)}
         </div>
 
@@ -108,7 +107,7 @@ export function LifeCalendarPage() {
       </section>
 
       {error ? <div className="mt-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
-      <p className="mt-3 px-2 text-center text-[10px] leading-5 text-[var(--life-text-muted)]">没有心情记录的日期保持空白；今天用小太阳标记。月历只展示事实，不计算连续天数或比较谁更积极。</p>
+      <p className="mt-3 px-2 text-center text-[10px] leading-5 text-[var(--life-text-muted)]">没有记录就留白；今天用小太阳标记。</p>
     </AppPageShell>
   );
 }

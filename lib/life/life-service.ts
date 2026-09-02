@@ -14,6 +14,7 @@ export const MOOD_KEYS = [
   "sad",
   "angry",
   "tired",
+  "excited",
 ] as const;
 export type MoodKey = (typeof MOOD_KEYS)[number];
 

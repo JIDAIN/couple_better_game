@@ -25,14 +25,14 @@
   --life-danger: #ec7d75;
   --life-info: #73b6cf;
 
-  --life-radius-sm: 12px;
-  --life-radius-control: 16px;
-  --life-radius-card: 22px;
-  --life-radius-hero: 28px;
+  --life-radius-sm: 10px;
+  --life-radius-control: 14px;
+  --life-radius-card: 18px;
+  --life-radius-hero: 22px;
 
-  --life-shadow-soft: 0 4px 16px rgb(78 92 85 / 0.08);
-  --life-shadow-float: 0 12px 32px rgb(78 92 85 / 0.13);
-  --life-shadow-press: 0 3px 0 rgb(90 128 111 / 0.18);
+  --life-shadow-soft: 0 2px 10px rgb(78 92 85 / 0.07);
+  --life-shadow-float: 0 10px 28px rgb(78 92 85 / 0.12);
+  --life-shadow-press: 0 2px 0 rgb(90 128 111 / 0.15);
 
   --life-space-xs: 0.375rem;
   --life-space-sm: 0.625rem;
@@ -51,9 +51,9 @@
 }
 
 .life-page-shell {
-  width: min(100%, 46rem);
+  width: min(100%, 30rem);
   margin-inline: auto;
-  padding: 1rem 0.75rem 5.5rem;
+  padding: 0.9rem 0.85rem 5.25rem;
 }
 
 .life-surface {
@@ -64,7 +64,7 @@
 }
 
 .life-section-card {
-  padding: 1rem;
+  padding: 0.85rem;
 }
 
 .life-record-row {

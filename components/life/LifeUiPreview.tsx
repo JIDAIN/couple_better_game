@@ -7,16 +7,10 @@ import { AppInput } from "@/components/ui/AppInput";
 import { AppNutritionBar } from "@/components/ui/AppNutritionBar";
 import { AppRecordRow } from "@/components/ui/AppRecordRow";
 import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
+import { MoodIcon } from "@/components/ui/MoodIcon";
+import { MOODS } from "@/components/life/today/today-life-model";
 
-const moods = [
-  { key: "happy", emoji: "😄", label: "开心" },
-  { key: "calm", emoji: "🙂", label: "平静" },
-  { key: "neutral", emoji: "😐", label: "一般" },
-  { key: "anxious", emoji: "😣", label: "焦虑" },
-  { key: "sad", emoji: "😢", label: "难过" },
-  { key: "angry", emoji: "😡", label: "生气" },
-  { key: "tired", emoji: "😴", label: "疲惫" },
-] as const;
+const moods = MOODS;
 
 export function RoleSwitchPreview() {
   const [value, setValue] = useState<AppRoleSwitchValue>("me");
@@ -51,7 +45,7 @@ function MoodRoleRow({
           <strong className="text-sm text-[var(--life-text)]">{label}</strong>
           <p className="mt-0.5 text-xs text-[var(--life-text-body)]">今天感觉怎么样？</p>
         </div>
-        <span className="text-2xl" aria-hidden>{moods.find((mood) => mood.key === value)?.emoji}</span>
+        {moods.find((mood) => mood.key === value) ? <MoodIcon moodKey={value} label="" className="h-10 w-10" /> : null}
       </div>
       <div className="grid grid-cols-7 gap-1.5" role="radiogroup" aria-label={`${label}今日心情`}>
         {moods.map((mood) => (
@@ -64,7 +58,7 @@ function MoodRoleRow({
             className="life-mood-chip"
             onClick={() => onChange(mood.key)}
           >
-            <span className="text-lg" aria-hidden>{mood.emoji}</span>
+            <MoodIcon moodKey={mood.key} label="" className="h-8 w-8" />
           </button>
         ))}
       </div>

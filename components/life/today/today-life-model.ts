@@ -1,13 +1,14 @@
 import type { MoodKey, SleepRecord } from "@/lib/life/life-service";
 
-export const MOODS: Array<{ key: MoodKey; emoji: string; label: string; tone: string; softTone: string }> = [
-  { key: "happy", emoji: "😊", label: "开心", tone: "bg-[var(--life-pink)]", softTone: "#ffe7eb" },
-  { key: "calm", emoji: "😌", label: "平静", tone: "bg-[var(--life-mint)]", softTone: "#e5f5ed" },
-  { key: "neutral", emoji: "🙂", label: "一般", tone: "bg-[var(--life-yellow)]", softTone: "#fff2ce" },
-  { key: "anxious", emoji: "😟", label: "焦虑", tone: "bg-[var(--life-blue)]", softTone: "#e4f4fb" },
-  { key: "sad", emoji: "😢", label: "难过", tone: "bg-[var(--life-pink)]", softTone: "#ffe9f0" },
-  { key: "angry", emoji: "😠", label: "生气", tone: "bg-[var(--life-coral)]", softTone: "#ffe5df" },
-  { key: "tired", emoji: "😴", label: "疲惫", tone: "bg-[var(--life-blue)]", softTone: "#e7f0ff" },
+export const MOODS: Array<{ key: MoodKey; label: string; softTone: string }> = [
+  { key: "tired", label: "心累", softTone: "#eee5df" },
+  { key: "angry", label: "生气", softTone: "#ffe1db" },
+  { key: "excited", label: "兴奋", softTone: "#fff3c9" },
+  { key: "anxious", label: "烦躁", softTone: "#e7edf7" },
+  { key: "neutral", label: "心动", softTone: "#ffe5ec" },
+  { key: "calm", label: "平静", softTone: "#e5f5df" },
+  { key: "sad", label: "伤心", softTone: "#e5f2ff" },
+  { key: "happy", label: "开心", softTone: "#fff0df" },
 ];
 
 export function localIsoDate(date = new Date()) {
