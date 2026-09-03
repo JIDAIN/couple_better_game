@@ -4,6 +4,11 @@ import { compressMealPhoto } from "./image-compression";
 import { downloadDriveMealOriginal } from "./google-drive-service";
 import { getLifeExport, getLifeSettings } from "./life-data-management";
 import { loadHomeSyncSnapshot } from "./supabase-home-sync";
+import {
+  claimDriveBridgeCommand,
+  driveBridgeRequestHash,
+  finishDriveBridgeCommand,
+} from "./drive-bridge-ledger";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -58,6 +63,27 @@ async function buildAttachment(command: DriveBridgeCommand) {
 export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, input: unknown) {
   const command = parseCommand(input);
   const startedAt = new Date().toISOString();
+  const requestHash = driveBridgeRequestHash(command);
+  const claim = await claimDriveBridgeCommand({
+    commandId: command.commandId,
+    actor: identity.partnerKey,
+    tool: command.tool,
+    requestHash,
+  });
+
+  if (!claim.claimed) {
+    if (claim.row.receipt) return claim.row.receipt;
+    return {
+      commandId: command.commandId,
+      ok: false as const,
+      receivedAt: startedAt,
+      finishedAt: new Date().toISOString(),
+      tool: command.tool,
+      error: "COMMAND_ALREADY_PROCESSING",
+      originalDriveFileId: command.originalDriveFileId,
+    };
+  }
+
   try {
     const attachment = await buildAttachment(command);
     const result = await executeLifeAgentTool(command.tool, command.args, {
@@ -66,7 +92,7 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
       attachment,
       toolCallId: `drive-${command.commandId}`,
     });
-    return {
+    const receipt = {
       commandId: command.commandId,
       ok: true as const,
       receivedAt: startedAt,
@@ -75,8 +101,10 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
       result,
       originalDriveFileId: command.originalDriveFileId,
     };
+    await finishDriveBridgeCommand(command.commandId, "succeeded", receipt);
+    return receipt;
   } catch (error) {
-    return {
+    const receipt = {
       commandId: command.commandId,
       ok: false as const,
       receivedAt: startedAt,
@@ -85,6 +113,8 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
       error: error instanceof Error ? error.message : "Drive Bridge 执行失败",
       originalDriveFileId: command.originalDriveFileId,
     };
+    await finishDriveBridgeCommand(command.commandId, "failed", receipt);
+    return receipt;
   }
 }
 
