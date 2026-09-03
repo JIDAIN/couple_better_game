@@ -9,7 +9,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
-  const auth = verifyDriveBridgeRequest(request, rawBody);
+  const auth = await verifyDriveBridgeRequest(request, rawBody);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, code: auth.code, error: auth.message }, { status: auth.status, headers: NO_STORE });
   }
