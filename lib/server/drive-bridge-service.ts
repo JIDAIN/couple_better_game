@@ -1,6 +1,6 @@
 import type { FixedLifeIdentity } from "./fixed-life-auth";
 import { executeLifeAgentTool } from "./life-agent-registry";
-import { compressMealPhoto } from "./image-compression";
+import { compressMealPhoto, DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES } from "./image-compression";
 import { downloadDriveMealOriginal } from "./google-drive-service";
 import { getLifeExport, getLifeSettings } from "./life-data-management";
 import { loadHomeSyncSnapshot } from "./supabase-home-sync";
@@ -49,7 +49,9 @@ async function buildAttachment(command: DriveBridgeCommand) {
     throw new Error("Drive 原图只能用于 attachPhoto=true 的 meal 写入");
   }
   const original = await downloadDriveMealOriginal(command.originalDriveFileId);
-  const compressed = await compressMealPhoto(original.bytes, original.mimeType);
+  const compressed = await compressMealPhoto(original.bytes, original.mimeType, {
+    maxInputBytes: DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES,
+  });
   return {
     bytes: compressed.bytes,
     contentType: compressed.contentType,
