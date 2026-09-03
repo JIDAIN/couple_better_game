@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { isUuid } from "../../../../../lib/nutrition/meal-service";
+import {
+  MealPhotoCompressionError,
+  compressMealPhoto,
+} from "../../../../../lib/server/image-compression";
 import { authorizeLifeRequest, authorizePersonalPartnerWrite } from "../../../../../lib/server/life-api";
 import {
   buildMealPhotoPath,
@@ -15,15 +19,6 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-const MIME_TO_EXTENSION: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/heic": "heic",
-  "image/heif": "heif",
-};
-
 type RouteContext = { params: Promise<{ id: string }> };
 
 function jsonError(message: string, status: number, errorCode: string) {
@@ -38,6 +33,10 @@ async function mealId(context: RouteContext) {
 function cloudError(error: NutritionCloudError) {
   const status = error.errorCode === "SERVER_CONFIG" ? 500 : error.message.includes("Meal not found") ? 404 : 502;
   return jsonError(error.message, status, error.errorCode);
+}
+
+function compressionError(error: MealPhotoCompressionError) {
+  return jsonError(error.message, 400, error.code);
 }
 
 async function authorizePhotoWrite(request: Request, id: string) {
@@ -59,7 +58,7 @@ export async function GET(request: Request, context: RouteContext) {
     return new Response(await storageResponse.arrayBuffer(), {
       status: 200,
       headers: {
-        "Content-Type": storageResponse.headers.get("content-type") || "image/jpeg",
+        "Content-Type": storageResponse.headers.get("content-type") || "image/webp",
         "Cache-Control": "private, max-age=300",
         "X-Content-Type-Options": "nosniff",
       },
@@ -89,13 +88,22 @@ export async function PUT(request: Request, context: RouteContext) {
   }
   const value = form.get("file");
   if (!(value instanceof File)) return jsonError("请选择一张照片", 400, "PHOTO_REQUIRED");
-  if (value.size <= 0 || value.size > MAX_PHOTO_BYTES) return jsonError("照片大小需要在 10MB 以内", 400, "PHOTO_TOO_LARGE");
-  const extension = MIME_TO_EXTENSION[value.type.toLowerCase()];
-  if (!extension) return jsonError("仅支持 JPEG、PNG、WebP、HEIC/HEIF 图片", 400, "PHOTO_TYPE_UNSUPPORTED");
 
-  const path = buildMealPhotoPath(id, extension);
+  let compressed;
   try {
-    await uploadMealPhotoObject(path, await value.arrayBuffer(), value.type);
+    compressed = await compressMealPhoto(await value.arrayBuffer(), value.type);
+  } catch (error) {
+    if (error instanceof MealPhotoCompressionError) return compressionError(error);
+    return jsonError("无法处理这张照片", 400, "PHOTO_DECODE_FAILED");
+  }
+
+  const path = buildMealPhotoPath(id, compressed.extension);
+  try {
+    const bytes = compressed.bytes.buffer.slice(
+      compressed.bytes.byteOffset,
+      compressed.bytes.byteOffset + compressed.bytes.byteLength,
+    ) as ArrayBuffer;
+    await uploadMealPhotoObject(path, bytes, compressed.contentType);
     let replacement;
     try {
       replacement = await replaceMealPhotoPath(id, path);
@@ -106,7 +114,21 @@ export async function PUT(request: Request, context: RouteContext) {
     if (replacement.previousPhotoPath && replacement.previousPhotoPath !== path) {
       await deleteMealPhotoObject(replacement.previousPhotoPath).catch(() => undefined);
     }
-    return NextResponse.json({ ok: true, meal: replacement.meal }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(
+      {
+        ok: true,
+        meal: replacement.meal,
+        photo: {
+          width: compressed.width,
+          height: compressed.height,
+          quality: compressed.quality,
+          originalBytes: compressed.originalBytes,
+          outputBytes: compressed.outputBytes,
+          contentType: compressed.contentType,
+        },
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     if (error instanceof NutritionCloudError) return cloudError(error);
     return jsonError("上传餐食照片失败", 502, "PHOTO_WRITE_FAILED");
