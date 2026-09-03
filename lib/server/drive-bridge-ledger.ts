@@ -33,9 +33,9 @@ export function driveBridgeRequestHash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-async function readLedger(commandId: string): Promise<LedgerRow | null> {
+async function readLedger(actor: "cat" | "fish", commandId: string): Promise<LedgerRow | null> {
   const response = await fetch(
-    `${supabaseUrl()}/rest/v1/life_drive_bridge_commands?command_id=eq.${encodeURIComponent(commandId)}&select=command_id,actor,tool,request_hash,status,receipt&limit=1`,
+    `${supabaseUrl()}/rest/v1/life_drive_bridge_commands?actor=eq.${actor}&command_id=eq.${encodeURIComponent(commandId)}&select=command_id,actor,tool,request_hash,status,receipt&limit=1`,
     { headers: headers(), cache: "no-store" },
   );
   if (!response.ok) throw new Error("DRIVE_BRIDGE_LEDGER_READ_FAILED");
@@ -49,7 +49,7 @@ export async function claimDriveBridgeCommand(input: {
   tool: string;
   requestHash: string;
 }) {
-  const response = await fetch(`${supabaseUrl()}/rest/v1/life_drive_bridge_commands?on_conflict=command_id`, {
+  const response = await fetch(`${supabaseUrl()}/rest/v1/life_drive_bridge_commands?on_conflict=actor,command_id`, {
     method: "POST",
     headers: headers({
       "Content-Type": "application/json",
@@ -68,17 +68,22 @@ export async function claimDriveBridgeCommand(input: {
   const inserted = (await response.json()) as LedgerRow[];
   if (inserted.length > 0) return { claimed: true as const, row: inserted[0] };
 
-  const existing = await readLedger(input.commandId);
+  const existing = await readLedger(input.actor, input.commandId);
   if (!existing) throw new Error("DRIVE_BRIDGE_LEDGER_MISSING");
-  if (existing.actor !== input.actor || existing.tool !== input.tool || existing.request_hash !== input.requestHash) {
+  if (existing.tool !== input.tool || existing.request_hash !== input.requestHash) {
     throw new Error("COMMAND_ID_REUSED_WITH_DIFFERENT_PAYLOAD");
   }
   return { claimed: false as const, row: existing };
 }
 
-export async function finishDriveBridgeCommand(commandId: string, status: "succeeded" | "failed", receipt: unknown) {
+export async function finishDriveBridgeCommand(
+  actor: "cat" | "fish",
+  commandId: string,
+  status: "succeeded" | "failed",
+  receipt: unknown,
+) {
   const response = await fetch(
-    `${supabaseUrl()}/rest/v1/life_drive_bridge_commands?command_id=eq.${encodeURIComponent(commandId)}`,
+    `${supabaseUrl()}/rest/v1/life_drive_bridge_commands?actor=eq.${actor}&command_id=eq.${encodeURIComponent(commandId)}`,
     {
       method: "PATCH",
       headers: headers({ "Content-Type": "application/json", Prefer: "return=minimal" }),
