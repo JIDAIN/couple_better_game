@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AppLifeBottomNav } from "@/components/ui/AppLifeBottomNav";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
@@ -23,8 +23,7 @@ export function PersistentLifeChrome({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { bootstrapReady } = useLifeIdentity();
   const showNavigation = isLifePath(pathname);
-  const startedAt = useRef<number>(Date.now());
-  const [splashDone, setSplashDone] = useState(false);
+  const [minSplashElapsed, setMinSplashElapsed] = useState(false);
 
   useEffect(() => {
     if (!showNavigation) return;
@@ -32,17 +31,15 @@ export function PersistentLifeChrome({ children }: { children: ReactNode }) {
   }, [router, showNavigation]);
 
   useEffect(() => {
-    if (!showNavigation) {
-      setSplashDone(true);
-      return;
-    }
-    if (!bootstrapReady) return;
-    const elapsed = Date.now() - startedAt.current;
-    const timer = window.setTimeout(() => setSplashDone(true), Math.max(0, MIN_SPLASH_MS - elapsed));
+    if (!showNavigation || minSplashElapsed) return;
+    const timer = window.setTimeout(() => setMinSplashElapsed(true), MIN_SPLASH_MS);
     return () => window.clearTimeout(timer);
-  }, [bootstrapReady, showNavigation]);
+  }, [minSplashElapsed, showNavigation]);
 
-  const showSplash = showNavigation && !splashDone;
+  // The minimum visual time and the real bootstrap run in parallel. Fast devices see a calm
+  // ~620ms entrance; slow networks wait for warm data up to the bootstrap cap instead of adding
+  // another delay after it finishes.
+  const showSplash = showNavigation && (!bootstrapReady || !minSplashElapsed);
 
   return (
     <>
