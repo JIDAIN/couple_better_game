@@ -39,11 +39,17 @@ export class MealPhotoCompressionError extends Error {
   }
 }
 
+function toBuffer(input: ArrayBuffer | Uint8Array | Buffer) {
+  if (Buffer.isBuffer(input)) return input;
+  if (input instanceof ArrayBuffer) return Buffer.from(new Uint8Array(input));
+  return Buffer.from(input.buffer, input.byteOffset, input.byteLength);
+}
+
 export async function compressMealPhoto(
   input: ArrayBuffer | Uint8Array | Buffer,
   mimeType: string,
 ): Promise<CompressedMealPhoto> {
-  const source = Buffer.isBuffer(input) ? input : Buffer.from(input);
+  const source = toBuffer(input);
   const normalizedType = mimeType.trim().toLowerCase();
   if (source.length === 0) {
     throw new MealPhotoCompressionError("请选择一张照片", "PHOTO_REQUIRED");
