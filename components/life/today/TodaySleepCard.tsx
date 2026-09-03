@@ -9,6 +9,7 @@ import type { LifeDayRecord, LifePartnerKey, SleepRecord } from "@/lib/life/life
 import { buildSleepTimestamps, durationText, formatTime, timeInputValue } from "./today-life-model";
 
 const FULL_SLEEP_MINUTES = 8 * 60;
+const SLEEP_RING_TONE = "var(--life-mint-strong)";
 
 function sleepProgress(record?: SleepRecord) {
   if (!record) return 0;
@@ -67,10 +68,7 @@ export function TodaySleepCard({
   return (
     <section className="life-surface life-section-card life-today-card">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-extrabold text-[var(--life-text)]">🌙 睡眠</p>
-          <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">8 小时为满环，时长一眼就能看见。</p>
-        </div>
+        <p className="text-sm font-extrabold text-[var(--life-text)]">🌙 睡眠</p>
         {!readOnly ? (
           <button type="button" className="life-card-action" onClick={() => setEditing((value) => !value)}>
             {editing ? "收起" : mySleep ? "编辑" : "+ 记录"}
@@ -79,8 +77,8 @@ export function TodaySleepCard({
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <SleepBubble label="我" record={mySleep} tone="var(--life-blue)" />
-        <SleepBubble label="Ta" record={sleepByRole.get(taPartnerKey)} tone="var(--life-teal)" />
+        <SleepBubble label="我" record={mySleep} />
+        <SleepBubble label="Ta" record={sleepByRole.get(taPartnerKey)} />
       </div>
 
       {!readOnly && editing ? (
@@ -93,14 +91,14 @@ export function TodaySleepCard({
   );
 }
 
-function SleepBubble({ label, record, tone }: { label: string; record?: SleepRecord; tone: string }) {
+function SleepBubble({ label, record }: { label: string; record?: SleepRecord }) {
   const progress = sleepProgress(record);
   const angle = Math.round(progress * 360);
   return (
     <div className="rounded-[var(--life-radius-card)] border border-[var(--life-border-soft)] bg-[var(--life-surface)] p-3 text-center">
       <div
         className="life-sleep-progress-ring mx-auto grid h-20 w-20 place-items-center rounded-full p-[7px]"
-        style={{ background: `conic-gradient(${tone} 0deg ${angle}deg, var(--life-border-soft) ${angle}deg 360deg)` }}
+        style={{ background: `conic-gradient(${SLEEP_RING_TONE} 0deg ${angle}deg, var(--life-border-soft) ${angle}deg 360deg)` }}
         aria-label={`${label}睡眠进度 ${Math.round(progress * 100)}%`}
       >
         <div className="grid h-full w-full place-items-center rounded-full bg-[var(--life-surface)] px-1">
