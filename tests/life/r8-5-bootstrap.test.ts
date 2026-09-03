@@ -32,6 +32,17 @@ describe("R8.5 startup prewarm", () => {
     expect(identity).toContain("preloadCurrentMealPhotos");
   });
 
+  it("renders prewarmed local artwork through the same raw URLs", () => {
+    const mood = source("components/ui/MoodIcon.tsx");
+    const activity = source("components/life/today/TodayActivityCard.tsx");
+    const nest = source("components/life/LifeNestPage.tsx");
+    const food = source("components/life/LifeFoodPage.tsx");
+    expect(mood).toContain("<Image unoptimized");
+    expect(activity).toContain('<Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png"');
+    expect(nest).toContain('<Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png"');
+    expect(food).toContain("<Image unoptimized src={src}");
+  });
+
   it("keeps heavier secondary screens warming after the app is interactive", () => {
     const identity = source("components/life/LifeIdentityContext.tsx");
     expect(identity).toContain("fetchWeights(me)");
