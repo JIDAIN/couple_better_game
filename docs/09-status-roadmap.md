@@ -2,7 +2,7 @@
 
 **状态日期：2026-09-03**
 
-详细重构计划见 `docs/16-v2-refactor-plan.md`；固定双账号与权限边界见 `docs/17-auth-and-pairing.md`；R1-R6 分阶段说明见 `docs/18-*` 至 `docs/23-*`；AI/MCP 边界见 `docs/11-ai-write-architecture.md`。
+详细重构计划见 `docs/16-v2-refactor-plan.md`；固定双账号与权限边界见 `docs/17-auth-and-pairing.md`；R1-R6 分阶段说明见 `docs/18-*` 至 `docs/23-*`；AI/MCP/内置 Agent 边界见 `docs/11-ai-write-architecture.md`。
 
 ## 1. V2 主功能与重构状态
 
@@ -21,6 +21,8 @@ V2-P11 全站代码边界联调                         ✅
 R1-R6 重构                                    ✅
 R7 移动端视觉与实机校准                         ✅
 R8 数据管理 + AI/MCP Production 接入            ✅
+R9 程序内置 AI Agent（代码/CI）                  ✅
+R9 Production 实机                              ⏳ 待单次授权
 ```
 
 ## 2. R1-R6 最终结果
@@ -59,25 +61,33 @@ PR #35 最终统一 Test / Lint / Build 均通过后已合并。
 ## 4. 安全与数据边界
 
 ```text
-Browser
+Browser manual UI
   -> same-origin Next.js API
   -> fixed account signed session
   -> server-only domain service / RPC
   -> Supabase PostgreSQL
 
-ChatGPT
+Browser /ai
+  -> fixed account signed session
+  -> server-only AI Gateway call
+  -> life_query / life_mutate registry
+  -> canonical domain service / RPC
+  -> Supabase PostgreSQL / Storage
+
+External MCP client（可选）
   -> OAuth 2.1 / PKCE
   -> /mcp
   -> domain adapter
-  -> server-only canonical service / RPC
+  -> canonical domain service / RPC
   -> Supabase PostgreSQL
 ```
 
-- Supabase service secret 永不进入浏览器或 ChatGPT；
+- Supabase service secret 永不进入浏览器、普通聊天或模型上下文；
+- AI Gateway credential 只存在于 Vercel server runtime；
 - MCP 使用独立 `LIFE_MCP_SIGNING_SECRET`；
-- 个人 AI 写入由 OAuth identity 强制绑定当前 `cat / fish`，不相信模型传入的 owner；
-- MCP 不暴露任意 SQL；
-- 业务数据继续以 Supabase 为准；
+- 个人 AI 写入在服务端强制绑定当前 `cat / fish`，不相信模型传入的 owner；
+- 不暴露任意 SQL、任意 Supabase 请求或任意 URL 下载工具；
+- 业务数据继续以 Supabase 为事实源；
 - 真实用户数据与生产 secret 不提交 GitHub。
 
 ## 5. 依赖提示
@@ -122,35 +132,13 @@ PR #40 已合并到 `main`，合并 commit：
 6b904beb1f5ae6073ea4c5fa53be900e4042309f
 ```
 
-R8 MCP 固定三个顶层工具：
+R8 Production MCP 地址：
 
 ```text
-life_capabilities
-life_query
-life_write
+https://couple-better-game.vercel.app/mcp
 ```
 
-当前能力：
-
-- Medicine：查询；
-- Meal：查询、新增、当前聊天照片上传；
-- Weight：查询；
-- Day / Mood / Sleep / Activity：查询；
-- Mood / Sleep / Activity：受控确认写入；
-- 后续新增 `cycle` 等 domain 时保持同一 Production `/mcp` 地址，不需要重新设计数据库通用入口。
-
-餐食照片统一处理：
-
-```text
-原始图片 <= 10 MB
--> 自动方向修正 / 缩放
--> 最长边 600 px
--> WebP quality 70
--> 若 > 120 KB：65 -> 60 -> 55
--> 最低 quality 55
-```
-
-Web 手动上传与 ChatGPT 上传共用同一压缩器。
+MCP/OAuth 服务端本身已上线并通过 discovery / 401 challenge 验证；但当前个人 ChatGPT 产品侧不提供所需的自定义 MCP 写入入口，因此 R9 不再把核心 AI 能力依赖于该客户端权限。
 
 ## 8. R8 测试与 Production 发布
 
@@ -162,9 +150,7 @@ Lint   ✅
 Build  ✅
 ```
 
-2026-09-03 在用户明确授权后执行 Production 发布。第一次发布尝试因 Vercel Production 安装阶段省略 devDependencies，缺少 `@tailwindcss/postcss` 而在 Build 阶段失败，未切换 Production alias；随后改用 `npm ci --include=dev` 重新构建。
-
-最终 Production deployment：
+最终 R8 Production deployment：
 
 ```text
 dpl_FvWJfrmtH1fcVie8UsXT4Ez871tD
@@ -180,16 +166,114 @@ https://couple-better-game.vercel.app
 - 未授权 `/mcp` -> 401，并返回正确 `WWW-Authenticate` / resource metadata；
 - 上述路由部署后无 Vercel runtime error。
 
-Production MCP 地址固定为：
+## 9. R9 程序内置 AI Agent
+
+R9 改用“AI 在程序内部作为当前登录用户的自然语言操作层”，不依赖 ChatGPT Plus 是否开放 MCP/GPT Actions。
+
+入口：
 
 ```text
-https://couple-better-game.vercel.app/mcp
+/ai
+/api/ai/chat
 ```
 
-Git 自动部署仍必须保持关闭：
+模型层：
+
+```text
+Vercel AI Gateway
+默认模型：google/gemini-2.5-flash
+可用 LIFE_AI_MODEL 替换
+Production 优先使用 VERCEL_OIDC_TOKEN
+```
+
+内部稳定工具：
+
+```text
+life_capabilities
+life_query
+life_mutate
+```
+
+AI 当前可查询：
+
+- 某日心情 / 睡眠 / 活动；
+- 月度双人心情；
+- 餐食与餐食明细；
+- 体重历史；
+- 家庭药箱；
+- 小信箱；
+- 周年日 / 目标体重；
+- V2 完整生活数据导出；
+- 旧 `/game` 完整同步快照。
+
+AI 当前可像当前登录用户一样修改：
+
+- Mood / Sleep：upsert；
+- Activity：create / update / delete；
+- Meal：create / update / delete + 当前图片；
+- Weight：create / update / delete；
+- Medicine：create / update / delete；
+- Mailbox：create / update / delete；
+- Settings：周年日 / 当前账号目标体重；
+- Legacy `/game`：仅固定强确认短语后允许完整 replace。
+
+权限边界：
+
+- cat 登录后 AI 个人记录只能写 cat；fish 同理；
+- 模型自己传入另一方 owner 会被服务端覆盖/拒绝；
+- Meal / Weight 修改删除前再次核验 owner；
+- 小信箱只能以当前账号寄出，也只能修改/删除当前账号自己发出的信；
+- Medicine 延续家庭共享药箱规则；
+- 删除要求用户当前消息明确表达删除；
+- 旧游戏完整覆盖要求当前消息明确包含 `确认覆盖游戏数据`；
+- 没有任意 SQL 或数据库管理员能力。
+
+图片继续统一使用：
+
+```text
+最长边 600 px
+WebP quality 70
+>120 KB -> 65 -> 60 -> 55
+最低 quality 55
+```
+
+用户可以在 `/ai` 上传餐食图片，AI 先视觉理解；若用户同时明确要求记录，同一张压缩图会保存到对应餐食记录。
+
+## 10. R9 测试状态
+
+PR #41：`R9: in-app AI agent with full life data access`。
+
+最新 CI run #222：
+
+```text
+Test   ✅
+Lint   ✅
+Build  ✅
+```
+
+新增权限回归测试覆盖：
+
+- 模型传 `fish` 也不能让 cat 登录者把个人体重写到 fish；
+- 没有明确删除意图时拒绝 delete；
+- 不能修改 Ta 发出的信；
+- 旧 `/game` 全量覆盖必须出现固定确认短语。
+
+R9 代码测试通过，但截至本状态记录**尚未发布 Production**。因此目前只能确认代码/构建闭环，不能声称线上 AI Gateway、真实登录态查询和真实写回已完成实机验收。
+
+## 11. 部署纪律
+
+Git 自动部署必须继续保持关闭：
 
 ```text
 vercel.json -> git.deploymentEnabled: false
 ```
 
-今后任何 Vercel Preview 或 Production 部署仍须再次取得用户明确授权。
+R9 Production 发布必须再次取得用户的单次明确授权。发布后还需执行：
+
+1. `/ai` Production 页面加载检查；
+2. 未登录 `/api/ai/chat` -> 401；
+3. 登录后 AI Gateway 首次真实对话；
+4. 只读查询药箱/饮食等真实数据；
+5. 用户明确授权的一次非破坏性写入实测；
+6. 图片识别 + 餐食照片绑定实测；
+7. Vercel runtime error/log 检查。
