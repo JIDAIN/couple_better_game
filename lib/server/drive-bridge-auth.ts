@@ -1,13 +1,12 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { FixedLifeIdentity } from "./fixed-life-auth";
+import {
+  getDriveBridgeConfig,
+  type DriveBridgeId,
+  type DriveBridgeRuntimeConfig,
+} from "./drive-bridge-config";
 
 const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
-
-export type DriveBridgeId = "cat" | "fish";
-
-function env(name: string) {
-  return process.env[name]?.trim() ?? "";
-}
 
 function safeEqual(left: string, right: string) {
   const a = Buffer.from(left);
@@ -15,12 +14,8 @@ function safeEqual(left: string, right: string) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function parseBridgeId(value: string): DriveBridgeId | null {
+export function parseDriveBridgeId(value: string): DriveBridgeId | null {
   return value === "cat" || value === "fish" ? value : null;
-}
-
-function bridgeEnvName(bridgeId: DriveBridgeId, suffix: string) {
-  return `LIFE_DRIVE_${bridgeId.toUpperCase()}_${suffix}`;
 }
 
 export function driveBridgeIdentity(bridgeId: DriveBridgeId): FixedLifeIdentity {
@@ -30,39 +25,24 @@ export function driveBridgeIdentity(bridgeId: DriveBridgeId): FixedLifeIdentity 
   };
 }
 
-export function driveBridgeSecret(bridgeId: DriveBridgeId) {
-  return env(bridgeEnvName(bridgeId, "BRIDGE_SECRET"));
-}
-
-export function driveBridgeWatchToken(bridgeId: DriveBridgeId) {
-  return env(bridgeEnvName(bridgeId, "WATCH_TOKEN"));
-}
-
-export function driveBridgeAppsScriptUrl(bridgeId: DriveBridgeId) {
-  return env(bridgeEnvName(bridgeId, "APPS_SCRIPT_URL"));
-}
-
-export function driveBridgeAppsScriptWakeSecret(bridgeId: DriveBridgeId) {
-  return env(bridgeEnvName(bridgeId, "APPS_SCRIPT_WAKE_SECRET"));
-}
-
-export function driveBridgeOriginalsMealsFolderId(bridgeId: DriveBridgeId) {
-  return env(bridgeEnvName(bridgeId, "ORIGINALS_MEALS_FOLDER_ID"));
-}
-
 export function signDriveBridgeBody(secret: string, timestamp: string, rawBody: string) {
   const digest = createHash("sha256").update(rawBody).digest("hex");
   return createHmac("sha256", secret).update(`${timestamp}.${digest}`).digest("base64url");
 }
 
-export function verifyDriveBridgeRequest(request: Request, rawBody: string) {
-  const bridgeId = parseBridgeId(request.headers.get("x-life-bridge-id")?.trim() ?? "");
+export async function verifyDriveBridgeRequest(request: Request, rawBody: string) {
+  const bridgeId = parseDriveBridgeId(request.headers.get("x-life-bridge-id")?.trim() ?? "");
   if (!bridgeId) {
     return { ok: false as const, status: 401, code: "BRIDGE_ID_INVALID", message: "Drive Bridge 身份无效" };
   }
 
-  const secret = driveBridgeSecret(bridgeId);
-  if (!secret) {
+  let config: DriveBridgeRuntimeConfig | null;
+  try {
+    config = await getDriveBridgeConfig(bridgeId);
+  } catch {
+    return { ok: false as const, status: 503, code: "BRIDGE_CONFIG_UNAVAILABLE", message: "Drive Bridge 配置暂时不可用" };
+  }
+  if (!config) {
     return { ok: false as const, status: 503, code: "BRIDGE_NOT_CONFIGURED", message: "Drive Bridge 尚未配置" };
   }
 
@@ -74,20 +54,25 @@ export function verifyDriveBridgeRequest(request: Request, rawBody: string) {
     return { ok: false as const, status: 401, code: "BRIDGE_TIMESTAMP_INVALID", message: "Drive Bridge 请求时间无效" };
   }
 
-  const expected = signDriveBridgeBody(secret, timestamp, rawBody);
+  const expected = signDriveBridgeBody(config.bridgeSecret, timestamp, rawBody);
   if (!supplied || !safeEqual(supplied, expected)) {
     return { ok: false as const, status: 401, code: "BRIDGE_SIGNATURE_INVALID", message: "Drive Bridge 签名无效" };
   }
 
-  return { ok: true as const, bridgeId, identity: driveBridgeIdentity(bridgeId) };
+  return { ok: true as const, bridgeId, identity: driveBridgeIdentity(bridgeId), config };
 }
 
-export function verifyDriveWatchToken(request: Request) {
+export async function verifyDriveWatchToken(request: Request) {
   const supplied = request.headers.get("x-goog-channel-token")?.trim() ?? "";
+  if (!supplied) return { ok: false as const };
   for (const bridgeId of ["cat", "fish"] as const) {
-    const expected = driveBridgeWatchToken(bridgeId);
-    if (expected && supplied && safeEqual(supplied, expected)) {
-      return { ok: true as const, bridgeId };
+    try {
+      const config = await getDriveBridgeConfig(bridgeId);
+      if (config?.watchToken && safeEqual(supplied, config.watchToken)) {
+        return { ok: true as const, bridgeId, config };
+      }
+    } catch {
+      continue;
     }
   }
   return { ok: false as const };
