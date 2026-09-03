@@ -5,6 +5,7 @@ import "animal-island-ui/style";
 import "./globals.css";
 import "./island-life-tokens.css";
 import "./island-life-refactor.css";
+import "./r8-ui-closeout.css";
 
 export const metadata: Metadata = {
   applicationName: "岛屿生活",

@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { fetchLifeDay, LifeApiError } from "@/lib/life/life-client";
+import { fetchLifeSettings } from "@/lib/life/settings-client";
+import { daysTogether, type LifeSettings } from "@/lib/life/settings-service";
 import type { LifeDayRecord } from "@/lib/life/life-service";
 import { useStaleQuery } from "@/lib/client/use-stale-query";
 import { TodayActivityCard } from "./today/TodayActivityCard";
@@ -26,6 +28,12 @@ export function TodayLifePage() {
     fetcher,
     staleMs: 20_000,
   });
+  const settingsQuery = useStaleQuery<LifeSettings>({
+    key: "life-settings",
+    fetcher: fetchLifeSettings,
+    staleMs: 60_000,
+  });
+  const togetherDay = useMemo(() => daysTogether(settingsQuery.data?.anniversaryDate ?? null, date), [date, settingsQuery.data?.anniversaryDate]);
 
   const queryNeedsLogin = query.error instanceof LifeApiError && query.error.status === 401;
   const queryError = query.error && !queryNeedsLogin
@@ -59,7 +67,15 @@ export function TodayLifePage() {
   }
 
   return (
-    <AppPageShell title={dayHeading(date)} subtitle="把普通日子里的小事，轻轻收好。">
+    <AppPageShell
+      title={dayHeading(date)}
+      subtitle={(
+        <div className="grid gap-0.5">
+          {togetherDay ? <span className="life-together-days">♡ 一起度过的第 {togetherDay} 天</span> : null}
+          <span>把普通日子里的小事，轻轻收好。</span>
+        </div>
+      )}
+    >
       {visibleError ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_18%,white)] px-3 py-2 text-sm text-[var(--life-danger)]">{visibleError}</div> : null}
       {query.data ? (
         <div className="grid gap-3">

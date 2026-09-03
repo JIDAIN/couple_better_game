@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppInput } from "@/components/ui/AppInput";
+import { AppNutritionBar } from "@/components/ui/AppNutritionBar";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppTextarea } from "@/components/ui/AppTextarea";
 import { invalidateStaleQuery, peekStaleQuery } from "@/lib/client/use-stale-query";
@@ -95,6 +96,16 @@ function validMealType(value: string | null): MealType {
 function validSnackPeriod(value: string | null): SnackPeriod | null {
   return value === "morning" || value === "afternoon" || value === "evening" || value === "late_night" ? value : null;
 }
+function draftNutrition(items: ItemDraft[]) {
+  const fields = ["caloriesKcal", "proteinG", "fatG", "carbsG"] as const;
+  const totals: Record<(typeof fields)[number], number> = { caloriesKcal: 0, proteinG: 0, fatG: 0, carbsG: 0 };
+  const known: Record<(typeof fields)[number], boolean> = { caloriesKcal: false, proteinG: false, fatG: false, carbsG: false };
+  items.forEach((item) => fields.forEach((field) => {
+    const value = numberOrNull(item[field]);
+    if (value != null && !Number.isNaN(value)) { totals[field] += value; known[field] = true; }
+  }));
+  return { totals, known };
+}
 
 export function LifeMealEditorPage() {
   const router = useRouter();
@@ -146,12 +157,8 @@ export function LifeMealEditorPage() {
     return () => { cancelled = true; };
   }, [cachedMeal, canEdit, initialDate, mealId, partnerKey]);
 
-  const caloriePreview = useMemo(() => {
-    const parsed = items.map((item) => numberOrNull(item.caloriesKcal));
-    const complete = parsed.length > 0 && parsed.every((value) => value !== null && !Number.isNaN(value));
-    return complete ? parsed.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null;
-  }, [items]);
-
+  const nutritionPreview = useMemo(() => draftNutrition(items), [items]);
+  const caloriePreview = nutritionPreview.known.caloriesKcal ? nutritionPreview.totals.caloriesKcal : null;
   const photoSrc = photoPreviewUrl ?? (!removePhoto && meal?.photoPath ? mealPhotoUrl(meal) : (DEFAULT_MEAL_ART[mealType] ?? DEFAULT_MEAL_ART.lunch));
   const customPhotoVisible = Boolean(photoPreviewUrl || (!removePhoto && meal?.photoPath));
   const title = mealType === "snack" ? (SNACK_LABELS[snackPeriod ?? "afternoon"] ?? "加餐") : MEAL_LABELS[mealType];
@@ -263,34 +270,33 @@ export function LifeMealEditorPage() {
   }
 
   return (
-    <AppPageShell title={meal ? `编辑${title}` : `添加${title}`} subtitle="餐次由入口决定，只记录这一餐吃了什么。">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <Link href="/food" className="life-back-link">← 返回饮食</Link>
-        <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-xs font-extrabold text-[var(--life-text-body)]">{title}</span>
-      </div>
-
+    <AppPageShell title={meal ? `编辑${title}` : `添加${title}`} subtitle="记录这一餐的时间、照片和食物。">
       <div className="grid gap-3">
         <section className="life-surface life-section-card life-editor-meta grid gap-3">
-          <div className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)] px-3 py-2.5">
-            <p className="text-[10px] font-bold text-[var(--life-text-muted)]">正在记录</p>
-            <p className="mt-0.5 text-sm font-black text-[var(--life-text)]">我的 · {title}</p>
-          </div>
           <div className="grid grid-cols-2 gap-2.5">
             <label className="grid gap-1 text-xs font-bold text-[var(--life-text-body)]">日期<AppInput type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
             <label className="grid gap-1 text-xs font-bold text-[var(--life-text-body)]">时间（可选）<AppInput type="time" value={time} onChange={(event) => setTime(event.target.value)} /></label>
           </div>
         </section>
 
-        <section className="life-surface life-section-card life-photo-editor">
+        <section className="life-surface life-section-card life-meal-editor-overview">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div><p className="text-sm font-extrabold text-[var(--life-text)]">餐食照片</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">不上传时使用统一卡通图。</p></div>
+            <div><p className="text-sm font-extrabold text-[var(--life-text)]">餐食照片与营养</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">和饮食列表使用同样的紧凑构图。</p></div>
             {customPhotoVisible ? <button type="button" onClick={clearPhoto} className="text-xs font-bold text-[var(--life-danger)]">移除照片</button> : null}
           </div>
-          <div className="relative aspect-[16/9] w-full overflow-hidden rounded-[var(--life-radius-control)]"><Image unoptimized src={photoSrc} alt={customPhotoVisible ? "当前餐食照片" : "默认餐食卡通图"} fill sizes="(max-width: 480px) 94vw, 450px" className="object-cover" /></div>
-          <label className="mt-3 flex cursor-pointer items-center justify-center rounded-xl bg-[var(--life-surface-soft)] px-3 py-2.5 text-sm font-extrabold text-[var(--life-teal-strong)]">
-            {customPhotoVisible ? "更换照片" : "上传实物照片"}
-            <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="sr-only" disabled={saving} onChange={(event) => choosePhoto(event.target.files?.[0] ?? null)} />
-          </label>
+          <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)] gap-3">
+            <label className="life-meal-editor-photo relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)]">
+              <Image unoptimized src={photoSrc} alt={customPhotoVisible ? "当前餐食照片" : "默认餐食卡通图"} fill sizes="(max-width: 480px) 42vw, 190px" className="object-cover" />
+              <span className="life-meal-photo-action">{customPhotoVisible ? "更换照片" : "＋ 上传照片"}</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="sr-only" disabled={saving} onChange={(event) => choosePhoto(event.target.files?.[0] ?? null)} />
+            </label>
+            <div className="grid gap-2 self-center">
+              <AppNutritionBar label="碳水" value={nutritionPreview.known.carbsG ? Number(nutritionPreview.totals.carbsG.toFixed(1)) : null} unit="g" max={100} />
+              <AppNutritionBar label="蛋白质" value={nutritionPreview.known.proteinG ? Number(nutritionPreview.totals.proteinG.toFixed(1)) : null} unit="g" max={60} />
+              <AppNutritionBar label="脂肪" value={nutritionPreview.known.fatG ? Number(nutritionPreview.totals.fatG.toFixed(1)) : null} unit="g" max={50} />
+              <div className="flex items-baseline justify-between border-t border-[var(--life-border-soft)] pt-2"><span className="text-xs font-bold text-[var(--life-text-body)]">总热量</span><strong className="text-base tabular-nums text-[var(--life-text)]">{caloriePreview == null ? "未估算" : `${Math.round(caloriePreview)} kcal`}</strong></div>
+            </div>
+          </div>
         </section>
 
         {items.map((item, index) => (
@@ -312,7 +318,7 @@ export function LifeMealEditorPage() {
         <button type="button" onClick={() => setItems((current) => [...current, emptyItem()])} className="rounded-[var(--life-radius-control)] border border-dashed border-[var(--life-mint-strong)] bg-[var(--life-surface-soft)] px-4 py-3 text-sm font-extrabold text-[var(--life-teal-strong)]">＋ 添加食物</button>
 
         <section className="life-surface life-section-card">
-          <div className="mb-2 flex items-center justify-between"><p className="text-sm font-extrabold text-[var(--life-text)]">补充说明</p><span className="text-xs font-bold text-[var(--life-text-muted)]">{caloriePreview == null ? "热量未完整估算" : `约 ${caloriePreview} kcal`}</span></div>
+          <div className="mb-2 flex items-center justify-between"><p className="text-sm font-extrabold text-[var(--life-text)]">补充说明</p><span className="text-xs font-bold text-[var(--life-text-muted)]">{caloriePreview == null ? "热量未完整估算" : `约 ${Math.round(caloriePreview)} kcal`}</span></div>
           <AppTextarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="地点、口味、份量等（可选）" />
         </section>
 

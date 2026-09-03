@@ -1,0 +1,304 @@
+/* R8.1 UI closeout — final visual adapter for the Island Life reference language. */
+
+.life-together-days {
+  color: var(--life-teal-strong);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+}
+
+.life-home-action-pill {
+  min-height: 2rem !important;
+  border: 1.5px solid color-mix(in srgb, var(--life-teal-strong) 38%, var(--life-border-soft)) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, white 82%, var(--life-surface-soft)) !important;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--life-border) 18%, transparent) !important;
+  color: var(--life-teal-strong) !important;
+  padding: 0.32rem 0.78rem !important;
+  font-size: 0.72rem !important;
+  font-weight: 850 !important;
+  line-height: 1 !important;
+}
+.life-home-action-pill:hover { background: white !important; }
+.life-home-action-pill:active { transform: translateY(1px); box-shadow: none !important; }
+
+.life-sleep-progress-ring {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--life-border-soft) 65%, transparent);
+}
+
+.life-activity-composer { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.68); }
+.life-activity-icon-choice {
+  display: inline-flex;
+  min-width: 3.55rem;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.66);
+  padding: 0.48rem 0.45rem;
+  color: var(--life-text-body);
+  box-shadow: 0 2px 0 rgb(90 103 96 / 0.08);
+  transition: transform var(--life-motion-fast) ease, border-color var(--life-motion-fast) ease, background var(--life-motion-fast) ease;
+}
+.life-activity-icon-choice span { font-size: 1.18rem; line-height: 1; }
+.life-activity-icon-choice small { font-size: 0.58rem; font-weight: 800; white-space: nowrap; }
+.life-activity-icon-choice.is-active {
+  border-color: color-mix(in srgb, var(--life-teal) 72%, white);
+  background: color-mix(in srgb, var(--life-mint) 55%, white);
+  color: var(--life-teal-strong);
+  transform: translateY(-1px);
+}
+.life-activity-icon-choice.is-compact { min-width: 2.55rem; padding: 0.42rem; }
+.life-activity-icon-choice.is-compact span { font-size: 1rem; }
+.life-row-mini-action,
+.life-inline-link {
+  border: 0;
+  background: transparent;
+  color: var(--life-teal-strong);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+.life-row-mini-action { border-radius: 999px; background: rgb(255 255 255 / 0.72); padding: 0.28rem 0.55rem; }
+.life-row-mini-action.is-danger { color: var(--life-danger); }
+.life-inline-link.is-strong { font-weight: 950; }
+
+.life-anniversary-card {
+  display: flex;
+  min-height: 7.3rem;
+  align-items: center;
+  gap: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--life-coral) 24%, var(--life-border-soft));
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 12% 20%, rgb(255 255 255 / 0.82) 0 1.2rem, transparent 1.25rem),
+    linear-gradient(135deg, #fffaf5, #fff0f2 62%, #f5fbf7);
+  padding: 1rem;
+  box-shadow: var(--life-shadow-soft);
+}
+.life-anniversary-art {
+  display: grid;
+  width: 4.35rem;
+  height: 4.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.72);
+  color: #d98b9e;
+  font-size: 2.25rem;
+  box-shadow: inset 0 0 0 1px rgb(218 143 158 / 0.18), 0 5px 16px rgb(193 132 143 / 0.13);
+}
+.life-wide-chevron {
+  display: grid;
+  width: 2.25rem;
+  height: 3.2rem;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--life-teal-strong);
+  font-size: 2rem;
+  font-weight: 500;
+  transform: scaleX(1.28);
+}
+.life-nest-tile { position: relative; min-height: 11rem !important; padding: 1rem !important; overflow: hidden; }
+.life-nest-tile-art {
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  place-items: center;
+  border-radius: 23px;
+  background: rgb(255 255 255 / 0.56);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.64), 0 5px 14px rgb(73 84 79 / 0.08);
+  font-size: 2.45rem;
+}
+.life-nest-tile-chevron {
+  position: absolute;
+  right: 0.95rem;
+  bottom: 0.78rem;
+  color: color-mix(in srgb, var(--life-teal-strong) 72%, var(--life-text-muted));
+  font-size: 1.65rem;
+  font-weight: 500;
+  transform: scaleX(1.22);
+}
+
+.life-meal-editor-overview { overflow: hidden; }
+.life-meal-editor-photo { display: block; box-shadow: inset 0 0 0 1px var(--life-border-soft); }
+.life-meal-photo-action {
+  position: absolute;
+  inset-inline: 0.5rem;
+  bottom: 0.5rem;
+  display: inline-flex;
+  min-height: 1.85rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.72);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.84);
+  color: var(--life-teal-strong);
+  font-size: 0.65rem;
+  font-weight: 900;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 3px 10px rgb(59 76 68 / 0.12);
+}
+
+.life-weight-hero-v2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(7rem, 0.75fr);
+  gap: 0.8rem;
+  align-items: stretch;
+}
+.life-weight-current,
+.life-weight-target {
+  border-radius: 22px;
+  padding: 0.85rem;
+}
+.life-weight-current { background: linear-gradient(145deg, #f9fffc, color-mix(in srgb, var(--life-mint) 25%, white)); }
+.life-weight-target { background: linear-gradient(145deg, #fffaf7, #fff0e9); text-align: right; }
+.life-weight-year-nav {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr 3.2rem;
+  align-items: center;
+  text-align: center;
+}
+.life-weight-year-nav strong { color: var(--life-text); font-size: 1rem; font-weight: 950; }
+.life-year-arrow {
+  display: grid;
+  width: 3rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.7);
+  color: var(--life-teal-strong);
+  box-shadow: 0 2px 0 rgb(90 103 96 / 0.08);
+}
+.life-year-arrow span { display: block; font-size: 1.75rem; line-height: 0.8; transform: scaleX(1.45); }
+.life-weight-period-switch { border-radius: 999px; background: var(--life-surface-soft); padding: 0.25rem; }
+.life-weight-period-switch button {
+  border-radius: 999px;
+  padding: 0.48rem 0.4rem;
+  color: var(--life-text-muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+.life-weight-period-switch button.is-active { background: white; color: var(--life-teal-strong); box-shadow: var(--life-shadow-press); }
+.life-weight-history-list { overflow: hidden; border: 1px solid var(--life-border-soft); border-radius: 22px; background: rgb(255 255 255 / 0.48); }
+.life-weight-history-row {
+  display: grid;
+  grid-template-columns: minmax(5.2rem, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--life-border-soft);
+}
+.life-weight-history-row:last-child { border-bottom: 0; }
+.life-weight-history-date { display: grid; min-width: 0; }
+.life-weight-history-date strong { font-size: 0.72rem; color: var(--life-text-body); }
+.life-weight-history-date span { margin-top: 0.12rem; font-size: 0.62rem; color: var(--life-text-muted); }
+.life-weight-history-value { display: flex; align-items: baseline; gap: 0.2rem; }
+.life-weight-history-value strong { font-size: 1.12rem; color: var(--life-text); font-weight: 950; font-variant-numeric: tabular-nums; }
+.life-weight-history-value span { font-size: 0.62rem; color: var(--life-text-muted); }
+.life-weight-history-actions { display: flex; gap: 0.45rem; }
+.life-weight-history-actions button { color: var(--life-teal-strong); font-size: 0.64rem; font-weight: 850; }
+.life-weight-history-actions button:last-child { color: var(--life-danger); }
+
+.life-mailbox-format-filter button {
+  border-radius: 999px;
+  padding: 0.48rem 0.3rem;
+  color: var(--life-text-muted);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+.life-mailbox-format-filter button.is-active { background: white; color: var(--life-teal-strong); box-shadow: var(--life-shadow-press); }
+.life-letter-preview {
+  position: relative;
+  height: 11rem;
+  overflow: hidden;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 25px;
+  box-shadow: var(--life-shadow-soft);
+}
+.life-letter-preview.theme-cream,
+.life-letter-reader.theme-cream { background: linear-gradient(145deg, #fffdf5, #fbf2d9); }
+.life-letter-preview.theme-forest,
+.life-letter-reader.theme-forest { background: linear-gradient(145deg, #f8fff8, #e3f1df); }
+.life-letter-preview.theme-sea,
+.life-letter-reader.theme-sea { background: linear-gradient(145deg, #f6fcff, #e1f0f5); }
+.life-letter-preview.theme-sunset,
+.life-letter-reader.theme-sunset { background: linear-gradient(145deg, #fff8f2, #f9deda); }
+.life-letter-preview-main { display: block; width: 100%; height: 100%; padding: 0.9rem 1rem 2.35rem; }
+.life-letter-read-hint {
+  position: absolute;
+  left: 1rem;
+  bottom: 0.72rem;
+  color: var(--life-text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+.life-letter-preview-actions { position: absolute; right: 0.7rem; bottom: 0.55rem; display: flex; gap: 0.3rem; }
+.life-letter-preview-actions button { border-radius: 999px; background: rgb(255 255 255 / 0.58); padding: 0.3rem 0.58rem; color: var(--life-teal-strong); font-size: 0.62rem; font-weight: 850; }
+.life-letter-preview-actions button:last-child { color: var(--life-danger); }
+.life-letter-reader {
+  width: min(100%, 32rem);
+  max-height: 86vh;
+  overflow-y: auto;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 28px;
+  padding: 1.15rem;
+  box-shadow: var(--life-shadow-float);
+}
+.life-mail-theme-choice {
+  display: grid;
+  min-height: 4.3rem;
+  place-items: center;
+  gap: 0.2rem;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.64);
+  padding: 0.45rem 0.25rem;
+}
+.life-mail-theme-choice span { font-size: 1.25rem; }
+.life-mail-theme-choice small { font-size: 0.55rem; color: var(--life-text-muted); font-weight: 800; }
+.life-mail-theme-choice.is-active { border-color: var(--life-teal); background: var(--life-surface-soft); }
+
+.life-medicine-list { border: 1px solid var(--life-border-soft); border-radius: 24px; }
+.life-medicine-row {
+  display: grid;
+  grid-template-columns: 2.15rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 4.8rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--life-border-soft);
+}
+.life-medicine-row:last-child { border-bottom: 0; }
+.life-medicine-status-icon {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--life-surface-soft);
+  color: var(--life-teal-strong);
+  font-size: 0.8rem;
+  font-weight: 950;
+}
+.life-medicine-row.status-soon .life-medicine-status-icon { background: #fff3d8; color: #b77a1f; }
+.life-medicine-row.status-expired .life-medicine-status-icon { background: #ffe8e8; color: var(--life-danger); }
+.life-medicine-status-chip { border-radius: 999px; background: var(--life-surface-soft); padding: 0.18rem 0.42rem; color: var(--life-text-muted); font-size: 0.55rem; font-weight: 850; white-space: nowrap; }
+.life-medicine-quantity { display: grid; min-width: 2.4rem; justify-items: center; }
+.life-medicine-quantity strong { color: var(--life-text); font-size: 1.05rem; font-weight: 950; }
+.life-medicine-quantity span { color: var(--life-text-muted); font-size: 0.55rem; }
+.life-medicine-actions { display: grid; gap: 0.22rem; }
+.life-medicine-actions button { color: var(--life-teal-strong); font-size: 0.6rem; font-weight: 850; }
+.life-medicine-actions button:last-child { color: var(--life-danger); }
+
+@media (max-width: 380px) {
+  .life-weight-hero-v2 { grid-template-columns: 1fr minmax(6.5rem, 0.7fr); gap: 0.55rem; }
+  .life-weight-history-row { grid-template-columns: minmax(4.6rem, 1fr) auto; }
+  .life-weight-history-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  .life-medicine-row { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+  .life-medicine-actions { grid-column: 2 / -1; display: flex; justify-content: flex-end; }
+}

@@ -115,8 +115,6 @@ export function LifeFoodPage() {
 
   const fixed = useMemo(() => new Map(FIXED_MEALS.map(({ type }) => [type, meals.filter((meal) => meal.mealType === type)])), [meals]);
   const snacks = useMemo(() => meals.filter((meal) => meal.mealType === "snack").sort((a, b) => (a.eatenAt ?? a.createdAt).localeCompare(b.eatenAt ?? b.createdAt)), [meals]);
-  const daily = useMemo(() => nutritionTotals(meals), [meals]);
-  const allCaloriesKnown = meals.length > 0 && daily.knownCalories === meals.length;
 
   if (!partnerKey) {
     return <AppPageShell title="饮食" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;
@@ -170,16 +168,6 @@ export function LifeFoodPage() {
             </div>
           </section>
         </div>
-
-        <section className="life-surface life-section-card life-daily-summary mt-3">
-          <div className="mb-3 flex items-center justify-between"><div><p className="text-sm font-extrabold text-[var(--life-text)]">今日摄入统计</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">三餐与全部加餐合计，只记录事实。</p></div>{query.loading && !query.data ? <span className="text-xs text-[var(--life-text-muted)]">首次读取…</span> : null}</div>
-          <div className="grid gap-2.5">
-            <AppNutritionBar label="碳水" value={daily.hasCarbs ? Number(daily.carbs.toFixed(1)) : null} unit="g" max={300} />
-            <AppNutritionBar label="蛋白质" value={daily.hasProtein ? Number(daily.protein.toFixed(1)) : null} unit="g" max={120} />
-            <AppNutritionBar label="脂肪" value={daily.hasFat ? Number(daily.fat.toFixed(1)) : null} unit="g" max={100} />
-            <div className="mt-1 flex items-center justify-between rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)] px-3 py-2.5"><span className="text-sm font-bold text-[var(--life-text-body)]">总热量</span><span className="text-lg font-extrabold tabular-nums text-[var(--life-text)]">{meals.length === 0 ? "未记录" : allCaloriesKnown ? `${daily.calories} kcal` : "未完整估算"}</span></div>
-          </div>
-        </section>
       </AppPageShell>
 
       {snackChooserOpen ? (

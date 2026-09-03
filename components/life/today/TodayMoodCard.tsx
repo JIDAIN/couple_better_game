@@ -13,11 +13,13 @@ export function TodayMoodCard({
   day,
   onChanged,
   onError,
+  readOnly = false,
 }: {
   date: string;
   day: LifeDayRecord;
-  onChanged: () => Promise<void>;
-  onError: (message: string) => void;
+  onChanged?: () => Promise<void>;
+  onError?: (message: string) => void;
+  readOnly?: boolean;
 }) {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -28,14 +30,14 @@ export function TodayMoodCard({
   }, [day.moods]);
 
   async function choose(moodKey: MoodKey) {
-    if (!mePartnerKey) return;
+    if (!mePartnerKey || readOnly) return;
     setSaving(true);
     try {
       await saveMood({ partnerKey: mePartnerKey, moodDate: date, moodKey });
       setPickerOpen(false);
-      await onChanged();
+      if (onChanged) await onChanged();
     } catch (cause) {
-      onError(cause instanceof Error ? cause.message : "保存心情失败");
+      onError?.(cause instanceof Error ? cause.message : "保存心情失败");
     } finally {
       setSaving(false);
     }
@@ -56,9 +58,11 @@ export function TodayMoodCard({
             <p className="text-sm font-extrabold text-[var(--life-text)]">🍃 心情</p>
             <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">各自记录，彼此看见。</p>
           </div>
-          <AppButton variant="ghost" onClick={() => setPickerOpen(true)}>
-            {myMood ? "修改我的" : "+ 记录我的"}
-          </AppButton>
+          {!readOnly ? (
+            <AppButton variant="ghost" className="life-home-action-pill" onClick={() => setPickerOpen(true)}>
+              {myMood ? "编辑" : "+ 记录"}
+            </AppButton>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -67,7 +71,7 @@ export function TodayMoodCard({
         </div>
       </section>
 
-      {pickerOpen ? (
+      {!readOnly && pickerOpen ? (
         <div className="life-sheet-backdrop" role="presentation" onMouseDown={() => !saving && setPickerOpen(false)}>
           <section className="life-mood-sheet" role="dialog" aria-modal="true" aria-labelledby="mood-picker-title" onMouseDown={(event) => event.stopPropagation()}>
             <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--life-border)]" />
