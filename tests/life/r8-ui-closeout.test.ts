@@ -6,26 +6,30 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-describe("R8.1 UI closeout", () => {
-  it("shows shared anniversary day count and edits it from Nest", () => {
+describe("R8.2 visual and interaction closeout", () => {
+  it("shows shared anniversary day count with the heart at the end and edits it from Nest", () => {
     const today = source("components/life/TodayLifePage.tsx");
     const nest = source("components/life/LifeNestPage.tsx");
     const settingsRoute = source("app/api/life/settings/route.ts");
     expect(today).toContain("daysTogether");
-    expect(today).toContain("一起度过的第 {togetherDay} 天");
+    expect(today).toContain("life-together-heart");
+    expect(today.indexOf("一起度过的第")).toBeLessThan(today.indexOf("life-together-heart"));
     expect(nest).toContain("我们的纪念日");
     expect(nest).toContain("patchLifeSettings({ anniversaryDate");
     expect(settingsRoute).toContain("resolveFixedLifeIdentity");
   });
 
-  it("keeps home actions pill-shaped and mood/sleep use 编辑 after saving", () => {
+  it("uses genuinely compact framed home actions and 编辑 after saving", () => {
     const mood = source("components/life/today/TodayMoodCard.tsx");
     const sleep = source("components/life/today/TodaySleepCard.tsx");
-    const css = source("app/r8-ui-closeout.css");
+    const css = source("app/r8-2-ui-calibration.css");
     expect(mood).toContain('myMood ? "编辑" : "+ 记录"');
     expect(sleep).toContain('mySleep ? "编辑" : "+ 记录"');
-    expect(css).toContain(".life-home-action-pill");
-    expect(css).toContain("border-radius: 999px");
+    expect(mood).toContain('className="life-card-action"');
+    expect(sleep).toContain('className="life-card-action"');
+    expect(css).toContain(".life-card-action");
+    expect(css).toContain("height: 1.95rem");
+    expect(css).toContain("border-radius: 13px");
   });
 
   it("makes eight hours a full sleep ring and caps longer sleep", () => {
@@ -35,16 +39,31 @@ describe("R8.1 UI closeout", () => {
     expect(sleep).toContain("conic-gradient");
   });
 
-  it("separates activity add and edit while offering many activity icons", () => {
+  it("makes mood icons large and frameless and closes immediately when chosen", () => {
+    const mood = source("components/life/today/TodayMoodCard.tsx");
+    const css = source("app/r8-2-ui-calibration.css");
+    const closeIndex = mood.indexOf("setPickerOpen(false)");
+    const saveIndex = mood.indexOf("await saveMood");
+    expect(closeIndex).toBeGreaterThan(-1);
+    expect(closeIndex).toBeLessThan(saveIndex);
+    expect(mood).not.toContain('className={`life-mood-choice ${active');
+    expect(css).toContain("width: 3.75rem !important");
+    expect(css).toContain("background: transparent !important");
+    expect(css).toContain("box-shadow: none !important");
+  });
+
+  it("uses a Notion-style activity icon picker instead of a fixed category strip", () => {
     const activity = source("components/life/today/TodayActivityCard.tsx");
-    for (const label of ["散步", "学习", "运动", "约会", "电影", "桌游", "旅行", "做饭", "购物", "家务"]) {
+    for (const label of ["散步", "学习", "运动", "约会", "电影", "桌游", "旅行", "做饭", "购物", "家务", "阅读", "骑行", "展览"]) {
       expect(activity).toContain(label);
     }
-    expect(activity).toContain("const [addOpen");
-    expect(activity).toContain("const [editMode");
+    expect(activity).toContain("function ActivityIconPicker");
+    expect(activity).toContain('useState<ActivityIconKey>("other")');
+    expect(activity).toContain("life-activity-leading-icon");
+    expect(activity).toContain("life-activity-icon-popover");
+    expect(activity).not.toContain("life-activity-icon-choice");
     expect(activity).toContain("setRecords((current) => [saved");
     expect(activity).toContain("updateActivityEntry");
-    expect(activity).toContain('editMode ? "完成编辑" : "编辑"');
   });
 
   it("uses compact meal photo and macros and removes duplicate daily summary", () => {
@@ -67,13 +86,15 @@ describe("R8.1 UI closeout", () => {
     expect(calendarDay).toContain("readOnly");
   });
 
-  it("uses large Nest art with descriptions and chevrons instead of 打开", () => {
+  it("uses consistent SVG Nest art and a dedicated chevron column", () => {
     const nest = source("components/life/LifeNestPage.tsx");
-    const css = source("app/r8-ui-closeout.css");
-    expect(nest).toContain("life-nest-tile-art");
-    expect(nest).toContain("life-nest-tile-chevron");
-    expect(nest).not.toContain("打开 →");
-    expect(css).toContain("width: 4.5rem");
+    const css = source("app/r8-2-ui-calibration.css");
+    expect(nest).toContain("NestFeatureIcon");
+    expect(nest).toContain("life-nest-tile-copy");
+    expect(nest).toContain("<svg");
+    expect(css).toContain("grid-template-columns: minmax(0,1fr) 1.25rem");
+    expect(css).toContain("position: static !important");
+    expect(nest).not.toContain('icon: "⚖️"');
   });
 
   it("records exact weight time and charts daily averages by period and year", () => {
@@ -91,16 +112,38 @@ describe("R8.1 UI closeout", () => {
     expect(weight).toContain("life-weight-year-nav");
   });
 
-  it("gives mailbox titles themes type filtering equal previews and a full reader", () => {
+  it("keeps mailbox structure but gives equal compact journal-style paper previews", () => {
     const mailbox = source("components/life/LifeMailboxPage.tsx");
-    const css = source("app/r8-ui-closeout.css");
+    const css = source("app/r8-2-ui-calibration.css");
+    const mailboxCss = source("app/r8-2-mailbox.css");
     expect(mailbox).toContain('type FormatFilter = "all" | MailboxFormat');
     expect(mailbox).toContain("THEMES");
     expect(mailbox).toContain("form.title");
     expect(mailbox).toContain("firstSentence(letter.body)");
     expect(mailbox).toContain("setReading(letter)");
-    expect(css).toContain(".life-letter-preview");
-    expect(css).toContain("height: 11rem");
+    expect(css).toContain("height: 9.1rem !important");
+    expect(mailboxCss).toContain('font-family: ui-serif, "Songti SC"');
+    expect(mailboxCss).toContain("box-shadow: none !important");
+  });
+
+  it("connects My to real backup export import and transactional restore", () => {
+    const me = source("components/life/LifeMePage.tsx");
+    const page = source("components/life/LifeDataManagementPage.tsx");
+    const route = source("app/api/life/data-management/route.ts");
+    const server = source("lib/server/life-data-management.ts");
+    const migration = source("supabase/migrations/20260903194500_r8_2_full_data_management.sql");
+    expect(me).toContain('href="/me/data"');
+    expect(page).toContain("立即备份");
+    expect(page).toContain("导出 JSON");
+    expect(page).toContain("导入 JSON");
+    expect(page).toContain("恢复点");
+    expect(route).toContain('const RESTORE_CONFIRMATION = "确认恢复生活数据"');
+    expect(server).toContain("create_life_backup_snapshot");
+    expect(server).toContain("list_life_backup_snapshots");
+    expect(server).toContain("restore_life_backup_snapshot");
+    expect(server).toContain("import_life_full_data");
+    expect(migration).toContain("restore_life_backup_snapshot");
+    expect(migration).toContain("pre_restore");
   });
 
   it("renders medicines as a compact quantity/status/expiry list", () => {
