@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AppButton } from "@/components/ui/AppButton";
 import { AppInput } from "@/components/ui/AppInput";
 import { AppRecordRow } from "@/components/ui/AppRecordRow";
@@ -46,12 +46,10 @@ export function TodayActivityCard({
   const [draft, setDraft] = useState("");
   const [draftType, setDraftType] = useState<ActivityTypeKey>("walk");
   const [saving, setSaving] = useState<string | null>(null);
-  const [records, setRecords] = useState<ActivityRecord[]>(day.activities);
+  const [records, setRecords] = useState<ActivityRecord[]>(() => day.activities);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [editType, setEditType] = useState<ActivityTypeKey>("other");
-
-  useEffect(() => setRecords(day.activities), [day.activities]);
 
   async function add() {
     const text = draft.trim();
