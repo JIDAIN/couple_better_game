@@ -8,9 +8,141 @@ type CacheEntry<T> = {
   promise?: Promise<T>;
 };
 
+type PersistedEntry = {
+  data: unknown;
+  updatedAt: number;
+};
+
+type PersistedCache = {
+  version: 2;
+  entries: Record<string, PersistedEntry>;
+};
+
 const queryCache = new Map<string, CacheEntry<unknown>>();
+const CACHE_PREFIX = "couple-better-game:life-query:v2:";
+const SCOPE_HINT_KEY = "couple-better-game:life-scope";
+const MAX_PERSISTED_ENTRIES = 120;
+const MAX_PERSISTED_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+let activeScope: string | null = null;
+let hydratedScope: string | null = null;
+
+function browserReady() {
+  return typeof window !== "undefined";
+}
+
+function validScope(value: string | null): value is "cat" | "fish" {
+  return value === "cat" || value === "fish";
+}
+
+function storageKey(scope: string) {
+  return `${CACHE_PREFIX}${scope}`;
+}
+
+function shouldPersistKey(key: string) {
+  return key.startsWith("life-day:")
+    || key.startsWith("life-month:")
+    || key.startsWith("meals:")
+    || key.startsWith("weights:")
+    || key === "medicines"
+    || key === "mailbox"
+    || key === "life-settings";
+}
+
+export function readStaleQueryScopeHint() {
+  if (!browserReady()) return null;
+  try {
+    const value = window.sessionStorage.getItem(SCOPE_HINT_KEY);
+    return validScope(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function hydrateScope(scope: string) {
+  if (!browserReady() || hydratedScope === scope) return;
+  hydratedScope = scope;
+  try {
+    const raw = window.localStorage.getItem(storageKey(scope));
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Partial<PersistedCache> | null;
+    if (!parsed || parsed.version !== 2 || !parsed.entries || typeof parsed.entries !== "object") return;
+    const cutoff = Date.now() - MAX_PERSISTED_AGE_MS;
+    for (const [key, entry] of Object.entries(parsed.entries)) {
+      if (!shouldPersistKey(key) || !entry || typeof entry !== "object") continue;
+      const candidate = entry as PersistedEntry;
+      if (typeof candidate.updatedAt !== "number") continue;
+      if (candidate.updatedAt > 0 && candidate.updatedAt < cutoff) continue;
+      queryCache.set(key, { data: candidate.data, updatedAt: candidate.updatedAt });
+    }
+  } catch {
+    // A corrupt or quota-constrained browser cache must never block the app.
+  }
+}
+
+function ensureScopeFromHint() {
+  if (activeScope || !browserReady()) return;
+  const hint = readStaleQueryScopeHint();
+  if (!hint) return;
+  activeScope = hint;
+  hydrateScope(hint);
+}
+
+function persistCurrentScope() {
+  if (!browserReady() || !activeScope) return;
+  try {
+    const cutoff = Date.now() - MAX_PERSISTED_AGE_MS;
+    const entries = Array.from(queryCache.entries())
+      .filter(([key, entry]) => shouldPersistKey(key)
+        && entry.data !== undefined
+        && (entry.updatedAt === 0 || entry.updatedAt >= cutoff))
+      .sort(([, left], [, right]) => right.updatedAt - left.updatedAt)
+      .slice(0, MAX_PERSISTED_ENTRIES);
+    const payload: PersistedCache = {
+      version: 2,
+      entries: Object.fromEntries(entries.map(([key, entry]) => [key, {
+        data: entry.data,
+        updatedAt: entry.updatedAt,
+      }])),
+    };
+    window.localStorage.setItem(storageKey(activeScope), JSON.stringify(payload));
+  } catch {
+    // localStorage is an acceleration/fallback layer only; Supabase remains the source of truth.
+  }
+}
+
+export function setStaleQueryScope(scope: "cat" | "fish" | null) {
+  if (activeScope === scope && hydratedScope === scope) return;
+  activeScope = scope;
+  hydratedScope = null;
+  queryCache.clear();
+  if (scope) hydrateScope(scope);
+}
+
+export function rememberStaleQueryScope(scope: "cat" | "fish") {
+  if (browserReady()) {
+    try {
+      window.sessionStorage.setItem(SCOPE_HINT_KEY, scope);
+    } catch {
+      // Ignore storage restrictions.
+    }
+  }
+  setStaleQueryScope(scope);
+}
+
+export function forgetStaleQueryScope() {
+  if (browserReady()) {
+    try {
+      window.sessionStorage.removeItem(SCOPE_HINT_KEY);
+    } catch {
+      // Ignore storage restrictions.
+    }
+  }
+  setStaleQueryScope(null);
+}
 
 function entryFor<T>(key: string) {
+  ensureScopeFromHint();
   return queryCache.get(key) as CacheEntry<T> | undefined;
 }
 
@@ -20,6 +152,7 @@ export function peekStaleQuery<T>(key: string) {
 
 export function setStaleQueryData<T>(key: string, data: T) {
   queryCache.set(key, { data, updatedAt: Date.now() });
+  persistCurrentScope();
 }
 
 export function invalidateStaleQuery(prefix: string) {
@@ -27,10 +160,19 @@ export function invalidateStaleQuery(prefix: string) {
     if (!key.startsWith(prefix)) continue;
     queryCache.set(key, { ...entry, updatedAt: 0 });
   }
+  persistCurrentScope();
 }
 
-export function clearStaleQueries() {
+export function clearStaleQueries({ persisted = false }: { persisted?: boolean } = {}) {
+  ensureScopeFromHint();
   queryCache.clear();
+  if (persisted && browserReady() && activeScope) {
+    try {
+      window.localStorage.removeItem(storageKey(activeScope));
+    } catch {
+      // Ignore storage restrictions.
+    }
+  }
 }
 
 export async function prefetchStaleQuery<T>({
@@ -52,6 +194,7 @@ export async function prefetchStaleQuery<T>({
   try {
     const data = await promise;
     queryCache.set(key, { data, updatedAt: Date.now() });
+    persistCurrentScope();
     return data;
   } catch (cause) {
     queryCache.set(key, { data: cached?.data, updatedAt: cached?.updatedAt ?? 0 });
@@ -99,11 +242,18 @@ export function useStaleQuery<T>({
     try {
       const next = await promise;
       queryCache.set(key, { data: next, updatedAt: Date.now() });
+      persistCurrentScope();
       setData(next);
       setError(null);
       return next;
     } catch (cause) {
-      setError(cause instanceof Error ? cause : new Error("数据暂时没有加载出来"));
+      const fallback = entryFor<T>(key)?.data;
+      if (fallback !== undefined) {
+        setData(fallback);
+        setError(null);
+      } else {
+        setError(cause instanceof Error ? cause : new Error("数据暂时没有加载出来"));
+      }
       throw cause;
     } finally {
       const latest = entryFor<T>(key);
@@ -131,6 +281,13 @@ export function useStaleQuery<T>({
       cancelled = true;
     };
   }, [key, refresh]);
+
+  useEffect(() => {
+    if (!browserReady()) return;
+    const handleOnline = () => { void refresh(true).catch(() => undefined); };
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, [refresh]);
 
   const update = useCallback((next: T | ((current: T | undefined) => T)) => {
     const current = peekStaleQuery<T>(key);
