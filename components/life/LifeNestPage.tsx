@@ -11,12 +11,14 @@ import { fetchLifeSettings, patchLifeSettings } from "@/lib/life/settings-client
 import { daysTogether, type LifeSettings } from "@/lib/life/settings-service";
 import { localIsoDate } from "./today/today-life-model";
 
-const tiles = [
-  { href: "/nest/weight", icon: "⚖️", title: "体重", note: "看见变化，也保留每一次记录", tone: "is-blue" },
-  { href: "/nest/mailbox", icon: "💌", title: "小信箱", note: "信纸和明信片都收在这里", tone: "is-pink" },
-  { href: "/nest/medicine", icon: "🧰", title: "家庭药箱", note: "一起维护数量和有效期", tone: "is-mint" },
-  { href: "/nest/game-machine", icon: "🎮", title: "游戏机", note: "小游戏和旧玩法都从这里进入", tone: "is-yellow" },
-] as const;
+type NestIconName = "weight" | "mailbox" | "medicine" | "game";
+
+const tiles: ReadonlyArray<{ href: string; icon: NestIconName; title: string; note: string; tone: string }> = [
+  { href: "/nest/weight", icon: "weight", title: "体重", note: "看见变化，也保留每一次记录", tone: "is-blue" },
+  { href: "/nest/mailbox", icon: "mailbox", title: "小信箱", note: "信纸和明信片都收在这里", tone: "is-pink" },
+  { href: "/nest/medicine", icon: "medicine", title: "家庭药箱", note: "一起维护数量和有效期", tone: "is-mint" },
+  { href: "/nest/game-machine", icon: "game", title: "游戏机", note: "小游戏和旧玩法都从这里进入", tone: "is-yellow" },
+];
 
 function anniversaryText(value: string | null) {
   if (!value) return "还没有设置纪念日";
@@ -70,7 +72,7 @@ export function LifeNestPage() {
             <span className="block text-[10px] font-extrabold tracking-[0.16em] text-[var(--life-text-muted)]">OUR DAY</span>
             <span className="mt-1 block text-sm font-black text-[var(--life-text)]">纪念日</span>
             <span className="mt-1 block text-xs text-[var(--life-text-body)]">{anniversaryText(settingsQuery.data?.anniversaryDate ?? null)}</span>
-            {togetherDay ? <span className="mt-1 block text-[11px] font-extrabold text-[var(--life-teal-strong)]">一起度过的第 {togetherDay} 天</span> : null}
+            {togetherDay ? <span className="life-anniversary-days mt-1 block">一起度过的第 <strong>{togetherDay}</strong> 天 <b aria-hidden>♡</b></span> : null}
           </span>
           <span className="life-wide-chevron" aria-hidden>›</span>
         </button>
@@ -78,9 +80,11 @@ export function LifeNestPage() {
         <div className="life-nest-grid mt-3 grid grid-cols-2 gap-2.5">
           {tiles.map((tile) => (
             <Link key={tile.title} href={tile.href} className={`life-nest-tile ${tile.tone}`}>
-              <span className="life-nest-tile-art" aria-hidden>{tile.icon}</span>
-              <span className="mt-3 text-sm font-black text-[var(--life-text)]">{tile.title}</span>
-              <span className="mt-1 text-[10px] leading-5 text-[var(--life-text-muted)]">{tile.note}</span>
+              <span className="life-nest-tile-art" aria-hidden><NestFeatureIcon name={tile.icon} /></span>
+              <span className="life-nest-tile-copy">
+                <span className="life-nest-tile-title">{tile.title}</span>
+                <span className="life-nest-tile-note">{tile.note}</span>
+              </span>
               <span className="life-nest-tile-chevron" aria-hidden>›</span>
             </Link>
           ))}
@@ -105,5 +109,43 @@ export function LifeNestPage() {
         </div>
       ) : null}
     </>
+  );
+}
+
+function NestFeatureIcon({ name }: { name: NestIconName }) {
+  if (name === "weight") {
+    return (
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <path d="M32 13v36M20 17h24" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+        <path d="m20 17-9 18h18L20 17Zm24 0-9 18h18L44 17Z" stroke="currentColor" strokeWidth="2.8" strokeLinejoin="round" />
+        <path d="M18 50h28" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" />
+        <circle cx="32" cy="13" r="3.5" fill="currentColor" opacity=".28" />
+      </svg>
+    );
+  }
+  if (name === "mailbox") {
+    return (
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect x="10" y="17" width="44" height="32" rx="6" stroke="currentColor" strokeWidth="3" />
+        <path d="m12 21 20 16 20-16" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M32 29c-3.7-5.7-12-1.9-8.5 4.2 2.1 3.7 8.5 7.8 8.5 7.8s6.4-4.1 8.5-7.8C44 27.1 35.7 23.3 32 29Z" fill="currentColor" opacity=".82" />
+      </svg>
+    );
+  }
+  if (name === "medicine") {
+    return (
+      <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <path d="M23 19v-4.5A4.5 4.5 0 0 1 27.5 10h9a4.5 4.5 0 0 1 4.5 4.5V19" stroke="currentColor" strokeWidth="3" />
+        <rect x="9" y="19" width="46" height="34" rx="7" stroke="currentColor" strokeWidth="3" />
+        <path d="M28 28h8v6h6v8h-6v6h-8v-6h-6v-8h6v-6Z" fill="currentColor" opacity=".82" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M20 24h24c7.5 0 12.5 6.4 11 13.7l-2 9.1c-1.4 6.6-9.9 8.4-13.8 2.9L36 45h-8l-3.2 4.7C21 55.2 12.5 53.4 11 46.8l-2-9.1C7.5 30.4 12.5 24 20 24Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+      <path d="M20 31v10M15 36h10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="42" cy="33" r="2.5" fill="currentColor" /><circle cx="48" cy="39" r="2.5" fill="currentColor" opacity=".55" />
+    </svg>
   );
 }
