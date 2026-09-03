@@ -5,6 +5,7 @@ import {
   verifyDriveBridgeRequest,
   verifyDriveWatchToken,
 } from "../../lib/server/drive-bridge-auth";
+import { clearDriveBridgeConfigCache } from "../../lib/server/drive-bridge-config";
 
 const CAT_SECRET = "r10-cat-test-secret-long-enough-for-hmac";
 const FISH_SECRET = "r10-fish-test-secret-long-enough-for-hmac";
@@ -22,6 +23,7 @@ beforeEach(() => {
   process.env.LIFE_DRIVE_FISH_BRIDGE_SECRET = FISH_SECRET;
   process.env.LIFE_DRIVE_CAT_WATCH_TOKEN = "cat-watch-token";
   process.env.LIFE_DRIVE_FISH_WATCH_TOKEN = "fish-watch-token";
+  clearDriveBridgeConfigCache();
 });
 
 afterEach(() => {
@@ -30,6 +32,7 @@ afterEach(() => {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
+  clearDriveBridgeConfigCache();
 });
 
 function signedRequest(bridgeId: "cat" | "fish", secret: string, body: string, timestamp?: string) {
@@ -51,24 +54,24 @@ describe("R10 dual Drive bridge auth", () => {
     expect(driveBridgeIdentity("fish")).toEqual({ partnerKey: "fish", displayName: "鱼鱼" });
   });
 
-  it("accepts cat and fish only with their own HMAC secrets", () => {
+  it("accepts cat and fish only with their own HMAC secrets", async () => {
     const body = JSON.stringify({ commands: [{ commandId: "abc" }] });
 
-    const cat = verifyDriveBridgeRequest(signedRequest("cat", CAT_SECRET, body), body);
+    const cat = await verifyDriveBridgeRequest(signedRequest("cat", CAT_SECRET, body), body);
     expect(cat.ok).toBe(true);
     if (cat.ok) expect(cat.identity.partnerKey).toBe("cat");
 
-    const fish = verifyDriveBridgeRequest(signedRequest("fish", FISH_SECRET, body), body);
+    const fish = await verifyDriveBridgeRequest(signedRequest("fish", FISH_SECRET, body), body);
     expect(fish.ok).toBe(true);
     if (fish.ok) expect(fish.identity.partnerKey).toBe("fish");
 
-    expect(verifyDriveBridgeRequest(signedRequest("fish", CAT_SECRET, body), body)).toMatchObject({
+    await expect(verifyDriveBridgeRequest(signedRequest("fish", CAT_SECRET, body), body)).resolves.toMatchObject({
       ok: false,
       code: "BRIDGE_SIGNATURE_INVALID",
     });
   });
 
-  it("rejects a missing bridge id, tampered body, and stale timestamp", () => {
+  it("rejects a missing bridge id, tampered body, and stale timestamp", async () => {
     const original = JSON.stringify({ commands: [{ commandId: "abc" }] });
     const now = Math.floor(Date.now() / 1000);
     const timestamp = String(now);
@@ -80,30 +83,30 @@ describe("R10 dual Drive bridge auth", () => {
         "x-life-bridge-signature": signature,
       },
     });
-    expect(verifyDriveBridgeRequest(missingId, original)).toMatchObject({ ok: false, code: "BRIDGE_ID_INVALID" });
+    await expect(verifyDriveBridgeRequest(missingId, original)).resolves.toMatchObject({ ok: false, code: "BRIDGE_ID_INVALID" });
 
     const tampered = JSON.stringify({ commands: [{ commandId: "def" }] });
-    expect(verifyDriveBridgeRequest(signedRequest("cat", CAT_SECRET, original, timestamp), tampered)).toMatchObject({
+    await expect(verifyDriveBridgeRequest(signedRequest("cat", CAT_SECRET, original, timestamp), tampered)).resolves.toMatchObject({
       ok: false,
       code: "BRIDGE_SIGNATURE_INVALID",
     });
 
     const staleTimestamp = String(now - 301);
-    expect(verifyDriveBridgeRequest(signedRequest("cat", CAT_SECRET, original, staleTimestamp), original)).toMatchObject({
+    await expect(verifyDriveBridgeRequest(signedRequest("cat", CAT_SECRET, original, staleTimestamp), original)).resolves.toMatchObject({
       ok: false,
       code: "BRIDGE_TIMESTAMP_INVALID",
     });
   });
 
-  it("routes Google Drive watch tokens to the matching Harbor project", () => {
-    expect(verifyDriveWatchToken(new Request("https://example.test", { headers: { "x-goog-channel-token": "cat-watch-token" } }))).toEqual({
+  it("routes Google Drive watch tokens to the matching Harbor project", async () => {
+    await expect(verifyDriveWatchToken(new Request("https://example.test", { headers: { "x-goog-channel-token": "cat-watch-token" } }))).resolves.toMatchObject({
       ok: true,
       bridgeId: "cat",
     });
-    expect(verifyDriveWatchToken(new Request("https://example.test", { headers: { "x-goog-channel-token": "fish-watch-token" } }))).toEqual({
+    await expect(verifyDriveWatchToken(new Request("https://example.test", { headers: { "x-goog-channel-token": "fish-watch-token" } }))).resolves.toMatchObject({
       ok: true,
       bridgeId: "fish",
     });
-    expect(verifyDriveWatchToken(new Request("https://example.test", { headers: { "x-goog-channel-token": "wrong" } }))).toEqual({ ok: false });
+    await expect(verifyDriveWatchToken(new Request("https://example.test", { headers: { "x-goog-channel-token": "wrong" } }))).resolves.toEqual({ ok: false });
   });
 });

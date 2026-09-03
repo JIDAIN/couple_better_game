@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { verifyDriveBridgeRequest } from "@/lib/server/drive-bridge-auth";
-import { executeDriveBridgeBatch } from "@/lib/server/drive-bridge-service";
+import { createDriveBridgeStagingUpload } from "@/lib/server/drive-bridge-staging";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" };
+
+type StageBody = {
+  commandId?: unknown;
+  mimeType?: unknown;
+  size?: unknown;
+};
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -14,19 +20,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, code: auth.code, error: auth.message }, { status: auth.status, headers: NO_STORE });
   }
 
-  let payload: unknown;
+  let body: StageBody;
   try {
-    payload = JSON.parse(rawBody);
+    body = JSON.parse(rawBody) as StageBody;
   } catch {
     return NextResponse.json({ ok: false, code: "BAD_JSON", error: "请求 JSON 不正确" }, { status: 400, headers: NO_STORE });
   }
 
   try {
-    const receipts = await executeDriveBridgeBatch(auth.identity, payload);
-    return NextResponse.json({ ok: true, receipts }, { headers: NO_STORE });
+    const commandId = typeof body.commandId === "string" ? body.commandId.trim() : "";
+    const mimeType = typeof body.mimeType === "string" ? body.mimeType.trim() : "";
+    const size = typeof body.size === "number" ? body.size : Number(body.size);
+    const staging = await createDriveBridgeStagingUpload(auth.bridgeId, { commandId, mimeType, size });
+    return NextResponse.json({ ok: true, staging }, { headers: NO_STORE });
   } catch (error) {
     return NextResponse.json(
-      { ok: false, code: "BRIDGE_EXECUTE_FAILED", error: error instanceof Error ? error.message : "Drive Bridge 执行失败" },
+      { ok: false, code: "BRIDGE_STAGE_FAILED", error: error instanceof Error ? error.message : "创建原图暂存通道失败" },
       { status: 400, headers: NO_STORE },
     );
   }

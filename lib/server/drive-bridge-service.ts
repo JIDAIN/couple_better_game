@@ -1,7 +1,10 @@
 import type { FixedLifeIdentity } from "./fixed-life-auth";
 import { executeLifeAgentTool } from "./life-agent-registry";
 import { compressMealPhoto, DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES } from "./image-compression";
-import { downloadDriveMealOriginal } from "./google-drive-service";
+import {
+  deleteDriveBridgeStagedOriginal,
+  downloadDriveBridgeStagedOriginal,
+} from "./drive-bridge-staging";
 import { getLifeFullExport, getLifeSettings } from "./life-data-management";
 import { loadHomeSyncSnapshot } from "./supabase-home-sync";
 import {
@@ -18,6 +21,7 @@ export type DriveBridgeCommand = {
   args: JsonRecord;
   userText: string;
   originalDriveFileId?: string | null;
+  stagedOriginalPath?: string | null;
 };
 
 function asRecord(value: unknown): JsonRecord {
@@ -34,11 +38,13 @@ function parseCommand(value: unknown): DriveBridgeCommand {
   const tool = stringValue(row.tool);
   const userText = stringValue(row.userText).slice(0, 12000);
   const originalDriveFileId = stringValue(row.originalDriveFileId) || null;
+  const stagedOriginalPath = stringValue(row.stagedOriginalPath) || null;
   if (!commandId) throw new Error("commandId 不能为空");
   if (tool !== "life_capabilities" && tool !== "life_query" && tool !== "life_mutate") {
     throw new Error("tool 不受支持");
   }
-  return { commandId, tool, args: asRecord(row.args), userText, originalDriveFileId };
+  if (stagedOriginalPath && !originalDriveFileId) throw new Error("暂存原图必须关联 Drive fileId");
+  return { commandId, tool, args: asRecord(row.args), userText, originalDriveFileId, stagedOriginalPath };
 }
 
 async function buildAttachment(identity: FixedLifeIdentity, command: DriveBridgeCommand) {
@@ -48,18 +54,32 @@ async function buildAttachment(identity: FixedLifeIdentity, command: DriveBridge
   if (resource !== "meal" || command.args.attachPhoto !== true) {
     throw new Error("Drive 原图只能用于 attachPhoto=true 的 meal 写入");
   }
-  const original = await downloadDriveMealOriginal(command.originalDriveFileId, identity.partnerKey);
-  const compressed = await compressMealPhoto(original.bytes, original.mimeType, {
-    maxInputBytes: DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES,
-  });
-  return {
-    bytes: compressed.bytes,
-    contentType: compressed.contentType,
-    extension: compressed.extension,
-    width: compressed.width,
-    height: compressed.height,
-    outputBytes: compressed.outputBytes,
-  } as const;
+  if (!command.stagedOriginalPath) throw new Error("DRIVE_ORIGINAL_NOT_STAGED");
+
+  try {
+    const original = await downloadDriveBridgeStagedOriginal(
+      identity.partnerKey,
+      command.commandId,
+      command.stagedOriginalPath,
+    );
+    const compressed = await compressMealPhoto(original.bytes, original.mimeType, {
+      maxInputBytes: DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES,
+    });
+    return {
+      bytes: compressed.bytes,
+      contentType: compressed.contentType,
+      extension: compressed.extension,
+      width: compressed.width,
+      height: compressed.height,
+      outputBytes: compressed.outputBytes,
+    } as const;
+  } finally {
+    await deleteDriveBridgeStagedOriginal(
+      identity.partnerKey,
+      command.commandId,
+      command.stagedOriginalPath,
+    ).catch(() => undefined);
+  }
 }
 
 export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, input: unknown) {
@@ -130,8 +150,13 @@ export async function executeDriveBridgeBatch(identity: FixedLifeIdentity, value
       receipts.push(await executeDriveBridgeCommand(identity, input));
     } catch (error) {
       const row = asRecord(input);
+      const stagedOriginalPath = stringValue(row.stagedOriginalPath);
+      const commandId = stringValue(row.commandId);
+      if (stagedOriginalPath && commandId) {
+        await deleteDriveBridgeStagedOriginal(identity.partnerKey, commandId, stagedOriginalPath).catch(() => undefined);
+      }
       receipts.push({
-        commandId: stringValue(row.commandId),
+        commandId,
         ok: false as const,
         receivedAt: new Date().toISOString(),
         finishedAt: new Date().toISOString(),
@@ -151,7 +176,7 @@ export async function getDriveBridgeSnapshot(identity: FixedLifeIdentity, includ
     includeLegacy ? loadHomeSyncSnapshot() : Promise.resolve(null),
   ]);
   return {
-    schemaVersion: "r10-v2",
+    schemaVersion: "r10-v3",
     generatedAt: new Date().toISOString(),
     identity: { me: identity.partnerKey, displayName: identity.displayName },
     lifeExport,
