@@ -1,6 +1,7 @@
 import sharp from "sharp";
 
 export const MEAL_PHOTO_MAX_INPUT_BYTES = 10 * 1024 * 1024;
+export const DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES = 25 * 1024 * 1024;
 export const MEAL_PHOTO_MAX_EDGE = 600;
 export const MEAL_PHOTO_INITIAL_QUALITY = 70;
 export const MEAL_PHOTO_MIN_QUALITY = 55;
@@ -48,14 +49,17 @@ function toBuffer(input: ArrayBuffer | Uint8Array | Buffer) {
 export async function compressMealPhoto(
   input: ArrayBuffer | Uint8Array | Buffer,
   mimeType: string,
+  options?: { maxInputBytes?: number },
 ): Promise<CompressedMealPhoto> {
   const source = toBuffer(input);
   const normalizedType = mimeType.trim().toLowerCase();
+  const maxInputBytes = Math.max(1, options?.maxInputBytes ?? MEAL_PHOTO_MAX_INPUT_BYTES);
   if (source.length === 0) {
     throw new MealPhotoCompressionError("请选择一张照片", "PHOTO_REQUIRED");
   }
-  if (source.length > MEAL_PHOTO_MAX_INPUT_BYTES) {
-    throw new MealPhotoCompressionError("原始照片需要在 10MB 以内", "PHOTO_TOO_LARGE");
+  if (source.length > maxInputBytes) {
+    const maxMb = Math.max(1, Math.floor(maxInputBytes / 1024 / 1024));
+    throw new MealPhotoCompressionError(`原始照片需要在 ${maxMb}MB 以内`, "PHOTO_TOO_LARGE");
   }
   if (!SUPPORTED_INPUT_TYPES.has(normalizedType)) {
     throw new MealPhotoCompressionError(

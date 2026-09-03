@@ -2,7 +2,7 @@
 
 **状态日期：2026-09-03**
 
-详细重构计划见 `docs/16-v2-refactor-plan.md`；固定双账号与权限边界见 `docs/17-auth-and-pairing.md`；R1-R6 分阶段说明见 `docs/18-*` 至 `docs/23-*`；AI/MCP/内置 Agent 边界见 `docs/11-ai-write-architecture.md`。
+详细重构计划见 `docs/16-v2-refactor-plan.md`；固定双账号与权限边界见 `docs/17-auth-and-pairing.md`；R1-R6 分阶段说明见 `docs/18-*` 至 `docs/23-*`；AI 总架构见 `docs/11-ai-write-architecture.md`；R10 细节见 `docs/25-r10-chatgpt-project-drive-bridge.md`。
 
 ## 1. V2 主功能与重构状态
 
@@ -22,7 +22,9 @@ R1-R6 重构                                    ✅
 R7 移动端视觉与实机校准                         ✅
 R8 数据管理 + AI/MCP Production 接入            ✅
 R9 程序内置 AI Agent（代码/CI）                  ✅
-R9 Production 实机                              ⏳ 待单次授权
+R9 Production 实机                              ⏳ 未部署
+R10 ChatGPT Project × Drive Bridge（开发/CI）    🚧 本分支开发中
+R10 Production 激活                              ⏳ 待单次授权
 ```
 
 ## 2. R1-R6 最终结果
@@ -67,28 +69,35 @@ Browser manual UI
   -> server-only domain service / RPC
   -> Supabase PostgreSQL
 
-Browser /ai
+ChatGPT Project（R10 主路径）
+  -> Google Drive / Sheets App
+  -> AI Bridge Sheet
+  -> Apps Script signed worker
+  -> /api/drive-bridge/*
+  -> life_query / life_mutate
+  -> canonical domain service / RPC
+  -> Supabase PostgreSQL / Storage
+
+Browser /ai（R9 备用）
   -> fixed account signed session
   -> server-only AI Gateway call
   -> life_query / life_mutate registry
   -> canonical domain service / RPC
   -> Supabase PostgreSQL / Storage
 
-External MCP client（可选）
+External MCP client（R8 可选）
   -> OAuth 2.1 / PKCE
   -> /mcp
   -> domain adapter
   -> canonical domain service / RPC
-  -> Supabase PostgreSQL
 ```
 
-- Supabase service secret 永不进入浏览器、普通聊天或模型上下文；
-- AI Gateway credential 只存在于 Vercel server runtime；
-- MCP 使用独立 `LIFE_MCP_SIGNING_SECRET`；
-- 个人 AI 写入在服务端强制绑定当前 `cat / fish`，不相信模型传入的 owner；
+- Supabase service secret 永不进入浏览器、Google Sheet、普通聊天或模型上下文；
+- R10 Bridge 使用独立 HMAC、固定身份与 durable command ledger；
+- AI 不相信模型提供的个人 owner；
 - 不暴露任意 SQL、任意 Supabase 请求或任意 URL 下载工具；
-- 业务数据继续以 Supabase 为事实源；
-- 真实用户数据与生产 secret 不提交 GitHub。
+- Supabase 仍是事实源；Google Sheet 只是命令总线和状态镜像；
+- GitHub 不保存真实生活数据、原图或生产 secret。
 
 ## 5. 依赖提示
 
@@ -96,19 +105,7 @@ External MCP client（可选）
 
 ## 6. R7 实机视觉校准
 
-R7 已完成：
-
-- 主内容宽度收回移动端 `30rem`；
-- 统一卡片圆角、阴影、内边距、日历密度；
-- 五项底部导航使用统一线性 SVG；
-- 八种心情接入统一毛绒圆脸图标；
-- 月历双人心情上下排列；
-- 首页活动场景接入双人角色图；
-- Today、饮食、餐食编辑、日历、日期详情、小窝、体重、小信箱、家庭药箱、游戏机、我的完成页面级收口；
-- 账号切换清理旧身份缓存，登录并行预热常用生活数据；
-- 小信箱增加月份归档和日期轴信纸列表。
-
-`excited` migration 已在 Production 执行并验证。详细记录见 `docs/24-r7-mobile-ui-calibration.md`。
+R7 已完成移动端主宽度、卡片、导航、心情图标、日历、小信箱、账号缓存与常用页面收口。`excited` migration 已在 Production 执行并验证。详细记录见 `docs/24-r7-mobile-ui-calibration.md`。
 
 ## 7. R8 数据管理与 MCP
 
@@ -119,38 +116,21 @@ R8 Production Supabase 已执行：
 20260903023150  r8_mcp_redemption_rls
 ```
 
-其中包括：
+包括生活设置、transactional backup/export/restore/import、MCP code redemption 与 RLS。
 
-- 生活设置、周年日、目标体重、信纸元数据；
-- transactional backup snapshot / export / restore / import；
-- `life_mcp_code_redemptions` 授权码一次性兑换记录；
-- MCP redemption 表启用 RLS，浏览器角色无权限。
-
-PR #40 已合并到 `main`，合并 commit：
+PR #40 已合并，merge commit：
 
 ```text
 6b904beb1f5ae6073ea4c5fa53be900e4042309f
 ```
 
-R8 Production MCP 地址：
+R8 Production MCP：
 
 ```text
 https://couple-better-game.vercel.app/mcp
 ```
 
-MCP/OAuth 服务端本身已上线并通过 discovery / 401 challenge 验证；但当前个人 ChatGPT 产品侧不提供所需的自定义 MCP 写入入口，因此 R9 不再把核心 AI 能力依赖于该客户端权限。
-
-## 8. R8 测试与 Production 发布
-
-PR #40 最终 CI：
-
-```text
-Test   ✅
-Lint   ✅
-Build  ✅
-```
-
-最终 R8 Production deployment：
+最终 R8 Production：
 
 ```text
 dpl_FvWJfrmtH1fcVie8UsXT4Ez871tD
@@ -158,92 +138,24 @@ READY
 https://couple-better-game.vercel.app
 ```
 
-线上协议检查：
+MCP/OAuth 服务端 discovery / 401 challenge 已验证；但个人 ChatGPT Plus 的自定义 MCP 写入能力不满足本项目目标，因此 R10 改走官方 Google Drive App Bridge。
 
-- `/.well-known/oauth-protected-resource` -> 200；
-- `/.well-known/oauth-protected-resource/mcp` -> 200；
-- `/.well-known/oauth-authorization-server` -> 200；
-- 未授权 `/mcp` -> 401，并返回正确 `WWW-Authenticate` / resource metadata；
-- 上述路由部署后无 Vercel runtime error。
+## 8. R9 程序内置 AI Agent
 
-## 9. R9 程序内置 AI Agent
-
-R9 改用“AI 在程序内部作为当前登录用户的自然语言操作层”，不依赖 ChatGPT Plus 是否开放 MCP/GPT Actions。
-
-入口：
+R9 已建立：
 
 ```text
 /ai
 /api/ai/chat
-```
-
-模型层：
-
-```text
 Vercel AI Gateway
-默认模型：google/gemini-2.5-flash
-可用 LIFE_AI_MODEL 替换
-Production 优先使用 VERCEL_OIDC_TOKEN
+life_capabilities / life_query / life_mutate
 ```
 
-内部稳定工具：
+AI 可读取 V2 export/settings/legacy snapshot，并按当前身份 CRUD Mood、Sleep、Activity、Meal、Weight、Medicine、Mailbox、Settings 等已注册领域。
 
-```text
-life_capabilities
-life_query
-life_mutate
-```
+权限回归覆盖 owner 强制、删除意图、小信箱 owner 与 legacy 强确认。
 
-AI 当前可查询：
-
-- 某日心情 / 睡眠 / 活动；
-- 月度双人心情；
-- 餐食与餐食明细；
-- 体重历史；
-- 家庭药箱；
-- 小信箱；
-- 周年日 / 目标体重；
-- V2 完整生活数据导出；
-- 旧 `/game` 完整同步快照。
-
-AI 当前可像当前登录用户一样修改：
-
-- Mood / Sleep：upsert；
-- Activity：create / update / delete；
-- Meal：create / update / delete + 当前图片；
-- Weight：create / update / delete；
-- Medicine：create / update / delete；
-- Mailbox：create / update / delete；
-- Settings：周年日 / 当前账号目标体重；
-- Legacy `/game`：仅固定强确认短语后允许完整 replace。
-
-权限边界：
-
-- cat 登录后 AI 个人记录只能写 cat；fish 同理；
-- 模型自己传入另一方 owner 会被服务端覆盖/拒绝；
-- Meal / Weight 修改删除前再次核验 owner；
-- 小信箱只能以当前账号寄出，也只能修改/删除当前账号自己发出的信；
-- Medicine 延续家庭共享药箱规则；
-- 删除要求用户当前消息明确表达删除；
-- 旧游戏完整覆盖要求当前消息明确包含 `确认覆盖游戏数据`；
-- 没有任意 SQL 或数据库管理员能力。
-
-图片继续统一使用：
-
-```text
-最长边 600 px
-WebP quality 70
->120 KB -> 65 -> 60 -> 55
-最低 quality 55
-```
-
-用户可以在 `/ai` 上传餐食图片，AI 先视觉理解；若用户同时明确要求记录，同一张压缩图会保存到对应餐食记录。
-
-## 10. R9 测试状态
-
-PR #41：`R9: in-app AI agent with full life data access`。
-
-最新 CI run #222：
+PR #41 最终 CI run #223：
 
 ```text
 Test   ✅
@@ -251,29 +163,109 @@ Lint   ✅
 Build  ✅
 ```
 
-新增权限回归测试覆盖：
+PR #41 已合并到 main，merge commit：
 
-- 模型传 `fish` 也不能让 cat 登录者把个人体重写到 fish；
-- 没有明确删除意图时拒绝 delete；
-- 不能修改 Ta 发出的信；
-- 旧 `/game` 全量覆盖必须出现固定确认短语。
+```text
+6989042c1164f1140bdb151e351c4406ad417b34
+```
 
-R9 代码测试通过，但截至本状态记录**尚未发布 Production**。因此目前只能确认代码/构建闭环，不能声称线上 AI Gateway、真实登录态查询和真实写回已完成实机验收。
+**R9 未部署 Production。** 当前线上仍是 R8，不能声称线上 AI Gateway/writeback 已验收。
 
-## 11. 部署纪律
+## 9. R10 ChatGPT Project × Google Drive Bridge
 
-Git 自动部署必须继续保持关闭：
+R10 目标：不升级 ChatGPT 套餐，让 `🐟🐱生活` Project 的任意新聊天通过已连接 Google Drive / Sheets App 读取和修改程序。
+
+已创建 Google Drive 工作区：
+
+```text
+Couple Better Game/
+├─ AI-Bridge/
+├─ Originals/Meals/
+├─ Backups/Daily/
+├─ Backups/Monthly/
+└─ Trash/
+```
+
+已创建原生 Google Sheet：
+
+```text
+Couple Better Game AI Bridge
+ID: 1inEL4mXOQ2-w5UrkqtLoK6aU2o-4auCQSLlEGuA3cVo
+```
+
+Sheet 已包含：`README / META / COMMANDS / RECEIPTS / STATE_* / ASSETS`。
+
+当前主 Bridge 固定绑定 `cat`，不允许 Sheet 自行传 `actor=fish` 冒充 Ta。
+
+R10 服务端代码已新增：
+
+```text
+/api/drive-bridge/execute
+/api/drive-bridge/snapshot
+/api/drive-bridge/watch
+lib/server/drive-bridge-auth.ts
+lib/server/drive-bridge-service.ts
+lib/server/drive-bridge-ledger.ts
+lib/server/google-drive-service.ts
+```
+
+并新增 Apps Script 源码：
+
+```text
+scripts/google-apps-script/r10-drive-bridge/Code.gs
+scripts/google-apps-script/r10-drive-bridge/appsscript.json
+```
+
+实现边界：
+
+- Apps Script → Vercel HMAC 签名；
+- Google Drive push wake + 每分钟 polling fallback；
+- server-bound `cat` identity；
+- `life_drive_bridge_commands` durable ledger 防止回执丢失导致重复写；
+- Drive 原图保存不压缩；Service Account 只读 `Originals/Meals`；
+- Drive 原图压缩通道允许 25MB，仍输出现有 600px / WebP q70→55 / 120KB 目标；
+- 每日完整 JSON → `Backups/Daily`，每月快照 → `Backups/Monthly`；
+- Supabase 仍是唯一事实源。
+
+详细可行性、Project Instructions、环境变量、激活步骤见 `docs/25-r10-chatgpt-project-drive-bridge.md`。
+
+## 10. R10 尚未执行的 Production 动作
+
+截至本状态记录，以下动作**尚未执行**：
+
+- R10 Supabase migration 未应用 Production；
+- Google Cloud Service Account 未创建/未分享 `Originals/Meals`；
+- Apps Script Project 尚未实际部署为 Web App；
+- R10 Vercel env 未配置；
+- R10 Vercel Preview/Production 均未触发；
+- ChatGPT Project 多窗口真实读写尚未端到端验收。
+
+这些必须等代码 CI 通过后按 release checklist 激活。特别是 Vercel Production 仍需用户单次明确授权。
+
+## 11. R10 Production 验收清单
+
+上线时依次验证：
+
+1. Bridge HMAC 非法请求拒绝；
+2. snapshot 可刷新 `STATE_*`；
+3. Project 新窗口查询药箱；
+4. 新窗口新增一条用户明确授权的无害测试记录；
+5. 修改 / 删除安全门；
+6. 同 command ID 重放不会重复写；
+7. 上传真实餐食原图到 Drive，不改变原图；
+8. Vercel 下载原图并生成 Supabase 600px WebP；
+9. 程序显示压缩图；
+10. Daily backup 落 Drive；
+11. Drive webhook 正常延迟；
+12. 人为停掉 push 后 1 分钟 trigger 能补偿；
+13. 新建第二、第三个 ChatGPT Project 聊天仍能读取同一真实程序。
+
+## 12. 部署纪律
+
+Git 自动部署必须继续保持：
 
 ```text
 vercel.json -> git.deploymentEnabled: false
 ```
 
-R9 Production 发布必须再次取得用户的单次明确授权。发布后还需执行：
-
-1. `/ai` Production 页面加载检查；
-2. 未登录 `/api/ai/chat` -> 401；
-3. 登录后 AI Gateway 首次真实对话；
-4. 只读查询药箱/饮食等真实数据；
-5. 用户明确授权的一次非破坏性写入实测；
-6. 图片识别 + 餐食照片绑定实测；
-7. Vercel runtime error/log 检查。
+任何 Vercel Preview 或 Production deployment 都必须先取得用户明确许可。R10 开发、CI、Drive 文件夹/Sheet 准备和 Git 合并不等于 Production 发布。

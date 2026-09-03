@@ -71,3 +71,9 @@ export function getLifeExport() {
     p_space_slug: coupleSpaceSlug(),
   });
 }
+
+export function getLifeFullExport() {
+  return callRpc<Record<string, unknown>>("get_life_full_export", {
+    p_space_slug: coupleSpaceSlug(),
+  });
+}
