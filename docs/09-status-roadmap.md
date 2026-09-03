@@ -2,7 +2,7 @@
 
 **状态日期：2026-09-03**
 
-详细视觉规范见 `docs/12-island-life-design-system.md`；R8.1 见 `docs/30-r8-ui-closeout.md`；R8.2 见 `docs/31-r8-2-ui-calibration.md`；R10 Drive Bridge 见 `docs/25-*` 至 `docs/29-*`。
+详细视觉规范见 `docs/12-island-life-design-system.md`；R8.1 见 `docs/30-r8-ui-closeout.md`；R8.2 见 `docs/31-r8-2-ui-calibration.md`；R8.3 见 `docs/32-r8-3-visual-polish.md`；R10 Drive Bridge 见 `docs/25-*` 至 `docs/29-*`。
 
 ## 1. 主功能状态
 
@@ -20,13 +20,14 @@ V2-P8  游戏机列表 -> /game                     ✅
 R1-R7  重构与移动端校准                         ✅
 R8     数据管理 + MCP                          ✅
 R8.1   第一轮视觉/交互收口                       ✅ Production
-R8.2   Production 实机视觉二次校准               ✅ main / DB，待新部署许可
-R9     程序内置 AI Agent                        ✅ 备用入口
+R8.2   Production 实机视觉二次校准               ✅ Production
+R8.3   信息减法 + 饮食汇总 + 药箱/我的重排         ✅ Production
+R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
 R10    双 Harbor + Worker Pairing 后端            ✅ Production
 R10    Cat/Fish Apps Script Workers              ⏳ 待一次性人工激活
 ```
 
-## 2. 固定身份
+## 2. 固定身份与 Harbor
 
 ```text
 cat 登录  -> 我=cat,  Ta=fish
@@ -36,29 +37,38 @@ Harbor Cat  / 团子 -> authoritative actor = cat
 Harbor Fish / 仔仔 -> authoritative actor = fish
 ```
 
-“团子 / 仔仔”只用于会话识别；服务端权限始终绑定 cat/fish。
+“团子 / 仔仔”只用于会话识别；服务端权限始终绑定 `cat / fish`。
 
-## 3. R8.2 实机校准
+## 3. R8.2 / R8.3 UI 收口
 
-2026-09-03 Production 手机截图确认 R8.1 仍有视觉和交互差距，因此 R8.2 以真实手机密度重新校准：
+R8.2 解决第一轮 Production 实机差距：
 
-- 首页关系行改为“一起度过的第 N 天 ♡”，数字强调、爱心位于句末；
-- 心情/睡眠/活动右上操作改为小型描边控件；
-- 心情 picker 去掉背景圈、阴影和选中框，毛绒图放大，点选即关闭；
-- 活动改为默认 icon + 自由文本，点击 icon 弹出 Notion 风格 30 项图标面板；
-- 小窝四入口改为项目内统一 SVG，chevron 使用独立 Grid 列，不再与文字重叠；
-- 小信箱保留功能结构，重新做纸张、中文衬线阅读层级、低阴影与手机卡片密度；
-- “我的 → 数据管理”升级为真实 `/me/data`：恢复点、完整 JSON 导出、完整 JSON 导入、事务恢复。
+- 首页关系行与小型描边操作；
+- 心情 picker 去背景圈/阴影并点选即保存；
+- 活动改为自由文本 + Notion 风格 icon picker；
+- 小窝 SVG 与独立 chevron 布局；
+- 小信箱纸张阅读层级；
+- `/me/data` 接入真实备份/恢复。
 
-R8.2 PR #49 已 squash 合并 main：
+R8.3 继续按手机实机反馈做信息减法：
+
+- “一起度过的第 N 天 ♡”改为视觉语言中的柔和灰绿，不单独高亮数字；
+- 我/Ta 心情卡统一底色，睡眠圆环统一同一颜色和深浅；
+- 删除解释“程序怎么工作”的副标题，保留温暖氛围文字；
+- 饮食新增可复用 `DailyNutritionSummary`，展示当日 kcal、碳水/蛋白质/脂肪克数与热量占比；
+- 日历历史日期复用同一饮食汇总，并正确把历史 `date` 传给饮食页；
+- 已有餐食编辑入口统一为铅笔 SVG；
+- 小信箱用户术语改为“手札 / 明信片”，数据库 `letter / postcard` 不迁移；
+- 药箱按库存、状态、最终失效日优先重新设计；
+- 游戏机删除“开始游戏 →”，改为视觉语言统一 chevron；
+- “我的”昵称改为“小猫 / 小鱼”，删除 CURRENT ACCOUNT、身份映射、写入权限和生活 AI 助手卡；
+- 数据管理删除新版/旧版程序关系、去游戏机和架构长说明，只保留备份、导出、导入、恢复。
+
+R8.3 PR #50：
 
 ```text
-241cf5e74bdfa3f6471664d49f2d76f33a523080
-```
-
-最终 CI #257：
-
-```text
+merge commit: f1c6f1092d1b7eadc5866b0d22e0cc664261719b
+CI #263:
 Test   ✅
 Lint   ✅
 Build  ✅
@@ -66,70 +76,72 @@ Build  ✅
 
 ## 4. 数据管理安全模型
 
-R8 原有数据库已经具备事务备份和恢复，R8.2 把这些能力真正接到可见 UI，并新增：
+完整生活数据管理继续使用 R8/R8.2 的事务模型：
 
 ```text
-import_life_full_data(user + optional config)
+create backup
+export full JSON
+import full JSON
+restore snapshot
 ```
 
-Production migration 已执行成功。
-
-恢复 / 导入要求输入：
+恢复 / 导入要求：
 
 ```text
 确认恢复生活数据
 ```
 
-底层 `restore_life_backup_snapshot` 在写入前始终创建 `pre_restore` 完整保护点。因此手动恢复、JSON 导入都不是不可逆覆盖。
+底层 `restore_life_backup_snapshot` 会先创建 `pre_restore` 完整保护点，再修改数据。
 
-权限核对：
+`import_life_full_data` Production 权限：
 
 ```text
-service_role  -> import_life_full_data EXECUTE ✅
-authenticated -> EXECUTE ❌
-anon          -> EXECUTE ❌
+service_role  ✅
+authenticated ❌
+anon          ❌
 ```
 
-旧游戏覆盖仍沿用独立确认语 `确认覆盖游戏数据`，不与新版生活数据恢复混用。
+旧游戏覆盖仍使用独立确认语 `确认覆盖游戏数据`。
 
-## 5. R10 当前状态
-
-当前 Production：
+## 5. 当前 Production
 
 ```text
-deployment: dpl_3WHMG5Voo9YRgHByxjKHZQKHgT43
-status: READY
 primary domain: https://couple-better-game.vercel.app
+deployment: dpl_CSRYbAB4diHi96eV2stUSxzKmzXX
+status: READY
+R8.3 source commit: f1c6f1092d1b7eadc5866b0d22e0cc664261719b
 ```
 
-该部署包含 R8.1、R10 Worker Pairing、双 Harbor Bridge 和微信提醒后端，但**不包含 R8.2**。
+本次部署没有重新开启 Git 自动部署。Vercel 构建日志确认直接拉取上述精确 commit，再按仓库 `package-lock.json` 执行 `npm ci --include=dev` 与 `next build`。
 
-Cat/Fish 两张 Bridge Sheet 均已 `pairing_status=ready`。数据库仍为：
+Production 验证：
 
 ```text
-cat.apps_script_url  = empty
-fish.apps_script_url = empty
+Build / TypeScript / static generation ✅
+/                                      200
+/food                                  200
+/me                                    200
+主域名 alias                            ✅
+最近 15 分钟 runtime errors             0
 ```
 
-因此 R10 最后外部步骤仍是 Google Apps Script Worker 的一次性人工创建/授权/发布。
+## 6. R10 与微信提醒
 
-## 6. 微信提醒
-
-已完成后端和 Production DB：
+双 Harbor 后端与 PushPlus 提醒后端已在 Production：
 
 ```text
 Harbor Cat  -> 团子提醒 -> Cat PushPlus token
 Harbor Fish -> 仔仔提醒 -> Fish PushPlus token
 ```
 
-默认：
+默认提醒：
 
-- 每日 21:15：本人当天完全没有生活记录才提醒；
+- 每日 21:15：本人当天完全没有生活记录才轻提醒；
 - 纪念日 09:15：提前 7 天 / 1 天 / 当天；
 - delivery ledger 防重复；
-- token 仅进入各自 Apps Script Script Properties。
+- token 只进入各自 Apps Script Script Properties。
 
-真正发微信仍依赖 Worker 激活。
+当前剩余外部步骤仍是 Cat/Fish Google Apps Script Worker 的一次性人工创建、授权和发布。Worker 激活后再做 Harbor 真实读写、照片、watch、backup 和 PushPlus 真机验收。
 
 ## 7. 数据与备份
 
@@ -144,21 +156,20 @@ Drive    -> 餐食原图 + AI Bridge + Daily/Monthly 全量灾备
 ## 8. 当前执行顺序
 
 ```text
-1. R8.2 六组实机问题修正                  ✅
-2. R8.2 真实数据管理接入                   ✅
-3. R8.2 Test / Lint / Build               ✅ CI #257
-4. PR #49 合并 main                       ✅ 241cf5e...
-5. R8.2 Supabase migration + 权限核对      ✅
-6. 等用户新的明确许可后部署 R8.2 Production <- 当前部署边界
-7. Production 手机实机截图再次验收
-8. 激活 Harbor Cat / Fish Apps Script Workers
-9. Harbor 读写 / 照片 / watch / backup 验收
-10. Cat/Fish PushPlus 真实微信验收
+1. R8.3 视觉与信息层级修改                  ✅
+2. R8.3 Test / Lint / Build               ✅ CI #263
+3. PR #50 合并 main                       ✅ f1c6f109...
+4. R8.3 Production 部署                   ✅ dpl_CSRYb...
+5. Production 基础路由/runtime 验收         ✅
+6. 用户手机实机截图继续视觉验收              <- 当前
+7. 激活 Harbor Cat / Fish Apps Script Workers
+8. Harbor 读写 / 照片 / watch / backup 验收
+9. Cat/Fish PushPlus 真实微信验收
 ```
 
 ## 9. 部署纪律
 
-`vercel.json` 始终保持：
+`vercel.json` 当前仍为：
 
 ```json
 {
@@ -168,4 +179,4 @@ Drive    -> 餐食原图 + AI Bridge + Daily/Monthly 全量灾备
 }
 ```
 
-**任何后续 Vercel Preview 或 Production deployment 都必须逐次获得用户明确许可。** R8.2 尚未获得新的 Production 部署授权。
+**任何后续 Vercel Preview 或 Production deployment 都必须逐次获得用户明确许可。**
