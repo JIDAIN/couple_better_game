@@ -19,11 +19,11 @@ V2-P7  小信箱                                  ✅
 V2-P8  游戏机列表 -> /game                     ✅
 R1-R7  重构与移动端校准                         ✅
 R8     数据管理 + MCP Production                ✅ 底层
-R8.1   视觉与交互最终收口                        ✅ 已合并 main
+R8.1   视觉与交互最终收口                        ✅ Production
 R9     程序内置 AI Agent                        ✅ 代码/CI，非主入口
-R10    双 Harbor + Google Drive Bridge           ✅ 主体代码/DB/Drive
-R10    Base Production                          ✅
-R10    Worker Pairing Production                 ⏸ 等待新的明确部署许可
+R10    双 Harbor + Google Drive Bridge           ✅ Production backend
+R10    Worker Pairing Production                 ✅ 后端已上线
+R10    Cat/Fish Apps Script Workers              ⏳ 待一次性人工激活
 ```
 
 ## 2. 固定身份与权限
@@ -91,7 +91,7 @@ PR #47 已 squash 合并 main：
 52aebad2c28560958d055b06522b8b95b82eda39
 ```
 
-本轮没有新增冗余数据库字段，详细见 `docs/30-r8-ui-closeout.md`。
+当前 R8.1 已随统一 Production deployment 上线。
 
 ## 4. R9
 
@@ -103,7 +103,7 @@ R9 建立了：
 life_capabilities / life_query / life_mutate
 ```
 
-其 canonical registry 和权限层继续被 R10 复用。`/ai` 页面保留为备用入口，但用户的主目标已经转为 ChatGPT Project 内的 Harbor Cat / Harbor Fish。
+其 canonical registry 和权限层继续被 R10 复用。`/ai` 页面保留为备用入口，但用户主入口为 ChatGPT Project 内的 Harbor Cat / Harbor Fish。
 
 ## 5. R10 双 Harbor 架构
 
@@ -132,43 +132,54 @@ Google Drive
 
 ## 6. R10 Production 当前真实状态
 
-已上线的 R10 Base Production：
+当前统一 Production：
 
 ```text
-deployment: dpl_CzGCg22uf1A1pqfPXqg5gCuMUCNj
+deployment: dpl_3WHMG5Voo9YRgHByxjKHZQKHgT43
 status: READY
-source: 5c175a38586a77675580193ed47ac5e855ad6692
-https://couple-better-game.vercel.app
+source commit: 3775d90311b11f4d39e93b816e13f5332e1efff5
+primary domain: https://couple-better-game.vercel.app
 ```
 
-已验证线上路由包括：
+该部署已经同时包含 R8.1、Worker Pairing、双 Harbor Bridge 和微信提醒后端。
+
+已验证关键路由：
 
 ```text
+/api/drive-bridge/bootstrap
 /api/drive-bridge/execute
 /api/drive-bridge/reminders
 /api/drive-bridge/snapshot
 /api/drive-bridge/stage
 /api/drive-bridge/watch
+/api/life/settings
 ```
 
-线上 runtime 检查未发现错误。
-
-之后又完成并合并了 Worker Pairing：
+实测：
 
 ```text
-worker pairing main commit: 7028cd9392b4b99599b02b977bbc0803b351b195
-R8.1 latest main commit:      52aebad2c28560958d055b06522b8b95b82eda39
+GET / -> 200 OK
+GET /api/drive-bridge/bootstrap -> 405 Method Not Allowed（POST-only，符合预期）
+Vercel runtime error/fatal -> none
 ```
 
-Worker Pairing 增加精确 Sheet 绑定的一次性配对：
+Worker Pairing 已具备：
 
 - Cat/Fish pairing migration 已应用 Production；
-- 两张 Bridge Sheet 已分别写入高熵一次性配对码；
-- pairing code 只用于首次交换长期 HMAC/watch/wake secret；
-- 配对成功后 code 立即作废，并自动回填 Apps Script Web App URL；
-- 长期 secret 不进入聊天或 Sheet。
+- 两张 Bridge Sheet 均为 `pairing_status=ready`；
+- pairing code 与精确 Sheet / actor 绑定；
+- pairing code 成功使用后立即作废；
+- 长期 HMAC/watch/wake secret 只写入 Apps Script Script Properties；
+- Worker 会自动回填自己的 Apps Script Web App URL。
 
-**Worker Pairing + R8.1 仍尚未部署新的 Vercel Production。** 当前线上继续保持 R10 Base；下一次部署要把两批一次性统一发布，仍需用户新的明确许可。
+当前数据库仍显示：
+
+```text
+cat.apps_script_url  = empty
+fish.apps_script_url = empty
+```
+
+原因不是后端缺失，而是两个 Google Apps Script Worker 尚未由用户在 Google 页面创建并部署。
 
 ## 7. 微信提醒
 
@@ -187,7 +198,7 @@ Harbor Fish -> 仔仔提醒 -> Fish PushPlus token
 - delivery ledger 防重复；
 - PushPlus token 只进入各自 Apps Script Script Properties。
 
-该功能仍依赖 Worker Pairing Production + 两个真实 Apps Script Worker 激活后才会真正发微信。
+功能代码和后端已经上线，真正发微信仍依赖 Cat/Fish Worker 激活并分别配置自己的 PushPlus token。
 
 ## 8. Google Drive 与备份
 
@@ -206,22 +217,21 @@ Daily / Monthly 全量 JSON 灾备
 ## 9. 当前执行顺序
 
 ```text
-1. R8.1 23 项 UI/交互收口             ✅
-2. R8.1 Test / Lint / Build           ✅ CI #248
-3. R8.1 合并 main                     ✅ 52aebad...
-4. 用户明确许可新的 Production 部署     <- 当前唯一阻塞
-5. 将 R8.1 + R10 Worker Pairing 一次性统一部署
-6. 激活 Cat/Fish Apps Script Worker
-7. Harbor 真实读写 / 照片 / watch / fallback / backup 验收
-8. Cat/Fish PushPlus 真实微信验收
-9. 移动端截图与设计稿最后像素级校准
+1. R8.1 23 项 UI/交互收口                  ✅
+2. R8.1 Test / Lint / Build                ✅ CI #248
+3. R8.1 合并 main                          ✅
+4. R8.1 + R10 Worker Pairing 统一 Production ✅ dpl_3WHM...
+5. Git 自动部署恢复关闭                     ✅
+6. 激活 Harbor Cat Apps Script Worker       <- 当前
+7. 激活 Harbor Fish Apps Script Worker
+8. Harbor 真实读写 / 照片 / watch / fallback / backup 验收
+9. Cat/Fish PushPlus 真实微信验收
+10. 移动端截图与设计稿最后像素级校准
 ```
-
-这样避免为了 R10 pairing 单独部署一次、紧接着又为了 R8.1 UI 再部署一次。
 
 ## 10. 部署纪律
 
-必须始终保持：
+当前 main 已恢复：
 
 ```text
 vercel.json
@@ -232,6 +242,6 @@ vercel.json
 }
 ```
 
-**任何 Vercel Preview 或 Production deployment 都必须逐次获得用户明确许可。**
+本次授权期间只创建了一个新 Production deployment；恢复关闭的 commit 没有触发第二次部署。
 
-Git commit、PR、CI、Supabase 既有 schema 的读取以及 Drive 文档整理不等于 Vercel 部署。
+**任何后续 Vercel Preview 或 Production deployment 仍必须逐次获得用户明确许可。**
