@@ -39,6 +39,15 @@ export function LifeMePage() {
             </div>
           </section>
 
+          <Link href="/ai" className="life-surface mt-3 flex items-center gap-3 rounded-[var(--life-radius-card)] p-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[var(--life-surface-soft)] text-sm font-black text-[var(--life-teal-strong)]">AI</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-extrabold text-[var(--life-text)]">生活 AI 助手</p>
+              <p className="mt-1 text-[10px] leading-4 text-[var(--life-text-muted)]">直接问药箱、饮食、体重、日历等真实记录，也可以用自然语言新增、修改、删除和上传餐食照片。</p>
+            </div>
+            <span className="text-lg font-bold text-[var(--life-text-muted)]">›</span>
+          </Link>
+
           <section className="life-settings-list mt-3">
             <div className="life-settings-row">
               <span className="life-settings-icon">👤</span>
