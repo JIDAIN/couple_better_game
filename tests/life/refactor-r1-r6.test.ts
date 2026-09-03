@@ -31,7 +31,8 @@ describe("R1-R6 refactor boundaries", () => {
     expect(food).toContain("SNACK_OPTIONS");
     expect(food).toContain("+ 新增加餐");
     expect(editor).not.toContain("AppRoleSwitch");
-    expect(editor).toContain("记录这一餐的时间、照片和食物");
+    expect(editor).toContain("把这一餐轻轻记下来");
+    expect(editor).not.toContain("记录这一餐的时间、照片和食物");
   });
 
   it("enforces meal ownership server-side", () => {
@@ -60,6 +61,7 @@ describe("R1-R6 refactor boundaries", () => {
   it("loads the unified visual adapters and keeps Vercel git deploy disabled", () => {
     expect(source("app/layout.tsx")).toContain("island-life-refactor.css");
     expect(source("app/layout.tsx")).toContain("r8-ui-closeout.css");
+    expect(source("app/layout.tsx")).toContain("r8-3-visual-polish.css");
     const vercel = JSON.parse(source("vercel.json")) as { git?: { deploymentEnabled?: boolean } };
     expect(vercel.git?.deploymentEnabled).toBe(false);
   });

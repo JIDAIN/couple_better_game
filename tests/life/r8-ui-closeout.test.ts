@@ -6,84 +6,92 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-describe("R8.2 visual and interaction closeout", () => {
-  it("shows shared anniversary day count with the heart at the end and edits it from Nest", () => {
+describe("R8.3 visual polish and interaction closeout", () => {
+  it("keeps the together-day line warm and puts the heart at the end", () => {
     const today = source("components/life/TodayLifePage.tsx");
-    const nest = source("components/life/LifeNestPage.tsx");
-    const settingsRoute = source("app/api/life/settings/route.ts");
+    const css = source("app/r8-3-visual-polish.css");
     expect(today).toContain("daysTogether");
     expect(today).toContain("life-together-heart");
     expect(today.indexOf("一起度过的第")).toBeLessThan(today.indexOf("life-together-heart"));
-    expect(nest).toContain("我们的纪念日");
-    expect(nest).toContain("patchLifeSettings({ anniversaryDate");
-    expect(settingsRoute).toContain("resolveFixedLifeIdentity");
+    expect(css).toContain(".life-together-days strong");
+    expect(css).toContain("color: inherit !important");
+    expect(css).toContain("#d99aaa");
   });
 
-  it("uses genuinely compact framed home actions and 编辑 after saving", () => {
+  it("uses compact framed Today actions without explanatory subtitles", () => {
     const mood = source("components/life/today/TodayMoodCard.tsx");
     const sleep = source("components/life/today/TodaySleepCard.tsx");
-    const css = source("app/r8-2-ui-calibration.css");
+    const activity = source("components/life/today/TodayActivityCard.tsx");
     expect(mood).toContain('myMood ? "编辑" : "+ 记录"');
     expect(sleep).toContain('mySleep ? "编辑" : "+ 记录"');
-    expect(mood).toContain('className="life-card-action"');
-    expect(sleep).toContain('className="life-card-action"');
-    expect(css).toContain(".life-card-action");
-    expect(css).toContain("height: 1.95rem");
-    expect(css).toContain("border-radius: 13px");
+    expect(mood).not.toContain("各自记录，彼此看见");
+    expect(sleep).not.toContain("8 小时为满环");
+    expect(activity).not.toContain("今天一起做过的事");
+    expect(activity).toContain("普通的一天，也值得被记住");
   });
 
-  it("makes eight hours a full sleep ring and caps longer sleep", () => {
+  it("uses eight hours as full sleep and one identical ring tone for both people", () => {
     const sleep = source("components/life/today/TodaySleepCard.tsx");
     expect(sleep).toContain("const FULL_SLEEP_MINUTES = 8 * 60");
     expect(sleep).toContain("Math.min(1, minutes / FULL_SLEEP_MINUTES)");
-    expect(sleep).toContain("conic-gradient");
+    expect(sleep).toContain('const SLEEP_RING_TONE = "var(--life-mint-strong)"');
+    expect(sleep).not.toContain('tone="var(--life-blue)"');
+    expect(sleep).not.toContain('tone="var(--life-teal)"');
   });
 
-  it("makes mood icons large and frameless and closes immediately when chosen", () => {
+  it("keeps Me and Ta mood cards visually equal and closes picker on selection", () => {
     const mood = source("components/life/today/TodayMoodCard.tsx");
-    const css = source("app/r8-2-ui-calibration.css");
+    const css = source("app/r8-3-visual-polish.css");
     const closeIndex = mood.indexOf("setPickerOpen(false)");
     const saveIndex = mood.indexOf("await saveMood");
     expect(closeIndex).toBeGreaterThan(-1);
     expect(closeIndex).toBeLessThan(saveIndex);
-    expect(mood).not.toContain('className={`life-mood-choice ${active');
-    expect(css).toContain("width: 3.75rem !important");
-    expect(css).toContain("background: transparent !important");
-    expect(css).toContain("box-shadow: none !important");
+    expect(mood).not.toContain("emphasized");
+    expect(mood).not.toContain("is-me");
+    expect(css).toContain(".life-person-state.is-me");
+    expect(css).toContain("background: var(--life-surface) !important");
   });
 
-  it("uses a Notion-style activity icon picker instead of a fixed category strip", () => {
+  it("keeps the Notion-style activity icon popover and removes how-it-works copy", () => {
     const activity = source("components/life/today/TodayActivityCard.tsx");
-    for (const label of ["散步", "学习", "运动", "约会", "电影", "桌游", "旅行", "做饭", "购物", "家务", "阅读", "骑行", "展览"]) {
-      expect(activity).toContain(label);
-    }
-    expect(activity).toContain("function ActivityIconPicker");
+    for (const label of ["散步", "学习", "运动", "约会", "电影", "桌游", "旅行", "做饭", "购物", "家务", "阅读", "骑行", "展览"]) expect(activity).toContain(label);
+    expect(activity).toContain("ActivityIconPicker");
     expect(activity).toContain('useState<ActivityIconKey>("other")');
-    expect(activity).toContain("life-activity-leading-icon");
     expect(activity).toContain("life-activity-icon-popover");
-    expect(activity).not.toContain("life-activity-icon-choice");
     expect(activity).toContain("setRecords((current) => [saved");
-    expect(activity).toContain("updateActivityEntry");
+    expect(activity).not.toContain("默认使用小叶子");
   });
 
-  it("uses compact meal photo and macros and removes duplicate daily summary", () => {
+  it("adds a reusable daily nutrition summary to Food and historical Calendar Day", () => {
+    const summary = source("components/life/DailyNutritionSummary.tsx");
     const food = source("components/life/LifeFoodPage.tsx");
+    const calendar = source("components/life/LifeCalendarDayPage.tsx");
+    expect(summary).toContain("三大营养素热量占比");
+    expect(summary).toContain("carbs * 4");
+    expect(summary).toContain("protein * 4");
+    expect(summary).toContain("fat * 9");
+    expect(food).toContain("<DailyNutritionSummary meals={meals}");
+    expect(calendar).toContain("<DailyNutritionSummary meals={meals} label={person.label}");
+  });
+
+  it("uses pencil icons for existing meal editing and keeps add actions textual", () => {
+    const food = source("components/life/LifeFoodPage.tsx");
+    expect(food).toContain("function PencilIcon");
+    expect(food).toContain("life-meal-edit-icon");
+    expect(food).not.toContain("编辑这顿");
+    expect(food).not.toContain("编辑这次");
+    expect(food).toContain("+ 添加{label}");
+  });
+
+  it("keeps compact meal photo/macros while removing implementation copy", () => {
     const editor = source("components/life/LifeMealEditorPage.tsx");
-    expect(food).not.toContain("今日摄入统计");
     expect(editor).toContain("grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]");
     expect(editor).toContain("＋ 上传照片");
     expect(editor).toContain('label="蛋白质"');
     expect(editor).toContain('label="脂肪"');
     expect(editor).toContain('label="碳水"');
-    expect(editor).not.toContain('className="life-back-link"');
-  });
-
-  it("reuses Today cards for a historical calendar day", () => {
-    const calendarDay = source("components/life/LifeCalendarDayPage.tsx");
-    expect(calendarDay).toContain("TodayMoodCard");
-    expect(calendarDay).toContain("TodaySleepCard");
-    expect(calendarDay).toContain("TodayActivityCard");
-    expect(calendarDay).toContain("readOnly");
+    expect(editor).not.toContain("和饮食列表使用同样的紧凑构图");
+    expect(editor).toContain("把这一餐轻轻记下来");
   });
 
   it("uses consistent SVG Nest art and a dedicated chevron column", () => {
@@ -94,10 +102,9 @@ describe("R8.2 visual and interaction closeout", () => {
     expect(nest).toContain("<svg");
     expect(css).toContain("grid-template-columns: minmax(0,1fr) 1.25rem");
     expect(css).toContain("position: static !important");
-    expect(nest).not.toContain('icon: "⚖️"');
   });
 
-  it("records exact weight time and charts daily averages by period and year", () => {
+  it("keeps weight behavior but removes implementation explanations", () => {
     const weight = source("components/life/LifeWeightPage.tsx");
     expect(weight).toContain('label: "周"');
     expect(weight).toContain('label: "月"');
@@ -106,53 +113,59 @@ describe("R8.2 visual and interaction closeout", () => {
     expect(weight).toContain('useState<Period>("month")');
     expect(weight).toContain("function dailyAverages");
     expect(weight).toContain("measuredAtFrom(date, time)");
-    expect(weight).toContain("较上次");
-    expect(weight).toContain("目标体重");
-    expect(weight).not.toContain("AppTextarea");
-    expect(weight).toContain("life-weight-year-nav");
+    expect(weight).not.toContain("不再记录备注");
+    expect(weight).not.toContain("先求日平均");
+    expect(weight).toContain("慢慢看见自己的变化");
   });
 
-  it("keeps mailbox structure but gives equal compact journal-style paper previews", () => {
+  it("uses 手札 and 明信片 as the two mailbox formats", () => {
     const mailbox = source("components/life/LifeMailboxPage.tsx");
-    const css = source("app/r8-2-ui-calibration.css");
-    const mailboxCss = source("app/r8-2-mailbox.css");
-    expect(mailbox).toContain('type FormatFilter = "all" | MailboxFormat');
-    expect(mailbox).toContain("THEMES");
-    expect(mailbox).toContain("form.title");
-    expect(mailbox).toContain("firstSentence(letter.body)");
-    expect(mailbox).toContain("setReading(letter)");
-    expect(css).toContain("height: 9.1rem !important");
-    expect(mailboxCss).toContain('font-family: ui-serif, "Songti SC"');
-    expect(mailboxCss).toContain("box-shadow: none !important");
+    expect(mailbox).toContain('value === "letter" ? "手札" : "明信片"');
+    expect(mailbox).toContain("手札需要一个标题");
+    expect(mailbox).toContain("📖 手札");
+    expect(mailbox).toContain("长长的手札，短短的明信片");
+    expect(mailbox).not.toContain("✉️ 信纸");
   });
 
-  it("connects My to real backup export import and transactional restore", () => {
+  it("simplifies My to nickname sync and data management while hiding the R9 /ai entry", () => {
     const me = source("components/life/LifeMePage.tsx");
+    expect(me).toContain('currentPartnerKey === "cat" ? "小猫"');
+    expect(me).toContain('currentPartnerKey === "fish" ? "小鱼"');
+    expect(me).toContain("云端同步");
+    expect(me).toContain('href="/me/data"');
+    expect(me).not.toContain("身份映射");
+    expect(me).not.toContain("写入权限");
+    expect(me).not.toContain("生活 AI 助手");
+    expect(me).not.toContain('href="/ai"');
+  });
+
+  it("keeps real data management without legacy-program or game-machine explanations", () => {
     const page = source("components/life/LifeDataManagementPage.tsx");
     const route = source("app/api/life/data-management/route.ts");
-    const server = source("lib/server/life-data-management.ts");
-    const migration = source("supabase/migrations/20260903194500_r8_2_full_data_management.sql");
-    expect(me).toContain('href="/me/data"');
     expect(page).toContain("立即备份");
     expect(page).toContain("导出 JSON");
     expect(page).toContain("导入 JSON");
     expect(page).toContain("恢复点");
+    expect(page).not.toContain("变美变瘦大作战");
+    expect(page).not.toContain("game-machine");
     expect(route).toContain('const RESTORE_CONFIRMATION = "确认恢复生活数据"');
-    expect(server).toContain("create_life_backup_snapshot");
-    expect(server).toContain("list_life_backup_snapshots");
-    expect(server).toContain("restore_life_backup_snapshot");
-    expect(server).toContain("import_life_full_data");
-    expect(migration).toContain("restore_life_backup_snapshot");
-    expect(migration).toContain("pre_restore");
   });
 
-  it("renders medicines as a compact quantity/status/expiry list", () => {
+  it("renders medicine stock and expiry as compact cards", () => {
     const medicine = source("components/life/LifeMedicinePage.tsx");
-    const css = source("app/r8-ui-closeout.css");
-    expect(medicine).toContain("life-medicine-list");
-    expect(medicine).toContain("life-medicine-quantity");
-    expect(medicine).toContain("最终失效");
-    expect(css).toContain(".life-medicine-row");
-    expect(css).toContain("min-height: 4.8rem");
+    const css = source("app/r8-3-visual-polish.css");
+    expect(medicine).toContain("life-medicine-overview");
+    expect(medicine).toContain("life-medicine-card");
+    expect(medicine).toContain("life-medicine-stock");
+    expect(medicine).toContain("daysText(item.finalExpiryDate)");
+    expect(css).toContain(".life-medicine-card.status-soon");
+    expect(css).toContain(".life-medicine-card.status-expired");
+  });
+
+  it("uses visual-language chevrons for games instead of 开始游戏 arrows", () => {
+    const game = source("components/life/LifeGameMachinePage.tsx");
+    expect(game).toContain("life-game-chevron");
+    expect(game).not.toContain("开始游戏 →");
+    expect(game).not.toContain("当前只接一个已有游戏");
   });
 });

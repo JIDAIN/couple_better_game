@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
+import { DailyNutritionSummary } from "@/components/life/DailyNutritionSummary";
 import { TodayActivityCard } from "@/components/life/today/TodayActivityCard";
 import { TodayMoodCard } from "@/components/life/today/TodayMoodCard";
 import { TodaySleepCard } from "@/components/life/today/TodaySleepCard";
@@ -23,7 +24,7 @@ function mealNames(meal: MealRecord) {
 
 function calorieSummary(meals: MealRecord[]) {
   if (!meals.length) return "未记录";
-  if (meals.some((meal) => meal.totalCaloriesKcal == null)) return `${meals.length} 餐 · 热量未完整估算`;
+  if (meals.some((meal) => meal.totalCaloriesKcal == null)) return `${meals.length} 餐`;
   return `${meals.length} 餐 · ${meals.reduce((sum, meal) => sum + (meal.totalCaloriesKcal ?? 0), 0)} kcal`;
 }
 
@@ -62,7 +63,7 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
   }
 
   return (
-    <AppPageShell title={displayDate(date)} subtitle="和首页同一套卡片，只是把日期固定在这一天。" actions={<Link href="/calendar" className="life-back-link">返回月历</Link>}>
+    <AppPageShell title={displayDate(date)} subtitle="翻开这一天，看看我们留下了什么。" actions={<Link href="/calendar" className="life-back-link">返回月历</Link>}>
       {error ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
       {day ? (
         <div className="grid gap-3">
@@ -72,16 +73,19 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
 
           <section className="life-surface life-section-card life-calendar-food-card">
             <div className="flex items-center justify-between gap-3">
-              <div><p className="text-sm font-extrabold text-[var(--life-text)]">🍚 饮食</p><p className="mt-0.5 text-xs text-[var(--life-text-muted)]">回看这一天各自吃了什么。</p></div>
-              <Link href={`/food?date=${encodeURIComponent(date)}`} className="life-home-action-pill inline-flex items-center">查看饮食</Link>
+              <p className="text-sm font-extrabold text-[var(--life-text)]">🍚 饮食</p>
+              <Link href={`/food?date=${encodeURIComponent(date)}`} className="life-card-action inline-flex items-center">查看</Link>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
+            <div className="mt-3 grid gap-3">
               {people.map((person) => {
                 const meals = mealsByPerson.get(person.key) ?? [];
                 return (
-                  <div key={person.key} className="rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-3 py-3">
-                    <div className="flex items-center justify-between gap-2"><p className="text-xs font-extrabold text-[var(--life-text)]">{person.label}</p><span className="text-[9px] font-bold text-[var(--life-text-muted)]">{calorieSummary(meals)}</span></div>
-                    {meals.length ? <p className="mt-1.5 line-clamp-3 text-xs leading-5 text-[var(--life-text-body)]">{meals.map((meal) => mealNames(meal)).join("；")}</p> : <p className="mt-1.5 text-xs text-[var(--life-text-muted)]">没有饮食记录</p>}
+                  <div key={person.key} className="life-calendar-food-person">
+                    <div className="life-calendar-food-list">
+                      <div className="flex items-center justify-between gap-2"><p className="text-xs font-extrabold text-[var(--life-text)]">{person.label}</p><span className="text-[9px] font-bold text-[var(--life-text-muted)]">{calorieSummary(meals)}</span></div>
+                      {meals.length ? <p className="mt-1.5 line-clamp-3 text-xs leading-5 text-[var(--life-text-body)]">{meals.map((meal) => mealNames(meal)).join("；")}</p> : <p className="mt-1.5 text-xs text-[var(--life-text-muted)]">没有饮食记录</p>}
+                    </div>
+                    <DailyNutritionSummary meals={meals} label={person.label} />
                   </div>
                 );
               })}
