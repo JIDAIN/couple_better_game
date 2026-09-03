@@ -99,13 +99,52 @@ R8 已有数据库字段和 RPC，本轮只补 `/api/life/settings` 和前端客
 
 并同步更新旧 R1-R6 测试中已经被 R8.1 正式替换的文案断言。
 
+第一轮 CI 暴露两个兼容问题：
+
+- 旧 mailbox 测试仍断言 `全部信件 / life-letter-date`；
+- `TodayActivityCard` 中同步 props 到本地 state 的 effect 触发 `react-hooks/set-state-in-effect`。
+
+两项都已修复。最终 CI #248：
+
+```text
+Test   ✅
+Lint   ✅
+Build  ✅
+```
+
+## 最终合并状态
+
+PR：
+
+```text
+#47 R8.1: close remaining Island Life UI gaps
+```
+
+已 squash 合并到 `main`：
+
+```text
+52aebad2c28560958d055b06522b8b95b82eda39
+```
+
+`vercel.json` 合并后仍为：
+
+```json
+{
+  "git": {
+    "deploymentEnabled": false
+  }
+}
+```
+
+因此本次 Git 合并没有授权或触发新的 Vercel Preview/Production。
+
 ## 完成定义
 
-R8.1 只有满足下面条件才算开发完成：
+R8.1 开发阶段已经全部满足：
 
-1. 23 项全部在代码中落实；
-2. Test / Lint / Build 全绿；
-3. 文档更新；
-4. PR 合并 main；
-5. **不自动部署**；
-6. 用户下一次明确允许 Production 部署后，再做真实移动端截图验收与像素级微调。
+1. 23 项全部在代码中落实 ✅
+2. Test / Lint / Build 全绿 ✅
+3. 文档更新 ✅
+4. PR 合并 main ✅
+5. 不自动部署 ✅
+6. 等用户下一次明确允许 Production 部署后，再做真实移动端截图验收与像素级微调 ⏳
