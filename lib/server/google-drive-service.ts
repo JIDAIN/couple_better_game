@@ -1,4 +1,6 @@
 import { createSign } from "node:crypto";
+import type { DriveBridgeId } from "./drive-bridge-auth";
+import { driveBridgeOriginalsMealsFolderId } from "./drive-bridge-auth";
 
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
@@ -71,9 +73,9 @@ export type DriveMealOriginal = {
   size: number;
 };
 
-export async function downloadDriveMealOriginal(fileId: string): Promise<DriveMealOriginal> {
+export async function downloadDriveMealOriginal(fileId: string, bridgeId: DriveBridgeId): Promise<DriveMealOriginal> {
   if (!/^[A-Za-z0-9_-]{10,200}$/.test(fileId)) throw new Error("GOOGLE_DRIVE_FILE_ID_INVALID");
-  const allowedFolder = env("LIFE_DRIVE_ORIGINALS_MEALS_FOLDER_ID");
+  const allowedFolder = driveBridgeOriginalsMealsFolderId(bridgeId);
   if (!allowedFolder) throw new Error("GOOGLE_DRIVE_ORIGINALS_FOLDER_NOT_CONFIGURED");
 
   const metaResponse = await driveFetch(`/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size,parents,trashed&supportsAllDrives=true`);
@@ -86,7 +88,7 @@ export async function downloadDriveMealOriginal(fileId: string): Promise<DriveMe
     trashed?: boolean;
   };
   if (meta.trashed) throw new Error("GOOGLE_DRIVE_FILE_TRASHED");
-  if (!meta.parents?.includes(allowedFolder)) throw new Error("GOOGLE_DRIVE_FILE_OUTSIDE_ORIGINALS");
+  if (!meta.parents?.includes(allowedFolder)) throw new Error("GOOGLE_DRIVE_FILE_OUTSIDE_ACTOR_ORIGINALS");
   if (!meta.mimeType?.startsWith("image/")) throw new Error("GOOGLE_DRIVE_FILE_NOT_IMAGE");
 
   const response = await driveFetch(`/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`);

@@ -41,14 +41,14 @@ function parseCommand(value: unknown): DriveBridgeCommand {
   return { commandId, tool, args: asRecord(row.args), userText, originalDriveFileId };
 }
 
-async function buildAttachment(command: DriveBridgeCommand) {
+async function buildAttachment(identity: FixedLifeIdentity, command: DriveBridgeCommand) {
   if (!command.originalDriveFileId) return null;
   if (command.tool !== "life_mutate") throw new Error("只有 life_mutate 可以绑定原图");
   const resource = stringValue(command.args.resource);
   if (resource !== "meal" || command.args.attachPhoto !== true) {
     throw new Error("Drive 原图只能用于 attachPhoto=true 的 meal 写入");
   }
-  const original = await downloadDriveMealOriginal(command.originalDriveFileId);
+  const original = await downloadDriveMealOriginal(command.originalDriveFileId, identity.partnerKey);
   const compressed = await compressMealPhoto(original.bytes, original.mimeType, {
     maxInputBytes: DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES,
   });
@@ -87,12 +87,12 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
   }
 
   try {
-    const attachment = await buildAttachment(command);
+    const attachment = await buildAttachment(identity, command);
     const result = await executeLifeAgentTool(command.tool, command.args, {
       identity,
       latestUserText: command.userText,
       attachment,
-      toolCallId: `drive-${command.commandId}`,
+      toolCallId: `drive-${identity.partnerKey}-${command.commandId}`,
     });
     const receipt = {
       commandId: command.commandId,
@@ -103,7 +103,7 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
       result,
       originalDriveFileId: command.originalDriveFileId,
     };
-    await finishDriveBridgeCommand(command.commandId, "succeeded", receipt);
+    await finishDriveBridgeCommand(identity.partnerKey, command.commandId, "succeeded", receipt);
     return receipt;
   } catch (error) {
     const receipt = {
@@ -115,7 +115,7 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
       error: error instanceof Error ? error.message : "Drive Bridge 执行失败",
       originalDriveFileId: command.originalDriveFileId,
     };
-    await finishDriveBridgeCommand(command.commandId, "failed", receipt);
+    await finishDriveBridgeCommand(identity.partnerKey, command.commandId, "failed", receipt);
     return receipt;
   }
 }
@@ -151,7 +151,7 @@ export async function getDriveBridgeSnapshot(identity: FixedLifeIdentity, includ
     includeLegacy ? loadHomeSyncSnapshot() : Promise.resolve(null),
   ]);
   return {
-    schemaVersion: "r10-v1",
+    schemaVersion: "r10-v2",
     generatedAt: new Date().toISOString(),
     identity: { me: identity.partnerKey, displayName: identity.displayName },
     lifeExport,

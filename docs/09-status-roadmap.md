@@ -23,7 +23,8 @@ R7 移动端视觉与实机校准                         ✅
 R8 数据管理 + AI/MCP Production 接入            ✅
 R9 程序内置 AI Agent（代码/CI）                  ✅
 R9 Production 实机                              ⏳ 未部署
-R10 ChatGPT Project × Drive Bridge（开发/CI）    🚧 本分支开发中
+R10 Google Drive Bridge 基础                      ✅ 已合并
+R10 Harbor Cat / Harbor Fish 双入口              ✅ 代码/Drive/CI 完成，PR #43 待合并
 R10 Production 激活                              ⏳ 待单次授权
 ```
 
@@ -69,10 +70,10 @@ Browser manual UI
   -> server-only domain service / RPC
   -> Supabase PostgreSQL
 
-ChatGPT Project（R10 主路径）
+Harbor Cat / Harbor Fish（R10 主路径）
   -> Google Drive / Sheets App
-  -> AI Bridge Sheet
-  -> Apps Script signed worker
+  -> actor-specific Bridge Sheet
+  -> actor-specific Apps Script signed worker
   -> /api/drive-bridge/*
   -> life_query / life_mutate
   -> canonical domain service / RPC
@@ -93,8 +94,10 @@ External MCP client（R8 可选）
 ```
 
 - Supabase service secret 永不进入浏览器、Google Sheet、普通聊天或模型上下文；
-- R10 Bridge 使用独立 HMAC、固定身份与 durable command ledger；
+- Harbor Cat 与 Harbor Fish 使用独立 HMAC / watch / wake credential；
+- `x-life-bridge-id` 只能选择对应 secret，Cat secret 不能签成 Fish，反之亦然；
 - AI 不相信模型提供的个人 owner；
+- 原图 fileId 还要再次校验必须位于对应 actor 的 Drive 子目录；
 - 不暴露任意 SQL、任意 Supabase 请求或任意 URL 下载工具；
 - Supabase 仍是事实源；Google Sheet 只是命令总线和状态镜像；
 - GitHub 不保存真实生活数据、原图或生产 secret。
@@ -155,7 +158,7 @@ AI 可读取 V2 export/settings/legacy snapshot，并按当前身份 CRUD Mood�
 
 权限回归覆盖 owner 强制、删除意图、小信箱 owner 与 legacy 强确认。
 
-PR #41 最终 CI run #223：
+PR #41 最终 CI：
 
 ```text
 Test   ✅
@@ -171,96 +174,166 @@ PR #41 已合并到 main，merge commit：
 
 **R9 未部署 Production。** 当前线上仍是 R8，不能声称线上 AI Gateway/writeback 已验收。
 
-## 9. R10 ChatGPT Project × Google Drive Bridge
+## 9. R10 双 Harbor ChatGPT Project × Google Drive Bridge
 
-R10 目标：不升级 ChatGPT 套餐，让 `🐟🐱生活` Project 的任意新聊天通过已连接 Google Drive / Sheets App 读取和修改程序。
+用户已实际创建两个 ChatGPT Project：
 
-已创建 Google Drive 工作区：
+```text
+Harbor Cat
+Harbor Fish
+```
+
+它们是同一个生活空间的两个 AI 入口，不是两套程序或两套数据。
+
+固定语义：
+
+```text
+Harbor Cat:  我=cat,  Ta=fish
+Harbor Fish: 我=fish, Ta=cat
+```
+
+Google Drive 已调整为：
 
 ```text
 Couple Better Game/
 ├─ AI-Bridge/
+│  ├─ Cat/Couple Better Game AI Bridge - Cat
+│  └─ Fish/Couple Better Game AI Bridge - Fish
 ├─ Originals/Meals/
+│  ├─ Cat/
+│  └─ Fish/
 ├─ Backups/Daily/
 ├─ Backups/Monthly/
 └─ Trash/
 ```
 
-已创建原生 Google Sheet：
+两张 Bridge Sheet 都包含：
 
 ```text
-Couple Better Game AI Bridge
-ID: 1inEL4mXOQ2-w5UrkqtLoK6aU2o-4auCQSLlEGuA3cVo
+README / META / COMMANDS / RECEIPTS / STATE_* / ASSETS
 ```
 
-Sheet 已包含：`README / META / COMMANDS / RECEIPTS / STATE_* / ASSETS`。
-
-当前主 Bridge 固定绑定 `cat`，不允许 Sheet 自行传 `actor=fish` 冒充 Ta。
-
-R10 服务端代码已新增：
+且都已升级为：
 
 ```text
-/api/drive-bridge/execute
-/api/drive-bridge/snapshot
-/api/drive-bridge/watch
-lib/server/drive-bridge-auth.ts
-lib/server/drive-bridge-service.ts
-lib/server/drive-bridge-ledger.ts
-lib/server/google-drive-service.ts
+schema_version = r10-v2
 ```
 
-并新增 Apps Script 源码：
+备份不复制两份：
 
 ```text
-scripts/google-apps-script/r10-drive-bridge/Code.gs
-scripts/google-apps-script/r10-drive-bridge/appsscript.json
+Harbor Cat  = backup leader
+Harbor Fish = backup follower
 ```
 
-实现边界：
+所以 Daily/Monthly 的灾备单位始终是整个 Couple Better Game 家庭空间。
 
-- Apps Script → Vercel HMAC 签名；
-- Google Drive push wake + 每分钟 polling fallback；
-- server-bound `cat` identity；
-- `life_drive_bridge_commands` durable ledger 防止回执丢失导致重复写；
-- Drive 原图保存不压缩；Service Account 只读 `Originals/Meals`；
-- Drive 原图压缩通道允许 25MB，仍输出现有 600px / WebP q70→55 / 120KB 目标；
-- 每日完整 JSON → `Backups/Daily`，每月快照 → `Backups/Monthly`；
-- Supabase 仍是唯一事实源。
+## 10. R10 双入口安全实现
 
-详细可行性、Project Instructions、环境变量、激活步骤见 `docs/25-r10-chatgpt-project-drive-bridge.md`。
+服务端使用：
 
-## 10. R10 尚未执行的 Production 动作
+```text
+x-life-bridge-id: cat | fish
+```
 
-截至本状态记录，以下动作**尚未执行**：
+并为两边分别配置：
+
+```text
+BRIDGE_SECRET
+WATCH_TOKEN
+APPS_SCRIPT_URL
+APPS_SCRIPT_WAKE_SECRET
+ORIGINALS_MEALS_FOLDER_ID
+```
+
+Apps Script 代码只维护一份，但通过 Script Properties 分别绑定 Cat/Fish Sheet。
+
+命令账本主键已调整为：
+
+```text
+(actor, command_id)
+```
+
+原图也强制按 actor 目录隔离：
+
+```text
+Cat command  -> Originals/Meals/Cat only
+Fish command -> Originals/Meals/Fish only
+```
+
+Drive 原图仍不压缩；进入程序的展示图仍使用 600px / WebP q70→55 / 120KB 目标。
+
+## 11. R10 CI 与 Git 状态
+
+基础 R10 已通过 CI 并合并 main：
+
+```text
+PR #42
+merge: 8b3b1832d0901ea10efd5e2a9f8bc07ab06ee4f5
+```
+
+双 Harbor 收口：
+
+```text
+PR #43
+CI #232
+Test   ✅
+Lint   ✅
+Build  ✅
+```
+
+本批仍未触发 Vercel Preview/Production。
+
+## 12. R10 尚未执行的 Production 动作
+
+以下动作**尚未执行**：
 
 - R10 Supabase migration 未应用 Production；
-- Google Cloud Service Account 未创建/未分享 `Originals/Meals`；
-- Apps Script Project 尚未实际部署为 Web App；
-- R10 Vercel env 未配置；
+- Google Cloud Service Account 未正式创建/授权两个 actor 原图目录；
+- Cat/Fish Apps Script Project 尚未实际部署为 Web App；
+- Cat/Fish Production env secret 尚未配置；
 - R10 Vercel Preview/Production 均未触发；
-- ChatGPT Project 多窗口真实读写尚未端到端验收。
+- Harbor Cat / Harbor Fish 多窗口真实读写尚未端到端验收；
+- 旧 Supabase 压缩照片尚未归档到 `Backups/Legacy-Photos`。
 
-这些必须等代码 CI 通过后按 release checklist 激活。特别是 Vercel Production 仍需用户单次明确授权。
+这些统一放到取得 Vercel 部署许可后的 Production 激活阶段。
 
-## 11. R10 Production 验收清单
+## 13. R10 Production 验收清单
 
 上线时依次验证：
 
-1. Bridge HMAC 非法请求拒绝；
-2. snapshot 可刷新 `STATE_*`；
-3. Project 新窗口查询药箱；
-4. 新窗口新增一条用户明确授权的无害测试记录；
-5. 修改 / 删除安全门；
-6. 同 command ID 重放不会重复写；
-7. 上传真实餐食原图到 Drive，不改变原图；
-8. Vercel 下载原图并生成 Supabase 600px WebP；
-9. 程序显示压缩图；
-10. Daily backup 落 Drive；
-11. Drive webhook 正常延迟；
-12. 人为停掉 push 后 1 分钟 trigger 能补偿；
-13. 新建第二、第三个 ChatGPT Project 聊天仍能读取同一真实程序。
+1. Cat/Fish HMAC 交叉冒充失败；
+2. Cat/Fish snapshot 都能刷新各自 `STATE_*`；
+3. Harbor Cat 新窗口查询共享药箱；
+4. Harbor Fish 新窗口查询同一药箱；
+5. Cat 新增自己的无害测试记录；
+6. Fish 新增自己的无害测试记录；
+7. Cat 冒充 Fish 写个人记录失败；
+8. Fish 冒充 Cat 写个人记录失败；
+9. 同 actor command ID 重放不会重复写；
+10. Cat/Fish 原图只能使用自己的 Drive 子目录；
+11. 原图保持不变，Supabase 生成 600px WebP；
+12. 程序显示压缩图；
+13. 两个 Drive watch 都能唤醒正确 worker；
+14. 人为停掉 push 后一分钟 trigger 能补偿；
+15. 只有 Cat backup leader 写 Daily/Monthly；
+16. Daily backup 可完成恢复演练；
+17. Harbor Cat / Harbor Fish 各自新建多个聊天仍保持身份不串线。
 
-## 12. 部署纪律
+## 14. Project 人格与 Skill
+
+两个 Project 的底层数据 skill / 安全规则必须一致，但 AI 人格允许完全独立：
+
+```text
+Harbor Cat  -> 独立 AI name / style /称呼 /习惯
+Harbor Fish -> 独立 AI name / style /称呼 /习惯
+```
+
+共享 skill 负责数据读写、照片、药箱、小信箱、删除安全和未来 domain 扩展；Project-local personality 只改变交互风格，不能绕过权限。
+
+具体 Project Instructions / skill playbook 在 Production 激活前最后配置，不把任何生产 secret 写进 Project。
+
+## 15. 部署纪律
 
 Git 自动部署必须继续保持：
 
