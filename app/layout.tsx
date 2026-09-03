@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Cursor } from "animal-island-ui";
 import { LifeIdentityProvider } from "@/components/life/LifeIdentityContext";
+import { PersistentLifeChrome } from "@/components/life/PersistentLifeChrome";
+import { LifeServiceWorker } from "@/components/life/LifeServiceWorker";
 import "animal-island-ui/style";
 import "./globals.css";
 import "./island-life-tokens.css";
@@ -40,7 +42,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-full flex flex-col font-sans">
         <LifeIdentityProvider>
-          <Cursor className="app-cursor-root">{children}</Cursor>
+          <Cursor className="app-cursor-root">
+            <PersistentLifeChrome>{children}</PersistentLifeChrome>
+          </Cursor>
+          <LifeServiceWorker />
         </LifeIdentityProvider>
       </body>
     </html>
