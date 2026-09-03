@@ -3,6 +3,7 @@ const R10 = Object.freeze({
   DAILY_BACKUP_FOLDER_ID: '1DmBM6Pfo7fUlhXnOpDwr8eingWiJCkpK',
   MONTHLY_BACKUP_FOLDER_ID: '1qU5floe7ORg-KbfAPR9h55TmijgSfjGP',
   MAX_COMMANDS_PER_RUN: 25,
+  MAX_ORIGINAL_BYTES: 25 * 1024 * 1024,
   WATCH_TTL_MS: 23 * 60 * 60 * 1000,
   WATCH_RENEW_MARGIN_MS: 2 * 60 * 60 * 1000,
 });
@@ -25,6 +26,10 @@ function r10BridgeId_() {
 
 function r10SheetId_() {
   return r10Required_('SHEET_ID');
+}
+
+function r10OriginalsFolderId_() {
+  return r10Required_('ORIGINALS_MEALS_FOLDER_ID');
 }
 
 function r10IsBackupLeader_() {
@@ -132,6 +137,70 @@ function r10AppendReceipt_(receipt) {
   ]);
 }
 
+function r10FileInsideOriginals_(file) {
+  const allowedId = r10OriginalsFolderId_();
+  const queue = [];
+  const seen = {};
+  let parents = file.getParents();
+  while (parents.hasNext()) queue.push(parents.next().getId());
+  let depth = 0;
+  while (queue.length && depth < 32) {
+    const id = queue.shift();
+    if (id === allowedId) return true;
+    if (seen[id]) continue;
+    seen[id] = true;
+    depth += 1;
+    try {
+      const folder = DriveApp.getFolderById(id);
+      const folderParents = folder.getParents();
+      while (folderParents.hasNext()) queue.push(folderParents.next().getId());
+    } catch (error) {}
+  }
+  return false;
+}
+
+function r10DriveOriginal_(fileId) {
+  if (!fileId) throw new Error('original_drive_file_id is empty');
+  const file = DriveApp.getFileById(fileId);
+  if (file.isTrashed()) throw new Error('Drive original is trashed');
+  if (!r10FileInsideOriginals_(file)) throw new Error('Drive original is outside this Harbor Originals folder');
+  const mimeType = String(file.getMimeType() || '').toLowerCase();
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+  if (allowed.indexOf(mimeType) === -1) throw new Error('Unsupported meal photo type: ' + mimeType);
+  const size = Number(file.getSize() || 0);
+  if (!size || size > R10.MAX_ORIGINAL_BYTES) throw new Error('Drive original must be <= 25MB');
+  return { file: file, mimeType: mimeType, size: size };
+}
+
+function r10StageOriginal_(command) {
+  if (!command.originalDriveFileId) return command;
+  const original = r10DriveOriginal_(command.originalDriveFileId);
+  const response = r10Post_('/api/drive-bridge/stage', {
+    commandId: command.commandId,
+    mimeType: original.mimeType,
+    size: original.size,
+  });
+  const staging = response.staging || {};
+  if (!staging.signedUrl || !staging.path) throw new Error('Bridge did not return a signed staging URL');
+
+  const upload = UrlFetchApp.fetch(staging.signedUrl, {
+    method: 'put',
+    contentType: original.mimeType,
+    payload: original.file.getBlob().getBytes(),
+    muteHttpExceptions: true,
+    headers: {
+      'x-upsert': 'true',
+      'cache-control': 'max-age=3600',
+    },
+  });
+  const status = upload.getResponseCode();
+  if (status < 200 || status >= 300) {
+    throw new Error('Staging upload failed ' + status + ': ' + upload.getContentText().slice(0, 300));
+  }
+  command.stagedOriginalPath = staging.path;
+  return command;
+}
+
 function processPendingCommands() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(5000)) return { ok: false, skipped: 'locked' };
@@ -168,12 +237,36 @@ function processPendingCommands() {
     }
     if (!pending.length) return { ok: true, processed: 0 };
 
-    const response = r10Post_('/api/drive-bridge/execute', { commands: pending.map(function (item) { return item.command; }) });
+    const ready = [];
+    let stagingFailed = 0;
+    pending.forEach(function (item) {
+      try {
+        item.command = r10StageOriginal_(item.command);
+        ready.push(item);
+      } catch (error) {
+        stagingFailed += 1;
+        const receipt = {
+          commandId: item.command.commandId,
+          tool: item.command.tool,
+          ok: false,
+          error: String(error && error.message ? error.message : error),
+          finishedAt: new Date().toISOString(),
+          originalDriveFileId: item.command.originalDriveFileId || '',
+        };
+        r10AppendReceipt_(receipt);
+        sheet.getRange(item.rowNumber, header.map.status + 1).setValue('failed');
+        if (header.map.processed_at != null) sheet.getRange(item.rowNumber, header.map.processed_at + 1).setValue(receipt.finishedAt);
+        if (header.map.error != null) sheet.getRange(item.rowNumber, header.map.error + 1).setValue(receipt.error);
+      }
+    });
+    if (!ready.length) return { ok: true, processed: 0, stagingFailed: stagingFailed };
+
+    const response = r10Post_('/api/drive-bridge/execute', { commands: ready.map(function (item) { return item.command; }) });
     const receipts = Array.isArray(response.receipts) ? response.receipts : [];
     const byId = {};
     receipts.forEach(function (receipt) { if (receipt && receipt.commandId) byId[receipt.commandId] = receipt; });
 
-    pending.forEach(function (item) {
+    ready.forEach(function (item) {
       const receipt = byId[item.command.commandId] || {
         commandId: item.command.commandId,
         tool: item.command.tool,
@@ -192,7 +285,7 @@ function processPendingCommands() {
 
     r10WriteMeta_('last_command_at', new Date().toISOString());
     refreshSnapshot();
-    return { ok: true, processed: pending.length };
+    return { ok: true, processed: ready.length, stagingFailed: stagingFailed };
   } finally {
     lock.releaseLock();
   }
