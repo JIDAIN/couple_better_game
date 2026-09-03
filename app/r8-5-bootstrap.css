@@ -1,0 +1,165 @@
+/* R8.5 startup gate: spend a short initial moment warming data/images, then keep the app responsive. */
+.life-app-under-splash {
+  visibility: hidden;
+}
+
+.life-startup-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 82% 13%, rgba(255, 224, 150, .48), transparent 22%),
+    linear-gradient(180deg, #eaf6f0 0%, #f7f4df 63%, #e9f2df 100%);
+  color: var(--life-text);
+}
+
+.life-startup-sky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.life-startup-cloud {
+  position: absolute;
+  width: 5.4rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,.7);
+  filter: blur(.1px);
+  animation: life-cloud-drift 5.5s ease-in-out infinite alternate;
+}
+.life-startup-cloud::before,
+.life-startup-cloud::after {
+  content: "";
+  position: absolute;
+  bottom: .25rem;
+  border-radius: 50%;
+  background: inherit;
+}
+.life-startup-cloud::before { left: .8rem; width: 1.7rem; height: 1.7rem; }
+.life-startup-cloud::after { right: 1rem; width: 2.1rem; height: 2.1rem; }
+.life-startup-cloud.is-one { top: 17%; left: 9%; }
+.life-startup-cloud.is-two { top: 29%; right: 4%; transform: scale(.76); opacity: .72; animation-delay: -.9s; }
+.life-startup-sun {
+  position: absolute;
+  top: 13%;
+  right: 18%;
+  width: 3.7rem;
+  height: 3.7rem;
+  border-radius: 50%;
+  background: #f7df87;
+  box-shadow: 0 0 0 .85rem rgba(247,223,135,.18);
+}
+
+.life-startup-island {
+  position: relative;
+  width: min(17rem, 72vw);
+  height: 8rem;
+  margin-top: -2.6rem;
+  border-radius: 50% 50% 44% 44% / 58% 58% 40% 40%;
+  background: linear-gradient(180deg, #badcad 0 58%, #e9d69c 59% 72%, #b8d7c9 73% 100%);
+  box-shadow: 0 18px 36px rgba(94, 120, 100, .12);
+  animation: life-island-float 2.6s ease-in-out infinite;
+}
+.life-startup-home {
+  position: absolute;
+  left: 53%;
+  top: 2.05rem;
+  display: grid;
+  width: 3.2rem;
+  height: 2.65rem;
+  place-items: center;
+  border-radius: 1rem;
+  background: #fff7e8;
+  color: #c78675;
+  font-size: 2rem;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px rgba(194,147,122,.15);
+}
+.life-startup-tree {
+  position: absolute;
+  left: 27%;
+  top: 1.15rem;
+  width: 3.2rem;
+  height: 4.2rem;
+}
+.life-startup-tree i {
+  position: absolute;
+  left: 1.35rem;
+  bottom: 0;
+  width: .52rem;
+  height: 2.45rem;
+  border-radius: 999px;
+  background: #9b7356;
+}
+.life-startup-tree b,
+.life-startup-tree b::before,
+.life-startup-tree b::after {
+  position: absolute;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  background: #79b896;
+}
+.life-startup-tree b { left: .45rem; top: 0; }
+.life-startup-tree b::before,
+.life-startup-tree b::after { content: ""; }
+.life-startup-tree b::before { left: -1rem; top: .85rem; transform: scale(.78); }
+.life-startup-tree b::after { right: -1rem; top: .85rem; transform: scale(.78); }
+
+.life-startup-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(12vh, 5.8rem);
+  display: grid;
+  justify-items: center;
+  gap: .28rem;
+  text-align: center;
+}
+.life-startup-copy strong {
+  font-size: 1.15rem;
+  font-weight: 950;
+  letter-spacing: .05em;
+}
+.life-startup-copy > span:not(.life-startup-dots) {
+  color: var(--life-text-muted);
+  font-size: .72rem;
+  font-weight: 720;
+}
+.life-startup-dots {
+  display: flex;
+  gap: .28rem;
+  margin-top: .35rem;
+}
+.life-startup-dots i {
+  width: .38rem;
+  height: .38rem;
+  border-radius: 50%;
+  background: var(--life-teal);
+  animation: life-dot-bob 1s ease-in-out infinite;
+}
+.life-startup-dots i:nth-child(2) { animation-delay: .14s; }
+.life-startup-dots i:nth-child(3) { animation-delay: .28s; }
+
+@keyframes life-dot-bob {
+  0%, 70%, 100% { transform: translateY(0); opacity: .42; }
+  35% { transform: translateY(-.28rem); opacity: 1; }
+}
+@keyframes life-island-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-.28rem); }
+}
+@keyframes life-cloud-drift {
+  from { transform: translateX(-.35rem); }
+  to { transform: translateX(.5rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .life-startup-island,
+  .life-startup-cloud,
+  .life-startup-dots i { animation: none !important; }
+}

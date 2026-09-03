@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { LifePartnerKey } from "@/lib/life/life-service";
 import {
   forgetStaleQueryScope,
+  peekStaleQuery,
   prefetchStaleQuery,
   readStaleQueryScopeHint,
   rememberStaleQueryScope,
@@ -13,7 +14,8 @@ import { fetchLifeSettings } from "@/lib/life/settings-client";
 import { fetchWeights } from "@/lib/life/weight-client";
 import { fetchMedicines } from "@/lib/life/medicine-client";
 import { fetchMailboxLetters } from "@/lib/life/mailbox-client";
-import { fetchMeals } from "@/lib/nutrition/meal-client";
+import { fetchMeals, mealPhotoUrl } from "@/lib/nutrition/meal-client";
+import type { MealRecord } from "@/lib/nutrition/meal-service";
 
 export type LifeRelativeIdentity = {
   currentPartnerKey: LifePartnerKey | null;
@@ -21,6 +23,7 @@ export type LifeRelativeIdentity = {
   taPartnerKey: LifePartnerKey | null;
   authenticated: boolean;
   loading: boolean;
+  bootstrapReady: boolean;
   refreshIdentity: () => Promise<LifePartnerKey | null>;
 };
 
@@ -30,6 +33,7 @@ const LifeIdentityContext = createContext<LifeRelativeIdentity>({
   taPartnerKey: null,
   authenticated: false,
   loading: true,
+  bootstrapReady: false,
   refreshIdentity: async () => null,
 });
 
@@ -42,22 +46,74 @@ function localDate() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-async function warmLifeData(me: LifePartnerKey) {
+const CORE_IMAGE_ASSETS = [
+  "/illustrations/life/activity-girls.png",
+  "/illustrations/life/mood-tired.png",
+  "/illustrations/life/mood-angry.png",
+  "/illustrations/life/mood-excited.png",
+  "/illustrations/life/mood-annoyed.png",
+  "/illustrations/life/mood-love.png",
+  "/illustrations/life/mood-calm.png",
+  "/illustrations/life/mood-sad.png",
+  "/illustrations/life/mood-happy.png",
+  "/illustrations/meals/breakfast.svg",
+  "/illustrations/meals/lunch.svg",
+  "/illustrations/meals/dinner.svg",
+  "/illustrations/meals/snack.svg",
+] as const;
+
+function preloadImage(src: string, timeoutMs = 1200) {
+  if (typeof window === "undefined") return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const image = new window.Image();
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = window.setTimeout(finish, timeoutMs);
+    image.onload = () => { window.clearTimeout(timer); finish(); };
+    image.onerror = () => { window.clearTimeout(timer); finish(); };
+    image.decoding = "async";
+    image.src = src;
+    if (image.complete) { window.clearTimeout(timer); finish(); }
+  });
+}
+
+async function preloadCurrentMealPhotos(me: LifePartnerKey, ta: LifePartnerKey, date: string) {
+  const meals = [
+    ...(peekStaleQuery<MealRecord[]>(`meals:${me}:${date}`) ?? []),
+    ...(peekStaleQuery<MealRecord[]>(`meals:${ta}:${date}`) ?? []),
+  ];
+  const urls = Array.from(new Set(meals.filter((meal) => meal.photoPath).map(mealPhotoUrl)));
+  await Promise.allSettled(urls.map((url) => preloadImage(url, 1400)));
+}
+
+async function warmLifeEssentials(me: LifePartnerKey) {
   const date = localDate();
   const month = date.slice(0, 7);
   const ta = oppositePartnerKey(me);
-  const tasks = [
+
+  const coreTasks = [
     prefetchStaleQuery({ key: `life-day:${date}`, fetcher: () => fetchLifeDay(date), staleMs: 20_000 }),
     prefetchStaleQuery({ key: `life-month:${month}`, fetcher: () => fetchLifeMonth(month), staleMs: 60_000 }),
     prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
     prefetchStaleQuery({ key: `meals:${ta}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: ta })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
+    prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
+    ...CORE_IMAGE_ASSETS.map((src) => preloadImage(src)),
+  ];
+
+  await Promise.allSettled(coreTasks);
+  await preloadCurrentMealPhotos(me, ta, date);
+
+  // Secondary pages keep warming after the app becomes interactive.
+  void Promise.allSettled([
     prefetchStaleQuery({ key: `weights:${me}`, fetcher: () => fetchWeights(me) }),
     prefetchStaleQuery({ key: `weights:${ta}`, fetcher: () => fetchWeights(ta) }),
     prefetchStaleQuery({ key: "medicines", fetcher: fetchMedicines }),
     prefetchStaleQuery({ key: "mailbox", fetcher: fetchMailboxLetters }),
-    prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
-  ];
-  await Promise.allSettled(tasks);
+  ]);
 }
 
 function validPartner(value: unknown): value is LifePartnerKey {
@@ -68,7 +124,9 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
   const [partnerKey, setPartnerKey] = useState<LifePartnerKey | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [bootstrapReady, setBootstrapReady] = useState(false);
   const partnerRef = useRef<LifePartnerKey | null>(null);
+  const bootstrappedRef = useRef(false);
 
   const applyIdentity = useCallback((next: LifePartnerKey | null, authoritative: boolean) => {
     partnerRef.current = next;
@@ -81,6 +139,25 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     } else if (next) {
       rememberStaleQueryScope(next);
     }
+  }, []);
+
+  const finishInitialBootstrap = useCallback(async (next: LifePartnerKey | null) => {
+    if (bootstrappedRef.current) return;
+    bootstrappedRef.current = true;
+    if (!next || (typeof navigator !== "undefined" && !navigator.onLine)) {
+      setBootstrapReady(true);
+      return;
+    }
+
+    const warm = warmLifeEssentials(next);
+    // Never trap the user behind startup. If the network is poor, cached UI becomes available
+    // after a short grace period while the same warm-up continues in the background.
+    await Promise.race([
+      warm,
+      new Promise<void>((resolve) => window.setTimeout(resolve, 2200)),
+    ]);
+    setBootstrapReady(true);
+    void warm.catch(() => undefined);
   }, []);
 
   const refreshIdentity = useCallback(async () => {
@@ -101,15 +178,19 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
       next = fallback;
     }
 
+    const alreadyBootstrapped = bootstrappedRef.current;
     applyIdentity(next, authoritative);
-    if (next && (typeof navigator === "undefined" || navigator.onLine)) await warmLifeData(next);
+    await finishInitialBootstrap(next);
+    if (alreadyBootstrapped && next && (typeof navigator === "undefined" || navigator.onLine)) {
+      void warmLifeEssentials(next).catch(() => undefined);
+    }
     return next;
-  }, [applyIdentity]);
+  }, [applyIdentity, finishInitialBootstrap]);
 
   useEffect(() => {
     const hint = readStaleQueryScopeHint();
     if (hint && !partnerRef.current) applyIdentity(hint, false);
-    const task = window.setTimeout(() => { void refreshIdentity().catch(() => undefined); }, 0);
+    const task = window.setTimeout(() => { void refreshIdentity().catch(() => { setBootstrapReady(true); }); }, 0);
     const handleOnline = () => { void refreshIdentity().catch(() => undefined); };
     window.addEventListener("online", handleOnline);
     return () => {
@@ -124,8 +205,9 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     taPartnerKey: partnerKey ? oppositePartnerKey(partnerKey) : null,
     authenticated,
     loading,
+    bootstrapReady,
     refreshIdentity,
-  }), [authenticated, loading, partnerKey, refreshIdentity]);
+  }), [authenticated, bootstrapReady, loading, partnerKey, refreshIdentity]);
 
   return <LifeIdentityContext.Provider value={value}>{children}</LifeIdentityContext.Provider>;
 }

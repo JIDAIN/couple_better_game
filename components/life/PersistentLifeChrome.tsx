@@ -1,11 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AppLifeBottomNav } from "@/components/ui/AppLifeBottomNav";
+import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 
 const PREFETCH_ROUTES = ["/", "/food", "/calendar", "/nest", "/me"] as const;
+const MIN_SPLASH_MS = 620;
 
 function isLifePath(pathname: string) {
   return pathname === "/"
@@ -19,12 +21,52 @@ function isLifePath(pathname: string) {
 export function PersistentLifeChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { bootstrapReady } = useLifeIdentity();
   const showNavigation = isLifePath(pathname);
+  const [minSplashElapsed, setMinSplashElapsed] = useState(false);
 
   useEffect(() => {
     if (!showNavigation) return;
     for (const route of PREFETCH_ROUTES) router.prefetch(route);
   }, [router, showNavigation]);
 
-  return <>{children}{showNavigation ? <AppLifeBottomNav /> : null}</>;
+  useEffect(() => {
+    if (!showNavigation || minSplashElapsed) return;
+    const timer = window.setTimeout(() => setMinSplashElapsed(true), MIN_SPLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [minSplashElapsed, showNavigation]);
+
+  // The minimum visual time and the real bootstrap run in parallel. Fast devices see a calm
+  // ~620ms entrance; slow networks wait for warm data up to the bootstrap cap instead of adding
+  // another delay after it finishes.
+  const showSplash = showNavigation && (!bootstrapReady || !minSplashElapsed);
+
+  return (
+    <>
+      <div className={showSplash ? "life-app-under-splash" : undefined} aria-hidden={showSplash || undefined}>{children}</div>
+      {showNavigation && !showSplash ? <AppLifeBottomNav /> : null}
+      {showSplash ? <LifeStartupSplash /> : null}
+    </>
+  );
+}
+
+function LifeStartupSplash() {
+  return (
+    <div className="life-startup-splash" role="status" aria-live="polite" aria-label="正在准备岛屿生活">
+      <div className="life-startup-sky" aria-hidden>
+        <span className="life-startup-cloud is-one" />
+        <span className="life-startup-cloud is-two" />
+        <span className="life-startup-sun" />
+      </div>
+      <div className="life-startup-island" aria-hidden>
+        <span className="life-startup-tree"><i /><b /></span>
+        <span className="life-startup-home">⌂</span>
+      </div>
+      <div className="life-startup-copy">
+        <strong>岛屿生活</strong>
+        <span>小岛正在醒来</span>
+        <span className="life-startup-dots" aria-hidden><i /><i /><i /></span>
+      </div>
+    </div>
+  );
 }
