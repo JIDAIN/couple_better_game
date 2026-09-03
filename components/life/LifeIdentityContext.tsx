@@ -178,9 +178,10 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
       next = fallback;
     }
 
+    const alreadyBootstrapped = bootstrappedRef.current;
     applyIdentity(next, authoritative);
     await finishInitialBootstrap(next);
-    if (bootstrappedRef.current && next && (typeof navigator === "undefined" || navigator.onLine)) {
+    if (alreadyBootstrapped && next && (typeof navigator === "undefined" || navigator.onLine)) {
       void warmLifeEssentials(next).catch(() => undefined);
     }
     return next;
