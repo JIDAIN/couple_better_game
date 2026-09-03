@@ -29,7 +29,9 @@ describe("relative me / Ta identity", () => {
     expect(identity).toContain("rememberStaleQueryScope(next)");
     expect(identity).toContain("forgetStaleQueryScope()");
     expect(identity).toContain("const fallback = partnerRef.current ?? readStaleQueryScopeHint()");
-    expect(identity).toContain("await warmLifeData(next)");
+    expect(identity).toContain("await finishInitialBootstrap(next)");
+    expect(identity).toContain("warmLifeEssentials");
+    expect(identity).toContain("bootstrapReady");
     expect(identity).toContain('key: "medicines"');
     expect(identity).toContain('key: "mailbox"');
     expect(identity).toContain('key: "life-settings"');
