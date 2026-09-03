@@ -22,14 +22,17 @@ describe("relative me / Ta identity", () => {
     expect(login).not.toContain("选择账号");
   });
 
-  it("refreshes identity in place and warms shared page data before login navigation", () => {
+  it("refreshes identity in place, preserves weak-network scope, and warms shared page data", () => {
     const identity = source("components/life/LifeIdentityContext.tsx");
     const login = source("components/life/LifeLoginPage.tsx");
     const me = source("components/life/LifeMePage.tsx");
-    expect(identity).toContain("clearStaleQueries()");
+    expect(identity).toContain("rememberStaleQueryScope(next)");
+    expect(identity).toContain("forgetStaleQueryScope()");
+    expect(identity).toContain("const fallback = partnerRef.current ?? readStaleQueryScopeHint()");
     expect(identity).toContain("await warmLifeData(next)");
     expect(identity).toContain('key: "medicines"');
     expect(identity).toContain('key: "mailbox"');
+    expect(identity).toContain('key: "life-settings"');
     expect(login).toContain("await refreshIdentity()");
     expect(me).toContain("await refreshIdentity()");
     expect(login).not.toContain("router.refresh()");
