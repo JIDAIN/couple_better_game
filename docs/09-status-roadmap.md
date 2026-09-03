@@ -22,6 +22,7 @@ R8     数据管理 + MCP                          ✅
 R8.1   第一轮视觉/交互收口                       ✅ Production
 R8.2   Production 实机视觉二次校准               ✅ Production
 R8.3   信息减法 + 饮食汇总 + 药箱/我的重排         ✅ Production
+R8.3   关系天数 / 活动图标面板 hotfix             ✅ Production
 R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
 R10    双 Harbor + Worker Pairing 后端            ✅ Production
 R10    Cat/Fish Apps Script Workers              ⏳ 待一次性人工激活
@@ -52,7 +53,6 @@ R8.2 解决第一轮 Production 实机差距：
 
 R8.3 继续按手机实机反馈做信息减法：
 
-- “一起度过的第 N 天 ♡”改为视觉语言中的柔和灰绿，不单独高亮数字；
 - 我/Ta 心情卡统一底色，睡眠圆环统一同一颜色和深浅；
 - 删除解释“程序怎么工作”的副标题，保留温暖氛围文字；
 - 饮食新增可复用 `DailyNutritionSummary`，展示当日 kcal、碳水/蛋白质/脂肪克数与热量占比；
@@ -64,11 +64,20 @@ R8.3 继续按手机实机反馈做信息减法：
 - “我的”昵称改为“小猫 / 小鱼”，删除 CURRENT ACCOUNT、身份映射、写入权限和生活 AI 助手卡；
 - 数据管理删除新版/旧版程序关系、去游戏机和架构长说明，只保留备份、导出、导入、恢复。
 
-R8.3 PR #50：
+2026-09-03 晚间实机 hotfix：
+
+- 首页“一起度过的第 N 天”整体字号放大；
+- `N` 单独放大一档，并改为更亮的暖粉强调色；
+- 句末单爱心改为项目内双爱心 SVG；
+- 活动 icon picker 在手机端固定到导航上方，`z-index` 高于底部导航；
+- icon grid 增加可滚动最大高度，保证 30 个活动图标都可查看；
+- 380px 以下屏幕自动降为 5 列。
+
+Hotfix PR #51：
 
 ```text
-merge commit: f1c6f1092d1b7eadc5866b0d22e0cc664261719b
-CI #263:
+merge commit: a0ab9f21b268cb770f494bcc68fb36ec075a75b3
+CI #268:
 Test   ✅
 Lint   ✅
 Build  ✅
@@ -107,22 +116,23 @@ anon          ❌
 
 ```text
 primary domain: https://couple-better-game.vercel.app
-deployment: dpl_CSRYbAB4diHi96eV2stUSxzKmzXX
+deployment: dpl_B71YH8fSWiQYnckrmDXzzAftc3bz
 status: READY
-R8.3 source commit: f1c6f1092d1b7eadc5866b0d22e0cc664261719b
+hotfix source commit: c384fd048de3d6a1691f6d654730adec6d53e9a9
+hotfix code merge: a0ab9f21b268cb770f494bcc68fb36ec075a75b3
 ```
 
-本次部署没有重新开启 Git 自动部署。Vercel 构建日志确认直接拉取上述精确 commit，再按仓库 `package-lock.json` 执行 `npm ci --include=dev` 与 `next build`。
+本次使用一次受控 Git Production 触发：临时开启 `main` deployment，Vercel 创建唯一 Production 后立即恢复 `deploymentEnabled: false`。
 
 Production 验证：
 
 ```text
 Build / TypeScript / static generation ✅
 /                                      200
-/food                                  200
-/me                                    200
 主域名 alias                            ✅
-最近 15 分钟 runtime errors             0
+最近 20 分钟 runtime errors             0
+本次新增 Production 数量                1
+Git deploymentEnabled                   false
 ```
 
 ## 6. R10 与微信提醒
@@ -158,13 +168,14 @@ Drive    -> 餐食原图 + AI Bridge + Daily/Monthly 全量灾备
 ```text
 1. R8.3 视觉与信息层级修改                  ✅
 2. R8.3 Test / Lint / Build               ✅ CI #263
-3. PR #50 合并 main                       ✅ f1c6f109...
-4. R8.3 Production 部署                   ✅ dpl_CSRYb...
-5. Production 基础路由/runtime 验收         ✅
-6. 用户手机实机截图继续视觉验收              <- 当前
-7. 激活 Harbor Cat / Fish Apps Script Workers
-8. Harbor 读写 / 照片 / watch / backup 验收
-9. Cat/Fish PushPlus 真实微信验收
+3. PR #50 合并 main                       ✅
+4. R8.3 Production 部署                   ✅
+5. 关系天数 / icon picker hotfix           ✅ PR #51 / CI #268
+6. Hotfix Production 部署                 ✅ dpl_B71YH8...
+7. 用户手机实机截图继续视觉验收              <- 当前
+8. 激活 Harbor Cat / Fish Apps Script Workers
+9. Harbor 读写 / 照片 / watch / backup 验收
+10. Cat/Fish PushPlus 真实微信验收
 ```
 
 ## 9. 部署纪律
