@@ -1,0 +1,312 @@
+/* R8.2 screenshot-driven mobile calibration. Keep business semantics out of this layer. */
+
+/* Today header */
+.life-today-subtitle { margin-top: .15rem; }
+.life-together-days {
+  display: inline-flex;
+  width: fit-content;
+  align-items: baseline;
+  gap: .16rem;
+  color: color-mix(in srgb, var(--life-text-body) 72%, var(--life-teal-strong));
+  font-size: .76rem;
+  font-weight: 720;
+  letter-spacing: .01em;
+  line-height: 1.5;
+}
+.life-together-days strong {
+  color: var(--life-teal-strong);
+  font-size: .86rem;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+}
+.life-together-heart {
+  margin-left: .1rem;
+  color: color-mix(in srgb, var(--life-coral) 76%, #c47084);
+  font-size: .92rem;
+  font-weight: 900;
+  transform: translateY(.02rem);
+}
+
+/* Tiny action control used by Today cards. Deliberately not AnimalButton: the reference uses a compact framed text control. */
+.life-card-action {
+  display: inline-flex;
+  min-width: 3.35rem;
+  height: 1.95rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--life-teal-strong) 42%, var(--life-border-soft));
+  border-radius: 13px;
+  background: rgb(255 255 255 / .48);
+  padding: 0 .62rem;
+  color: var(--life-teal-strong);
+  box-shadow: 0 1px 0 rgb(76 112 102 / .06);
+  font-size: .68rem;
+  font-weight: 880;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background var(--life-motion-fast) ease, transform var(--life-motion-fast) ease;
+}
+.life-card-action:active { background: var(--life-surface-soft); transform: translateY(1px); }
+
+/* Mood picker: the plush face itself is the choice. No ring, tile, active frame or shadow. */
+.life-mood-sheet-v2 { padding-inline: 1.1rem !important; }
+.life-mood-choice-grid { align-items: start; }
+.life-mood-choice,
+.life-mood-choice[aria-checked="true"] {
+  display: grid;
+  min-width: 0;
+  justify-items: center;
+  gap: .35rem;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  color: var(--life-text-body);
+  box-shadow: none !important;
+  outline: none;
+  transform: none !important;
+}
+.life-mood-choice:active { transform: scale(.96) !important; }
+.life-mood-choice > span:last-child { font-size: .68rem; font-weight: 820; }
+.life-mood-orb,
+.life-mood-choice[aria-checked="true"] .life-mood-orb {
+  display: grid;
+  width: 3.75rem !important;
+  height: 3.75rem !important;
+  place-items: center;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.life-mood-orb img { width: 100% !important; height: 100% !important; filter: none !important; }
+.life-mood-cancel { background: color-mix(in srgb, var(--life-surface-soft) 64%, white) !important; box-shadow: none !important; }
+
+/* Activity composer: Notion-like text row + icon popover, not category chips. */
+.life-activity-composer { position: relative; overflow: visible !important; box-shadow: none !important; }
+.life-activity-input-row { min-height: 2.45rem; }
+.life-activity-leading-icon {
+  display: grid;
+  width: 2.45rem;
+  height: 2.45rem;
+  place-items: center;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 11px;
+  background: rgb(255 255 255 / .72);
+  color: var(--life-text-body);
+  box-shadow: 0 1px 2px rgb(62 83 75 / .05);
+  font-size: 1.18rem;
+}
+.life-activity-leading-icon.is-small { width: 2.25rem; height: 2.25rem; font-size: 1.05rem; }
+.life-activity-add-button {
+  height: 2.35rem;
+  border: 0;
+  border-radius: 11px;
+  background: var(--life-teal);
+  padding: 0 .8rem;
+  color: white;
+  font-size: .7rem;
+  font-weight: 900;
+}
+.life-activity-add-button:disabled { opacity: .42; }
+.life-activity-icon-popover {
+  position: absolute;
+  z-index: 36;
+  top: calc(100% + .45rem);
+  left: 0;
+  width: min(17rem, calc(100vw - 3.5rem));
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--life-border) 70%, white);
+  border-radius: 17px;
+  background: color-mix(in srgb, white 94%, var(--life-surface-soft));
+  box-shadow: 0 14px 34px rgb(48 67 60 / .16);
+  padding: .65rem;
+}
+.life-activity-icon-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .05rem .12rem .5rem;
+  color: var(--life-text-body);
+  font-size: .66rem;
+  font-weight: 880;
+}
+.life-activity-icon-popover-head button { width: 1.6rem; height: 1.6rem; border-radius: 50%; color: var(--life-text-muted); font-size: 1rem; }
+.life-activity-icon-grid { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: .2rem; }
+.life-activity-icon-grid button {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 1.12rem;
+}
+.life-activity-icon-grid button:hover,
+.life-activity-icon-grid button:active { background: var(--life-surface-soft); }
+.life-activity-icon-grid button.is-current { background: color-mix(in srgb, var(--life-mint) 55%, white); }
+.life-activity-edit-row { position: relative; overflow: visible; }
+
+/* Nest cards: reserve a real chevron column so it can never overlap the copy. */
+.life-anniversary-card {
+  min-height: 6.6rem !important;
+  gap: .75rem !important;
+  border-radius: 21px !important;
+  padding: .85rem .9rem !important;
+  box-shadow: 0 4px 14px rgb(78 91 84 / .07) !important;
+}
+.life-anniversary-art {
+  width: 3.85rem !important;
+  height: 3.85rem !important;
+  font-size: 2rem !important;
+  box-shadow: inset 0 0 0 1px rgb(218 143 158 / .13) !important;
+}
+.life-anniversary-days { color: var(--life-teal-strong); font-size: .67rem; font-weight: 790; }
+.life-anniversary-days strong { font-size: .76rem; font-weight: 950; }
+.life-anniversary-days b { color: var(--life-coral); font-size: .8rem; }
+.life-wide-chevron { width: 1.35rem !important; height: 2.6rem !important; font-size: 1.6rem !important; opacity: .86; }
+.life-nest-grid { gap: .65rem !important; }
+.life-nest-tile {
+  display: grid !important;
+  grid-template-columns: minmax(0,1fr) 1.25rem;
+  grid-template-rows: auto 1fr;
+  min-height: 9.65rem !important;
+  border-radius: 20px !important;
+  padding: .82rem !important;
+  box-shadow: 0 4px 14px rgb(78 91 84 / .065) !important;
+}
+.life-nest-tile-art {
+  grid-column: 1 / -1;
+  width: 3.85rem !important;
+  height: 3.85rem !important;
+  border-radius: 19px !important;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .72), 0 2px 8px rgb(73 84 79 / .055) !important;
+  font-size: 0 !important;
+}
+.life-nest-tile-art svg { width: 2.55rem; height: 2.55rem; color: color-mix(in srgb, var(--life-teal-strong) 78%, #718a86); }
+.life-nest-tile.is-pink .life-nest-tile-art svg { color: #cc8396; }
+.life-nest-tile.is-blue .life-nest-tile-art svg { color: #6a98a5; }
+.life-nest-tile.is-yellow .life-nest-tile-art svg { color: #8c8370; }
+.life-nest-tile-copy {
+  align-self: end;
+  min-width: 0;
+  padding-top: .65rem;
+  padding-right: .28rem;
+}
+.life-nest-tile-title { display: block; color: var(--life-text); font-size: .82rem; font-weight: 950; line-height: 1.35; }
+.life-nest-tile-note { display: -webkit-box; margin-top: .28rem; overflow: hidden; color: var(--life-text-muted); font-size: .61rem; font-weight: 560; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.life-nest-tile-chevron {
+  position: static !important;
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
+  justify-self: end;
+  margin-bottom: -.05rem;
+  color: var(--life-teal-strong) !important;
+  font-size: 1.55rem !important;
+  line-height: 1;
+  transform: scaleX(1.2) !important;
+}
+
+/* Mailbox — borrow mature journal patterns (paper hierarchy, restrained metadata, readable body), not third-party code. */
+.life-mailbox-toolbar-v2 {
+  border: 1px solid color-mix(in srgb, var(--life-border-soft) 82%, transparent) !important;
+  border-radius: 18px !important;
+  background: rgb(255 255 255 / .44) !important;
+  box-shadow: none !important;
+  padding: .8rem !important;
+}
+.life-mailbox-toolbar-v2 .life-mailbox-format-filter,
+.life-mailbox-toolbar-v2 .life-mailbox-tab-switch { background: color-mix(in srgb, var(--life-surface-soft) 55%, transparent) !important; }
+.life-letter-preview {
+  height: 9.1rem !important;
+  border: 1px solid rgb(126 112 84 / .14) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 3px 10px rgb(71 68 55 / .055) !important;
+}
+.life-letter-preview::before,
+.life-letter-reader::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 16%, rgb(255 255 255 / .5) 0 .7px, transparent .8px),
+    linear-gradient(90deg, transparent 0 11%, rgb(120 100 70 / .025) 11.2%, transparent 11.5%);
+  background-size: 8px 8px, auto;
+  opacity: .65;
+}
+.life-letter-preview.theme-cream,
+.life-letter-reader.theme-cream { background: linear-gradient(145deg, #fffdf7, #faf3df) !important; }
+.life-letter-preview.theme-forest,
+.life-letter-reader.theme-forest { background: linear-gradient(145deg, #fcfff9, #eaf4e5) !important; }
+.life-letter-preview.theme-sea,
+.life-letter-reader.theme-sea { background: linear-gradient(145deg, #fbfeff, #e8f2f5) !important; }
+.life-letter-preview.theme-sunset,
+.life-letter-reader.theme-sunset { background: linear-gradient(145deg, #fffaf7, #f8e6e2) !important; }
+.life-letter-preview-main { position: relative; z-index: 1; padding: .78rem .85rem 2rem !important; }
+.life-letter-meta { color: color-mix(in srgb, var(--life-text-muted) 82%, #897d68); font-size: .58rem; font-weight: 760; letter-spacing: .02em; }
+.life-letter-title,
+.life-postcard-line {
+  font-family: ui-serif, "Songti SC", "Noto Serif CJK SC", "STSong", serif;
+  color: color-mix(in srgb, var(--life-text) 92%, #544b3d);
+}
+.life-letter-title { margin-top: .72rem; font-size: .92rem; font-weight: 820; letter-spacing: .025em; }
+.life-letter-excerpt { margin-top: .38rem; color: color-mix(in srgb, var(--life-text-body) 88%, #665f52); font-family: ui-serif, "Songti SC", "Noto Serif CJK SC", "STSong", serif; font-size: .69rem; line-height: 1.65; }
+.life-postcard-label { margin-top: .7rem; color: #9d927f; font-size: .55rem; font-weight: 800; letter-spacing: .18em; }
+.life-postcard-line { margin-top: .3rem; font-size: .86rem; font-weight: 760; line-height: 1.55; }
+.life-letter-stamp { border: 1px solid rgb(183 132 117 / .3) !important; background: rgb(255 255 255 / .25) !important; color: #b17f72 !important; font-size: .54rem !important; font-weight: 760 !important; }
+.life-letter-read-hint { left: .85rem !important; bottom: .58rem !important; color: #928a7a !important; font-size: .57rem !important; font-weight: 680 !important; }
+.life-letter-preview-actions { right: .62rem !important; bottom: .45rem !important; z-index: 2; }
+.life-letter-preview-actions button { background: rgb(255 255 255 / .46) !important; box-shadow: none !important; }
+.life-letter-reader { position: relative; border-radius: 21px !important; box-shadow: 0 18px 48px rgb(48 47 40 / .18) !important; }
+.life-letter-reader > * { position: relative; z-index: 1; }
+.life-letter-reader-body { font-family: ui-serif, "Songti SC", "Noto Serif CJK SC", "STSong", serif; letter-spacing: .02em; }
+
+/* Data management */
+.life-data-page { display: grid; gap: .75rem; }
+.life-data-hero {
+  display: grid;
+  grid-template-columns: 2.8rem minmax(0,1fr);
+  gap: .7rem;
+  align-items: center;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 19px;
+  background: linear-gradient(145deg, rgb(255 255 255 / .7), color-mix(in srgb, var(--life-mint) 22%, white));
+  padding: .85rem;
+}
+.life-data-hero-icon { display: grid; width: 2.7rem; height: 2.7rem; place-items: center; border-radius: 15px; background: rgb(255 255 255 / .6); color: var(--life-teal-strong); font-size: 1.2rem; }
+.life-data-action-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .45rem; }
+.life-data-action {
+  display: grid;
+  min-height: 4.8rem;
+  place-items: center;
+  align-content: center;
+  gap: .25rem;
+  border: 1px solid var(--life-border-soft);
+  border-radius: 16px;
+  background: rgb(255 255 255 / .5);
+  color: var(--life-text-body);
+  text-align: center;
+}
+.life-data-action span { font-size: 1.08rem; }
+.life-data-action strong { font-size: .63rem; font-weight: 900; }
+.life-data-action small { color: var(--life-text-muted); font-size: .52rem; }
+.life-backup-list { overflow: hidden; border: 1px solid var(--life-border-soft); border-radius: 18px; background: rgb(255 255 255 / .43); }
+.life-backup-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .65rem; align-items: center; padding: .72rem .8rem; border-bottom: 1px solid var(--life-border-soft); }
+.life-backup-row:last-child { border-bottom: 0; }
+.life-backup-row strong { color: var(--life-text); font-size: .7rem; }
+.life-backup-row p { margin-top: .18rem; color: var(--life-text-muted); font-size: .57rem; line-height: 1.5; }
+.life-backup-restore { border: 0; border-radius: 10px; background: var(--life-surface-soft); padding: .42rem .6rem; color: var(--life-teal-strong); font-size: .6rem; font-weight: 880; }
+.life-data-note { border-radius: 17px; background: rgb(255 255 255 / .4); padding: .8rem; color: var(--life-text-muted); font-size: .62rem; line-height: 1.7; }
+
+@media (max-width: 380px) {
+  .life-card-action { min-width: 3.05rem; height: 1.82rem; padding-inline: .52rem; font-size: .63rem; }
+  .life-mood-orb { width: 3.4rem !important; height: 3.4rem !important; }
+  .life-nest-tile { min-height: 9.1rem !important; }
+  .life-data-action-grid { grid-template-columns: 1fr; }
+  .life-data-action { min-height: 3.7rem; grid-template-columns: 2rem minmax(0,1fr); justify-items: start; text-align: left; padding: .55rem .7rem; }
+  .life-data-action span { grid-row: 1 / 3; align-self: center; }
+}
