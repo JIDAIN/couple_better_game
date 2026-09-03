@@ -2,113 +2,123 @@
 
 **上线日期：2026-09-03**
 
-## 1. Production 部署
+## 1. 当前 Production 部署
 
-用户已明确授权本次 R10 Production 部署。
+用户已明确授权将 R8.1 + R10 Worker Pairing + 双 Harbor + 微信提醒统一部署到 Production。
 
-最终上线源码固定为：
-
-```text
-GitHub repo: JIDAIN/couple_better_game
-commit: 5c175a38586a77675580193ed47ac5e855ad6692
-```
-
-该 commit 包含：
-
-- R10 Google Drive / Sheets Bridge；
-- Harbor Cat / Harbor Fish 双入口；
-- actor-specific HMAC、watch、wake；
-- Drive 原图 + Supabase 临时 staging + 600px WebP 展示图；
-- 单一家庭 Daily / Monthly 备份；
-- R9 `/ai` 备用入口；
-- Harbor Cat AI 称呼“团子”；
-- Harbor Fish AI 称呼“仔仔”；
-- PushPlus 微信提醒后端与 Apps Script worker 代码。
+本次受控部署通过临时打开 `vercel.json` 的 Git deployment 开关触发一次 main Production，Vercel 创建部署后立即恢复为关闭。
 
 Vercel Production：
 
 ```text
-deployment: dpl_CzGCg22uf1A1pqfPXqg5gCuMUCNj
+deployment: dpl_3WHMG5Voo9YRgHByxjKHZQKHgT43
 state: READY
 target: production
+source commit: 3775d90311b11f4d39e93b816e13f5332e1efff5
 primary domain: https://couple-better-game.vercel.app
 ```
 
-构建日志明确输出：
+该 source commit 的业务代码基线包含此前 main 的：
 
 ```text
-R10 source pinned to 5c175a38586a77675580193ed47ac5e855ad6692
+Worker Pairing: 7028cd9392b4b99599b02b977bbc0803b351b195
+R8.1 UI:       52aebad2c28560958d055b06522b8b95b82eda39
+Docs closeout: 007f0e0d8ec4c2831c3e02908e2d941ae8206c26
 ```
 
-并成功生成 R10 关键路由：
+随后已恢复：
 
 ```text
+main commit: ee4a08fb44f65f20a12f61f9e4acda6f95339548
+vercel.json -> git.deploymentEnabled=false
+```
+
+部署后检查表明，自本次授权开始只产生了一个新的 Vercel deployment。
+
+## 2. 已上线能力
+
+当前 Production 已同时包含：
+
+- R8.1 视觉与交互 23 项收口；
+- 首页共享纪念日与“一起度过的第 N 天”；
+- 8h 睡眠满环；
+- 活动新增/编辑分离和丰富活动类型；
+- 紧凑餐食编辑与宏量营养布局；
+- 历史日期复用首页卡片；
+- 体重日均趋势和周/月/季度/年切换；
+- 信箱标题/主题/筛选/阅读器；
+- 紧凑家庭药箱；
+- R10 Google Drive / Sheets Bridge；
+- Harbor Cat / Harbor Fish 双入口；
+- actor-specific HMAC、watch、wake；
+- 一次性 Sheet-bound Worker Pairing；
+- Drive 原图 + Supabase 临时 staging + 600px WebP 展示图；
+- 单一家庭 Daily / Monthly 备份；
+- Harbor Cat AI 称呼“团子”；
+- Harbor Fish AI 称呼“仔仔”；
+- PushPlus 微信提醒后端与 Apps Script worker 代码；
+- R9 `/ai` 备用入口与 `/mcp`。
+
+## 3. 构建与 HTTP 验收
+
+Vercel 构建成功：
+
+```text
+Next.js 16.2.6
+Compiled successfully
+TypeScript finished
+24/24 static pages generated
+Deployment completed
+```
+
+关键生产路由已生成：
+
+```text
+/api/drive-bridge/bootstrap
 /api/drive-bridge/execute
 /api/drive-bridge/reminders
 /api/drive-bridge/snapshot
 /api/drive-bridge/stage
 /api/drive-bridge/watch
+/api/life/settings
 /ai
 /mcp
 ```
 
-## 2. 一次性部署方式
-
-由于当前 Vercel connector 的高层 `deploy_to_vercel` 工具没有自动获得本地 Git workspace，本次使用受控 bootstrap source deployment：
-
-1. connector 只上传最小 Next.js 引导包；
-2. build 阶段从公开 GitHub 仓库下载**固定 commit**的 tarball；
-3. 下载后在同一次 build 中运行真实仓库的 `next build`；
-4. 最终产物来自固定 commit，不追随未来 Git push。
-
-该方式没有修改项目的 Git 自动部署策略。
-
-`main/vercel.json` 仍保持：
-
-```json
-{
-  "git": {
-    "deploymentEnabled": false
-  }
-}
-```
-
-因此本文件及后续普通 Git 提交不会自动生成新的 Preview / Production deployment。
-
-## 3. 上线后 HTTP 验收
-
-生产域名：
+上线后实测：
 
 ```text
 GET / -> 200 OK
-GET /ai -> 200 OK
+GET /api/drive-bridge/bootstrap -> 405 Method Not Allowed
 ```
 
-R10 POST-only route 存在性验证：
-
-```text
-GET /api/drive-bridge/reminders -> 405 Method Not Allowed
-GET /api/drive-bridge/snapshot  -> 405 Method Not Allowed
-```
-
-405 是预期行为，说明 Production 已命中新 R10 route，而不是旧版本 404。
+`bootstrap` 是 POST-only，因此 405 是预期结果，证明 Worker Pairing 新路由已经命中 Production。
 
 Vercel runtime error 检查：
 
 ```text
-No runtime errors found
+No error/fatal runtime logs found
 ```
 
 ## 4. Supabase Production 状态
 
-R10 数据库与微信提醒 migration 均已执行 Production。
+R10 bridge、pairing、微信提醒相关 migration 均已执行 Production。
 
-双 Harbor server-only config 已建立：
+双 Harbor server-only config：
 
 ```text
 cat  -> actor=cat,  backup_leader=true
 fish -> actor=fish, backup_leader=false
 ```
+
+当前 Worker 尚未真正创建，因此：
+
+```text
+cat.apps_script_url  = empty
+fish.apps_script_url = empty
+```
+
+两张 Bridge Sheet 当前均已准备好一次性 pairing code，状态为 `ready`；长期 HMAC/watch/wake secret 不进入 Sheet 或聊天。
 
 微信提醒默认配置：
 
@@ -118,8 +128,6 @@ daily record: 21:15
 anniversary: 09:15
 offsets: [7, 1, 0]
 ```
-
-提醒 claim 已做无副作用测试：Cat / Fish 都正常返回空列表，测试未创建 delivery，也未发送微信。
 
 ## 5. Harbor AI 身份
 
@@ -137,26 +145,17 @@ Ta = cat
 
 “团子 / 仔仔”只帮助自然语言和 Project 会话识别，不能覆盖服务端 `cat / fish` 权限绑定。
 
-## 6. R10 仍未完成的最后外部步骤
+## 6. 当前唯一剩余外部步骤
 
-R10 Production 后端已经上线，但整个 R10 仍不能标记为完全验收，原因是 Google Apps Script 当前无法由 ChatGPT connector 直接创建/发布。
+Production 后端、R8.1 UI 和 Worker Pairing 均已经上线。R10 现在只差 Google Apps Script Worker 的一次性人工创建，因为当前 ChatGPT Google Drive connector 不提供 Apps Script 项目创建/部署权限。
 
-当前 Production 数据库中：
+需要完成：
 
-```text
-cat.apps_script_url  = empty
-fish.apps_script_url = empty
-```
+1. 在 `Couple Better Game AI Bridge - Cat` 的 bound Apps Script 中放入 `Code.gs / Reminder.gs / Pairing.gs`；
+2. 部署为 Web App：Execute as Me，Who has access Anyone；
+3. 运行 `setupR10Pairing()`，让 Cat Worker 自动交换长期 secret、清空 pairing code、回填 `apps_script_url`、安装 triggers 并刷新 `STATE_*`；
+4. Fish 按相同流程操作；
+5. Cat/Fish 分别把自己的 `PUSHPLUS_TOKEN` 放入各自 Script Properties，再运行 `setupWechatReminderTrigger()`；
+6. 做真实读写、原图、watch、1 分钟 fallback、备份与微信提醒验收。
 
-仍需一次性完成：
-
-1. 建立 Harbor Cat Worker Apps Script；
-2. 建立 Harbor Fish Worker Apps Script；
-3. 两边分别填写已有 R10 Script Properties；
-4. 两边分别填写自己的 `PUSHPLUS_TOKEN`；
-5. 部署两个 Web App；
-6. 执行 `setupR10All()`；
-7. 将两个 Web App URL 回填 `life_drive_bridge_configs`；
-8. 做 Harbor Cat / Harbor Fish 真实读取、写入、照片、watch + 1 分钟 fallback、备份、微信提醒端到端验收。
-
-只有完成以上步骤，R10 才能从“Production backend READY”升级为“R10 fully operational”。
+只有上述 Worker 激活和端到端测试完成后，R10 才标记为 fully operational。
