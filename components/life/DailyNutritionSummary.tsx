@@ -52,7 +52,7 @@ export function DailyNutritionSummary({ meals, label }: { meals: MealRecord[]; l
     <section className="life-daily-nutrition-summary">
       <div className="life-daily-nutrition-head">
         <div><p className="life-daily-nutrition-kicker">{label ? `${label} · ` : ""}当日汇总</p><strong>{calorieText}</strong></div>
-        <div className="life-daily-nutrition-donut" style={{ background: donutBackground(summary.macros, summary.macroCalories) }} aria-label="三大营养素热量占比"><span>{summary.knownMacros ? "占比" : "—"}</span></div>
+        <div className="life-daily-nutrition-donut" style={{ background: donutBackground(summary.macros, summary.macroCalories) }} aria-label="三大营养素热量占比"><span style={{ gridArea: "1 / 1" }}>{summary.knownMacros ? "占比" : "—"}</span></div>
       </div>
       <div className="life-daily-nutrition-legend">
         {summary.macros.map((macro) => {
