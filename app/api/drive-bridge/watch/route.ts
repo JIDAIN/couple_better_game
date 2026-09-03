@@ -16,12 +16,12 @@ export async function POST(request: Request) {
   const scriptUrl = env("LIFE_DRIVE_APPS_SCRIPT_URL");
   const wakeSecret = env("LIFE_DRIVE_APPS_SCRIPT_WAKE_SECRET");
   if (scriptUrl && wakeSecret) {
-    fetch(scriptUrl, {
+    await fetch(scriptUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "drive-watch", secret: wakeSecret }),
       cache: "no-store",
-    }).catch(() => undefined);
+    }).catch(() => null);
   }
 
   return new NextResponse(null, { status: 204 });
