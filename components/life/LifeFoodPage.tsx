@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
 import { AppNutritionBar } from "@/components/ui/AppNutritionBar";
+import { DailyNutritionSummary } from "@/components/life/DailyNutritionSummary";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { useStaleQuery } from "@/lib/client/use-stale-query";
 import { fetchMeals, mealPhotoUrl, MealApiError } from "@/lib/nutrition/meal-client";
@@ -52,10 +53,10 @@ function nutritionTotals(meals: MealRecord[]) {
         if (item.proteinG != null) { acc.protein += item.proteinG; acc.hasProtein = true; }
         if (item.fatG != null) { acc.fat += item.fatG; acc.hasFat = true; }
       });
-      if (meal.totalCaloriesKcal != null) { acc.calories += meal.totalCaloriesKcal; acc.knownCalories += 1; }
+      if (meal.totalCaloriesKcal != null) acc.calories += meal.totalCaloriesKcal;
       return acc;
     },
-    { carbs: 0, protein: 0, fat: 0, calories: 0, knownCalories: 0, hasCarbs: false, hasProtein: false, hasFat: false },
+    { carbs: 0, protein: 0, fat: 0, calories: 0, hasCarbs: false, hasProtein: false, hasFat: false },
   );
 }
 function mealHref(date: string, partnerKey: NutritionPartnerKey, mealType: MealType, mealId?: string, snackPeriod?: SnackPeriod | null) {
@@ -67,6 +68,15 @@ function mealHref(date: string, partnerKey: NutritionPartnerKey, mealType: MealT
 function timeLabel(meal: MealRecord) {
   if (!meal.eatenAt) return "时间未记录";
   return new Date(meal.eatenAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function PencilIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m5 16.8-.8 3 3-.8L18 8.2 15.8 6 5 16.8Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m14.8 7 2.2 2.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function MealPhotoSlot({ meal, label, mealType }: { meal?: MealRecord; label: string; mealType: MealType }) {
@@ -122,7 +132,7 @@ export function LifeFoodPage() {
 
   return (
     <>
-      <AppPageShell title="饮食" subtitle="三餐固定，加餐可以记录多次；“我 / Ta”跟随当前登录身份。">
+      <AppPageShell title="饮食" subtitle="好好吃饭，也把喜欢的味道留下来。">
         <div className="mb-4 grid gap-3">
           <AppRoleSwitch value={role} onChange={setRole} />
           <label className="life-surface flex items-center justify-between gap-3 px-3 py-2.5"><span className="text-xs font-bold text-[var(--life-text-body)]">查看日期</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-xl border border-[var(--life-border-soft)] bg-[var(--life-surface)] px-2.5 py-1.5 text-sm font-bold text-[var(--life-text)]" /></label>
@@ -136,19 +146,23 @@ export function LifeFoodPage() {
             return (
               <section key={type} className="life-surface life-section-card life-meal-card">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <div><p className="text-sm font-extrabold text-[var(--life-text)]">{icon} {label}</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">固定餐次 · 一天一个入口</p></div>
-                  {canEdit ? <Link href={mealHref(date, partnerKey, type, primary?.id)} className="rounded-full bg-[var(--life-mint)] px-3 py-1.5 text-xs font-extrabold text-[#255f4d] shadow-[var(--life-shadow-press)]">{primary ? "编辑这顿" : `+ 添加${label}`}</Link> : <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--life-text-muted)]">只读</span>}
+                  <p className="text-sm font-extrabold text-[var(--life-text)]">{icon} {label}</p>
+                  {canEdit ? primary ? (
+                    <Link href={mealHref(date, partnerKey, type, primary.id)} className="life-meal-edit-icon" aria-label={`编辑${label}`} title={`编辑${label}`}><PencilIcon /></Link>
+                  ) : (
+                    <Link href={mealHref(date, partnerKey, type)} className="life-meal-add-link">+ 添加{label}</Link>
+                  ) : <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--life-text-muted)]">只读</span>}
                 </div>
                 <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)] gap-3"><MealPhotoSlot meal={primary} label={label} mealType={type} /><MealNutrition meal={primary} /></div>
-                {records.length > 1 ? <p className="mt-3 rounded-xl bg-[var(--life-surface-warm)] px-3 py-2 text-[10px] leading-5 text-[var(--life-text-muted)]">历史数据中还有 {records.length - 1} 条同餐次记录，暂不自动删除；后续可逐条整理。</p> : null}
+                {records.length > 1 ? <p className="mt-3 rounded-xl bg-[var(--life-surface-warm)] px-3 py-2 text-[10px] leading-5 text-[var(--life-text-muted)]">历史数据中还有 {records.length - 1} 条同餐次记录，暂不自动删除。</p> : null}
               </section>
             );
           })}
 
           <section className="life-surface life-section-card life-meal-card">
             <div className="flex items-center justify-between gap-3">
-              <div><p className="text-sm font-extrabold text-[var(--life-text)]">🍓 加餐</p><p className="mt-0.5 text-[10px] text-[var(--life-text-muted)]">一天可以有多次，每一次都是独立记录。</p></div>
-              {canEdit ? <button type="button" onClick={() => setSnackChooserOpen(true)} className="rounded-full bg-[var(--life-mint)] px-3 py-1.5 text-xs font-extrabold text-[#255f4d] shadow-[var(--life-shadow-press)]">+ 新增加餐</button> : <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--life-text-muted)]">只读</span>}
+              <p className="text-sm font-extrabold text-[var(--life-text)]">🍓 加餐</p>
+              {canEdit ? <button type="button" onClick={() => setSnackChooserOpen(true)} className="life-meal-add-link">+ 新增加餐</button> : <span className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-[10px] font-bold text-[var(--life-text-muted)]">只读</span>}
             </div>
 
             <div className="mt-3 grid gap-3">
@@ -159,7 +173,7 @@ export function LifeFoodPage() {
                   <article key={snack.id} className="rounded-[var(--life-radius-card)] border border-[var(--life-border-soft)] bg-[var(--life-surface-soft)] p-3">
                     <div className="mb-2.5 flex items-center justify-between gap-3">
                       <div><p className="text-xs font-extrabold text-[var(--life-text)]">{label} · {timeLabel(snack)}</p><p className="mt-0.5 line-clamp-1 text-[10px] text-[var(--life-text-muted)]">{mealNames(snack)}</p></div>
-                      {canEdit ? <Link href={mealHref(date, partnerKey, "snack", snack.id, snack.snackPeriod)} className="shrink-0 text-xs font-extrabold text-[var(--life-teal-strong)]">编辑这次</Link> : null}
+                      {canEdit ? <Link href={mealHref(date, partnerKey, "snack", snack.id, snack.snackPeriod)} className="life-meal-edit-icon" aria-label={`编辑${label}`} title={`编辑${label}`}><PencilIcon /></Link> : null}
                     </div>
                     <div className="grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)] gap-3"><MealPhotoSlot meal={snack} label={label} mealType="snack" /><MealNutrition meal={snack} /></div>
                   </article>
@@ -167,6 +181,8 @@ export function LifeFoodPage() {
               })}
             </div>
           </section>
+
+          <DailyNutritionSummary meals={meals} />
         </div>
       </AppPageShell>
 
@@ -174,7 +190,7 @@ export function LifeFoodPage() {
         <div className="life-sheet-backdrop" role="presentation" onMouseDown={() => setSnackChooserOpen(false)}>
           <section className="life-mood-sheet" role="dialog" aria-modal="true" aria-labelledby="snack-picker-title" onMouseDown={(event) => event.stopPropagation()}>
             <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--life-border)]" />
-            <div className="text-center"><p id="snack-picker-title" className="text-lg font-black text-[var(--life-text)]">这次是什么时候的加餐？</p><p className="mt-1 text-xs text-[var(--life-text-muted)]">选好后进入正常餐食编辑页。</p></div>
+            <div className="text-center"><p id="snack-picker-title" className="text-lg font-black text-[var(--life-text)]">这次是什么时候的加餐？</p></div>
             <div className="mt-5 grid gap-2">
               {SNACK_OPTIONS.map((option) => <Link key={option.period} href={mealHref(date, partnerKey, "snack", undefined, option.period)} className="flex items-center gap-3 rounded-[var(--life-radius-control)] bg-[var(--life-surface-soft)] px-4 py-3 text-sm font-extrabold text-[var(--life-text)]"><span className="text-xl">{option.icon}</span><span>{option.label}</span><span className="ml-auto text-[var(--life-text-muted)]">›</span></Link>)}
             </div>
