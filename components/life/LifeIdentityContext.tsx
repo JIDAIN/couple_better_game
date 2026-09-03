@@ -2,8 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LifePartnerKey } from "@/lib/life/life-service";
-import { clearStaleQueries, prefetchStaleQuery } from "@/lib/client/use-stale-query";
+import {
+  forgetStaleQueryScope,
+  prefetchStaleQuery,
+  readStaleQueryScopeHint,
+  rememberStaleQueryScope,
+} from "@/lib/client/use-stale-query";
 import { fetchLifeDay, fetchLifeMonth } from "@/lib/life/life-client";
+import { fetchLifeSettings } from "@/lib/life/settings-client";
 import { fetchWeights } from "@/lib/life/weight-client";
 import { fetchMedicines } from "@/lib/life/medicine-client";
 import { fetchMailboxLetters } from "@/lib/life/mailbox-client";
@@ -49,8 +55,13 @@ async function warmLifeData(me: LifePartnerKey) {
     prefetchStaleQuery({ key: `weights:${ta}`, fetcher: () => fetchWeights(ta) }),
     prefetchStaleQuery({ key: "medicines", fetcher: fetchMedicines }),
     prefetchStaleQuery({ key: "mailbox", fetcher: fetchMailboxLetters }),
+    prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
   ];
   await Promise.allSettled(tasks);
+}
+
+function validPartner(value: unknown): value is LifePartnerKey {
+  return value === "cat" || value === "fish";
 }
 
 export function LifeIdentityProvider({ children }: { children: ReactNode }) {
@@ -59,31 +70,53 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const partnerRef = useRef<LifePartnerKey | null>(null);
 
+  const applyIdentity = useCallback((next: LifePartnerKey | null, authoritative: boolean) => {
+    partnerRef.current = next;
+    setPartnerKey(next);
+    setAuthenticated(Boolean(next));
+    setLoading(false);
+    if (authoritative) {
+      if (next) rememberStaleQueryScope(next);
+      else forgetStaleQueryScope();
+    } else if (next) {
+      rememberStaleQueryScope(next);
+    }
+  }, []);
+
   const refreshIdentity = useCallback(async () => {
-    setLoading(true);
-    let next: LifePartnerKey | null = null;
+    const fallback = partnerRef.current ?? readStaleQueryScopeHint();
+    if (!fallback) setLoading(true);
+
+    let next = fallback;
+    let authoritative = false;
     try {
       const response = await fetch("/api/auth/session", { cache: "no-store" });
       if (!response.ok) throw new Error("读取登录状态失败");
       const data = (await response.json()) as { authenticated?: boolean; identity?: { partnerKey?: LifePartnerKey } };
-      next = data.authenticated && (data.identity?.partnerKey === "cat" || data.identity?.partnerKey === "fish") ? data.identity.partnerKey : null;
+      next = data.authenticated && validPartner(data.identity?.partnerKey) ? data.identity.partnerKey : null;
+      authoritative = true;
     } catch {
-      next = null;
-    } finally {
-      if (partnerRef.current !== next) clearStaleQueries();
-      partnerRef.current = next;
-      setPartnerKey(next);
-      setAuthenticated(Boolean(next));
-      setLoading(false);
+      // A temporary network/5xx failure must not turn a confirmed cat/fish session into "logged out".
+      // The server still validates every write; this fallback only keeps the local UI and cached reads usable.
+      next = fallback;
     }
-    if (next) await warmLifeData(next);
+
+    applyIdentity(next, authoritative);
+    if (next && (typeof navigator === "undefined" || navigator.onLine)) await warmLifeData(next);
     return next;
-  }, []);
+  }, [applyIdentity]);
 
   useEffect(() => {
+    const hint = readStaleQueryScopeHint();
+    if (hint && !partnerRef.current) applyIdentity(hint, false);
     const task = window.setTimeout(() => { void refreshIdentity().catch(() => undefined); }, 0);
-    return () => window.clearTimeout(task);
-  }, [refreshIdentity]);
+    const handleOnline = () => { void refreshIdentity().catch(() => undefined); };
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.clearTimeout(task);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [applyIdentity, refreshIdentity]);
 
   const value = useMemo<LifeRelativeIdentity>(() => ({
     currentPartnerKey: partnerKey,
