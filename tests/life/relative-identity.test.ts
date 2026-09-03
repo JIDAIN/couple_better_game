@@ -36,16 +36,16 @@ describe("relative me / Ta identity", () => {
     expect(me).not.toContain("router.refresh()");
   });
 
-  it("uses larger unframed moods and month-filtered mailbox cards", () => {
+  it("uses larger unframed moods and filtered mailbox previews", () => {
     const today = source("components/life/today/TodayMoodCard.tsx");
     const mailbox = source("components/life/LifeMailboxPage.tsx");
     const css = source("app/island-life-refactor.css");
     expect(today).toContain('className="life-person-state-orb"');
     expect(css).toContain(".life-person-state-orb { width: 5.4rem; height: 5.4rem;");
     expect(css).toContain(".life-calendar-mood { width: 2.35rem; height: 2.35rem;");
-    expect(mailbox).toContain("全部信件");
-    expect(mailbox).toContain("life-letter-date");
-    expect(mailbox).toContain("monthKey(letter.sentAt) === month");
+    expect(mailbox).toContain('value === "all" ? "所有"');
+    expect(mailbox).toContain("life-letter-preview");
+    expect(mailbox).toContain('month === "all" || monthKey(letter.sentAt) === month');
   });
 
   it("uses relative identity on key life pages", () => {
