@@ -19,11 +19,11 @@ V2-P7  小信箱                                  ✅
 V2-P8  游戏机列表 -> /game                     ✅
 R1-R7  重构与移动端校准                         ✅
 R8     数据管理 + MCP Production                ✅ 底层
-R8.1   视觉与交互最终收口                        🚧 当前开发分支
+R8.1   视觉与交互最终收口                        ✅ 已合并 main
 R9     程序内置 AI Agent                        ✅ 代码/CI，非主入口
 R10    双 Harbor + Google Drive Bridge           ✅ 主体代码/DB/Drive
 R10    Base Production                          ✅
-R10    Worker Pairing Production                 ⏸ 暂停，等待 R8.1 收口后再部署
+R10    Worker Pairing Production                 ⏸ 等待新的明确部署许可
 ```
 
 ## 2. 固定身份与权限
@@ -63,7 +63,7 @@ R8 Production 数据能力已包含：
 - transactional backup/export/restore/import
 - MCP OAuth/PKCE
 
-R8.1 发现原 UI 并未按视觉稿彻底验收，因此本轮重新以用户确认的 23 项为基线：
+R8.1 以用户确认的 23 项视觉/交互问题作为验收基线并已完成：
 
 - 首页“一起度过的第 N 天”；
 - 心情/睡眠统一“编辑”；
@@ -76,6 +76,20 @@ R8.1 发现原 UI 并未按视觉稿彻底验收，因此本轮重新以用户�
 - 体重精确时间、每日均值、周/月/季度/年、年份导航、目标体重；
 - 小信箱标题/主题/筛选/固定等高预览/阅读弹层；
 - 家庭药箱紧凑列表。
+
+R8.1 最终 CI #248：
+
+```text
+Test   ✅
+Lint   ✅
+Build  ✅
+```
+
+PR #47 已 squash 合并 main：
+
+```text
+52aebad2c28560958d055b06522b8b95b82eda39
+```
 
 本轮没有新增冗余数据库字段，详细见 `docs/30-r8-ui-closeout.md`。
 
@@ -142,10 +156,11 @@ https://couple-better-game.vercel.app
 之后又完成并合并了 Worker Pairing：
 
 ```text
-main commit: 7028cd9392b4b99599b02b977bbc0803b351b195
+worker pairing main commit: 7028cd9392b4b99599b02b977bbc0803b351b195
+R8.1 latest main commit:      52aebad2c28560958d055b06522b8b95b82eda39
 ```
 
-该版本增加精确 Sheet 绑定的一次性配对：
+Worker Pairing 增加精确 Sheet 绑定的一次性配对：
 
 - Cat/Fish pairing migration 已应用 Production；
 - 两张 Bridge Sheet 已分别写入高熵一次性配对码；
@@ -153,7 +168,7 @@ main commit: 7028cd9392b4b99599b02b977bbc0803b351b195
 - 配对成功后 code 立即作废，并自动回填 Apps Script Web App URL；
 - 长期 secret 不进入聊天或 Sheet。
 
-**但 `7028cd9...` 尚未部署 Vercel Production。** 用户在开始第二次部署前发现 R8 UI 未闭环，因此 Worker Pairing Production 当前主动暂停。
+**Worker Pairing + R8.1 仍尚未部署新的 Vercel Production。** 当前线上继续保持 R10 Base；下一次部署要把两批一次性统一发布，仍需用户新的明确许可。
 
 ## 7. 微信提醒
 
@@ -191,10 +206,10 @@ Daily / Monthly 全量 JSON 灾备
 ## 9. 当前执行顺序
 
 ```text
-1. R8.1 23 项 UI/交互收口             <- 当前
-2. R8.1 Test / Lint / Build
-3. R8.1 合并 main（不自动部署）
-4. 用户明确许可新的 Production 部署
+1. R8.1 23 项 UI/交互收口             ✅
+2. R8.1 Test / Lint / Build           ✅ CI #248
+3. R8.1 合并 main                     ✅ 52aebad...
+4. 用户明确许可新的 Production 部署     <- 当前唯一阻塞
 5. 将 R8.1 + R10 Worker Pairing 一次性统一部署
 6. 激活 Cat/Fish Apps Script Worker
 7. Harbor 真实读写 / 照片 / watch / fallback / backup 验收
