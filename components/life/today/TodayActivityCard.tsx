@@ -96,7 +96,7 @@ export function TodayActivityCard({ date, day, onChanged, onError, readOnly = fa
 
       <div className="life-activity-scene mb-3 flex min-h-20 items-end justify-between rounded-[var(--life-radius-control)] px-4 pt-3">
         <div className="pb-3 text-xs leading-5 text-[var(--life-text-body)]"><strong className="block text-sm text-[var(--life-text)]">今天一起做了什么？</strong><span>普通的一天，也值得被记住。</span></div>
-        <Image src="/illustrations/life/activity-girls.png" alt="一起生活的两个女孩" width={360} height={240} className="life-activity-girls" />
+        <Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png" alt="一起生活的两个女孩" width={360} height={240} className="life-activity-girls" />
       </div>
 
       {addOpen && !readOnly ? <div className="life-activity-composer mb-3 rounded-[var(--life-radius-control)] border border-[var(--life-border-soft)] bg-[var(--life-surface-soft)] p-3">
