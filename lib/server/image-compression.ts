@@ -40,9 +40,9 @@ export class MealPhotoCompressionError extends Error {
 }
 
 function toBuffer(input: ArrayBuffer | Uint8Array | Buffer) {
-  if (Buffer.isBuffer(input)) return input;
+  if (Buffer.isBuffer(input)) return Buffer.from(input);
   if (input instanceof ArrayBuffer) return Buffer.from(new Uint8Array(input));
-  return Buffer.from(input.buffer, input.byteOffset, input.byteLength);
+  return Buffer.from(input);
 }
 
 export async function compressMealPhoto(
@@ -77,7 +77,8 @@ export async function compressMealPhoto(
     let output = Buffer.alloc(0);
     let usedQuality = MEAL_PHOTO_INITIAL_QUALITY;
     for (const quality of QUALITY_STEPS) {
-      output = await normalized.clone().webp({ quality, effort: 4 }).toBuffer();
+      const encoded = await normalized.clone().webp({ quality, effort: 4 }).toBuffer();
+      output = Buffer.from(encoded);
       usedQuality = quality;
       if (output.length <= MEAL_PHOTO_MAX_OUTPUT_BYTES) break;
     }
