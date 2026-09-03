@@ -2,7 +2,7 @@ import type { FixedLifeIdentity } from "./fixed-life-auth";
 import { executeLifeAgentTool } from "./life-agent-registry";
 import { compressMealPhoto, DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES } from "./image-compression";
 import { downloadDriveMealOriginal } from "./google-drive-service";
-import { getLifeExport, getLifeSettings } from "./life-data-management";
+import { getLifeFullExport, getLifeSettings } from "./life-data-management";
 import { loadHomeSyncSnapshot } from "./supabase-home-sync";
 import {
   claimDriveBridgeCommand,
@@ -133,7 +133,7 @@ export async function executeDriveBridgeBatch(identity: FixedLifeIdentity, value
 
 export async function getDriveBridgeSnapshot(identity: FixedLifeIdentity, includeLegacy = false) {
   const [lifeExport, settings, legacyHome] = await Promise.all([
-    getLifeExport(),
+    getLifeFullExport(),
     getLifeSettings(),
     includeLegacy ? loadHomeSyncSnapshot() : Promise.resolve(null),
   ]);
