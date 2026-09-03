@@ -10,9 +10,10 @@ describe("R8.3 production screenshot hotfix", () => {
   it("makes the together-days sentence readable with a brighter larger number and double-heart SVG", () => {
     const today = source("components/life/TodayLifePage.tsx");
     const css = source("app/r8-3-hotfix.css");
-    expect(today).toContain("function TogetherHearts");
+    expect(today).toContain('className="life-together-heart"');
     expect(today).toContain('<svg viewBox="0 0 28 22"');
     expect(today.match(/<path/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(today.indexOf("一起度过的第")).toBeLessThan(today.indexOf("life-together-heart"));
     expect(css).toContain("font-size: .9rem !important");
     expect(css).toContain("font-size: 1.08rem !important");
     expect(css).toContain("color: #d17f96 !important");
