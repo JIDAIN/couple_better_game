@@ -1,8 +1,8 @@
 # 当前状态与 Roadmap
 
-**状态日期：2026-09-03**
+**状态日期：2026-09-04**
 
-详细视觉规范见 `docs/12-island-life-design-system.md`；R8.1 见 `docs/30-r8-ui-closeout.md`；R8.2 见 `docs/31-r8-2-ui-calibration.md`；R8.3 见 `docs/32-r8-3-visual-polish.md`；R10 Drive Bridge 见 `docs/25-*` 至 `docs/29-*`。
+详细视觉规范见 `docs/12-island-life-design-system.md`；R8.1 见 `docs/30-r8-ui-closeout.md`；R8.2 见 `docs/31-r8-2-ui-calibration.md`；R8.3 见 `docs/32-r8-3-visual-polish.md`；R8.4 见 `docs/33-r8-4-resilient-navigation-and-readiness.md`；R10 Drive Bridge 见 `docs/25-*` 至 `docs/29-*`。
 
 ## 1. 主功能状态
 
@@ -21,11 +21,11 @@ R1-R7  重构与移动端校准                         ✅
 R8     数据管理 + MCP                          ✅
 R8.1   第一轮视觉/交互收口                       ✅ Production
 R8.2   Production 实机视觉二次校准               ✅ Production
-R8.3   信息减法 + 饮食汇总 + 药箱/我的重排         ✅ Production
-R8.3   关系天数 / 活动图标面板 hotfix             ✅ Production
+R8.3   信息减法 + UI hotfix                     ✅ Production
+R8.4   弱网缓存 + 持久导航 + App Shell            ✅ main，待部署许可
 R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
 R10    双 Harbor + Worker Pairing 后端            ✅ Production
-R10    Cat/Fish Apps Script Workers              ⏳ 待一次性人工激活
+R10    Cat/Fish Apps Script Workers              ⏳ 尚未激活
 ```
 
 ## 2. 固定身份与 Harbor
@@ -38,149 +38,49 @@ Harbor Cat  / 团子 -> authoritative actor = cat
 Harbor Fish / 仔仔 -> authoritative actor = fish
 ```
 
-“团子 / 仔仔”只用于会话识别；服务端权限始终绑定 `cat / fish`。
+AI 昵称只用于会话识别；服务端权限始终绑定 `cat / fish`。
 
-## 3. R8.2 / R8.3 UI 收口
+## 3. R8.4 弱网与页面切换
 
-R8.2 解决第一轮 Production 实机差距：
+Production 实机确认原 stale-while-revalidate 仍只有内存缓存，而且 `/api/auth/session` 临时失败会被误判为退出登录；底部导航也在每个页面 Shell 内重复挂载。
 
-- 首页关系行与小型描边操作；
-- 心情 picker 去背景圈/阴影并点选即保存；
-- 活动改为自由文本 + Notion 风格 icon picker；
-- 小窝 SVG 与独立 chevron 布局；
-- 小信箱纸张阅读层级；
-- `/me/data` 接入真实备份/恢复。
+R8.4 已完成：
 
-R8.3 继续按手机实机反馈做信息减法：
+- `stale-query` 增加 cat/fish 身份隔离的 `localStorage` 持久读缓存；
+- `sessionStorage` 只保存当前标签页最近确认的 cat/fish scope；
+- 网络/5xx 失败不再自动变成“退出登录”，服务器明确 unauthenticated 才清身份；
+- 网络恢复后自动重新确认 session 并后台刷新；
+- 今日、月历、饮食、体重、药箱、信箱、设置均可在已有缓存时继续显示旧数据；
+- 底部导航上移至 Root `PersistentLifeChrome`，主 tab 切换时不再反复卸载重建；
+- Root 主动 prefetch 今日 / 饮食 / 日历 / 小窝 / 我的；
+- 新增 `/life-sw.js`，缓存主要页面壳与静态资源；
+- 页面弱网超过约 2.5 秒可回落已缓存 App Shell；
+- Service Worker 明确不缓存 `/api/*`、MCP、OAuth 数据，Supabase 始终是事实源；
+- 写操作仍要求真实网络和服务端权限，不伪装成离线写入。
 
-- 我/Ta 心情卡统一底色，睡眠圆环统一同一颜色和深浅；
-- 删除解释“程序怎么工作”的副标题，保留温暖氛围文字；
-- 饮食新增可复用 `DailyNutritionSummary`，展示当日 kcal、碳水/蛋白质/脂肪克数与热量占比；
-- 日历历史日期复用同一饮食汇总，并正确把历史 `date` 传给饮食页；
-- 已有餐食编辑入口统一为铅笔 SVG；
-- 小信箱用户术语改为“手札 / 明信片”，数据库 `letter / postcard` 不迁移；
-- 药箱按库存、状态、最终失效日优先重新设计；
-- 游戏机删除“开始游戏 →”，改为视觉语言统一 chevron；
-- “我的”昵称改为“小猫 / 小鱼”，删除 CURRENT ACCOUNT、身份映射、写入权限和生活 AI 助手卡；
-- 数据管理删除新版/旧版程序关系、去游戏机和架构长说明，只保留备份、导出、导入、恢复。
-
-2026-09-03 晚间实机 hotfix：
-
-- 首页“一起度过的第 N 天”整体字号放大；
-- `N` 单独放大一档，并改为更亮的暖粉强调色；
-- 句末单爱心改为项目内双爱心 SVG；
-- 活动 icon picker 在手机端固定到导航上方，`z-index` 高于底部导航；
-- icon grid 增加可滚动最大高度，保证 30 个活动图标都可查看；
-- 380px 以下屏幕自动降为 5 列。
-
-Hotfix PR #51：
+PR #52：
 
 ```text
-merge commit: a0ab9f21b268cb770f494bcc68fb36ec075a75b3
-CI #268:
-Test   ✅
+merge commit: 3232f834941431706d70a03deda4077978fe8b62
+CI #274:
+Test   ✅ 207/207
 Lint   ✅
 Build  ✅
 ```
 
-## 4. 数据管理安全模型
+R8.4 尚未部署 Production，因为本轮没有新的 Vercel 部署许可。
 
-完整生活数据管理继续使用 R8/R8.2 的事务模型：
-
-```text
-create backup
-export full JSON
-import full JSON
-restore snapshot
-```
-
-恢复 / 导入要求：
-
-```text
-确认恢复生活数据
-```
-
-底层 `restore_life_backup_snapshot` 会先创建 `pre_restore` 完整保护点，再修改数据。
-
-`import_life_full_data` Production 权限：
-
-```text
-service_role  ✅
-authenticated ❌
-anon          ❌
-```
-
-旧游戏覆盖仍使用独立确认语 `确认覆盖游戏数据`。
-
-## 5. 当前 Production
+## 4. 当前 Production
 
 ```text
 primary domain: https://couple-better-game.vercel.app
 deployment: dpl_B71YH8fSWiQYnckrmDXzzAftc3bz
 status: READY
-hotfix source commit: c384fd048de3d6a1691f6d654730adec6d53e9a9
-hotfix code merge: a0ab9f21b268cb770f494bcc68fb36ec075a75b3
 ```
 
-本次使用一次受控 Git Production 触发：临时开启 `main` deployment，Vercel 创建唯一 Production 后立即恢复 `deploymentEnabled: false`。
+当前线上仍是 R8.3 hotfix；R8.4 只在 main。
 
-Production 验证：
-
-```text
-Build / TypeScript / static generation ✅
-/                                      200
-主域名 alias                            ✅
-最近 20 分钟 runtime errors             0
-本次新增 Production 数量                1
-Git deploymentEnabled                   false
-```
-
-## 6. R10 与微信提醒
-
-双 Harbor 后端与 PushPlus 提醒后端已在 Production：
-
-```text
-Harbor Cat  -> 团子提醒 -> Cat PushPlus token
-Harbor Fish -> 仔仔提醒 -> Fish PushPlus token
-```
-
-默认提醒：
-
-- 每日 21:15：本人当天完全没有生活记录才轻提醒；
-- 纪念日 09:15：提前 7 天 / 1 天 / 当天；
-- delivery ledger 防重复；
-- token 只进入各自 Apps Script Script Properties。
-
-当前剩余外部步骤仍是 Cat/Fish Google Apps Script Worker 的一次性人工创建、授权和发布。Worker 激活后再做 Harbor 真实读写、照片、watch、backup 和 PushPlus 真机验收。
-
-## 7. 数据与备份
-
-```text
-Supabase -> 结构化生活数据事实源
-Drive    -> 餐食原图 + AI Bridge + Daily/Monthly 全量灾备
-浏览器   -> 仅页面缓存
-```
-
-家庭备份始终只有一套，Cat 为 backup leader，Fish 为 follower。
-
-## 8. 当前执行顺序
-
-```text
-1. R8.3 视觉与信息层级修改                  ✅
-2. R8.3 Test / Lint / Build               ✅ CI #263
-3. PR #50 合并 main                       ✅
-4. R8.3 Production 部署                   ✅
-5. 关系天数 / icon picker hotfix           ✅ PR #51 / CI #268
-6. Hotfix Production 部署                 ✅ dpl_B71YH8...
-7. 用户手机实机截图继续视觉验收              <- 当前
-8. 激活 Harbor Cat / Fish Apps Script Workers
-9. Harbor 读写 / 照片 / watch / backup 验收
-10. Cat/Fish PushPlus 真实微信验收
-```
-
-## 9. 部署纪律
-
-`vercel.json` 当前仍为：
+`vercel.json` 保持：
 
 ```json
 {
@@ -189,5 +89,100 @@ Drive    -> 餐食原图 + AI Bridge + Daily/Monthly 全量灾备
   }
 }
 ```
+
+## 5. R10 AI 当前真实状态
+
+代码/协议已经具备：
+
+- Cat/Fish 独立 HMAC 固定身份；
+- canonical `life_query / life_mutate`；
+- 个人数据写权限隔离；
+- 共享药箱 / 设置；
+- `(actor, command_id)` 幂等 ledger；
+- Drive 原图身份目录隔离；
+- 原图 -> 600px WebP -> Supabase Storage；
+- Drive watch + 一分钟 fallback；
+- Cat 单一家庭备份 leader。
+
+但 Production 数据库实况仍为：
+
+```text
+cat  apps_script_url = empty / paired_at = null
+fish apps_script_url = empty / paired_at = null
+life_drive_bridge_commands = 0 条真实命令
+```
+
+因此 Harbor AI **后端设计足够，但目前还不能称为真实可用**。必须先激活并 pair 两个 Apps Script Worker，再做真实读写、照片、watch、fallback 和 backup 验收。
+
+## 6. 微信提醒当前真实状态
+
+Production 已有 Cat/Fish 两份提醒偏好：
+
+```text
+daily reminder      21:15  enabled
+anniversary reminder 09:15 enabled
+offsets             [7,1,0]
+```
+
+后端已有：
+
+- daily no-record 判定；
+- 纪念日提醒；
+- delivery ledger 防重复；
+- claim 超时恢复；
+- PushPlus 失败最多 3 次重试；
+- PushPlus accepted 后 complete 失败时避免重复发送。
+
+但当前：
+
+```text
+life_notification_deliveries = 0
+```
+
+且两个 Apps Script Worker 尚未激活，因此 **微信提醒还没有真正发送过一条测试消息**。
+
+## 7. 达到“日常实用”的最后验收
+
+AI：
+
+```text
+1. 创建并发布 Cat / Fish Apps Script Web App
+2. 分别完成 pairing + setupR10All()
+3. Harbor Cat / Fish 绑定各自 Bridge
+4. 两边真实 query / mutate
+5. 跨身份写入拒绝
+6. 餐食原图完整链路
+7. Drive watch 延迟实测
+8. 1 分钟 fallback 实测
+9. Cat Daily backup 实际生成
+10. 至少一次恢复演练
+```
+
+微信：
+
+```text
+1. 两个 Worker 分别配置本人的 PUSHPLUS_TOKEN
+2. Cat / Fish 各发送一条真实测试消息
+3. 已有当天记录时不发送 daily reminder
+4. 同 dedupe key 不重复发送
+5. 模拟一次失败后重试成功
+```
+
+这些验收通过后，当前架构对两个人的私人日常使用已经足够，不需要再增加数据库、消息队列或额外付费基础设施。长期最可能的容量瓶颈是 Google Drive 原始照片空间。
+
+## 8. 当前执行顺序
+
+```text
+1. R8.4 刷新 / 弱网修复                      ✅
+2. R8.4 Test / Lint / Build                  ✅ CI #274
+3. PR #52 合并 main                           ✅ 3232f834...
+4. 等新许可后部署 R8.4 Production             <- 当前部署边界
+5. 激活 Harbor Cat / Fish Apps Script Workers
+6. Harbor 读写 / 照片 / watch / fallback 验收
+7. Cat backup / restore 验收
+8. Cat/Fish PushPlus 真实微信验收
+```
+
+## 9. 部署纪律
 
 **任何后续 Vercel Preview 或 Production deployment 都必须逐次获得用户明确许可。**
