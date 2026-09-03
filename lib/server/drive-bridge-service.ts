@@ -125,8 +125,21 @@ export async function executeDriveBridgeBatch(identity: FixedLifeIdentity, value
   const commands = Array.isArray(body.commands) ? body.commands.slice(0, 25) : [];
   if (commands.length === 0) throw new Error("commands 不能为空");
   const receipts = [];
-  for (const command of commands) {
-    receipts.push(await executeDriveBridgeCommand(identity, command));
+  for (const input of commands) {
+    try {
+      receipts.push(await executeDriveBridgeCommand(identity, input));
+    } catch (error) {
+      const row = asRecord(input);
+      receipts.push({
+        commandId: stringValue(row.commandId),
+        ok: false as const,
+        receivedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        tool: stringValue(row.tool),
+        error: error instanceof Error ? error.message : "Drive Bridge 命令格式不正确",
+        originalDriveFileId: stringValue(row.originalDriveFileId) || null,
+      });
+    }
   }
   return receipts;
 }
