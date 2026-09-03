@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
@@ -85,11 +84,10 @@ function MealNutrition({ meal }: { meal?: MealRecord }) {
   return <div className="grid gap-2"><AppNutritionBar label="碳水" value={!meal || !totals.hasCarbs ? null : Number(totals.carbs.toFixed(1))} unit="g" max={100} /><AppNutritionBar label="蛋白质" value={!meal || !totals.hasProtein ? null : Number(totals.protein.toFixed(1))} unit="g" max={60} /><AppNutritionBar label="脂肪" value={!meal || !totals.hasFat ? null : Number(totals.fat.toFixed(1))} unit="g" max={50} /><div className="flex items-baseline justify-between border-t border-[var(--life-border-soft)] pt-2"><span className="text-xs font-bold text-[var(--life-text-body)]">总热量</span><span className="text-base font-extrabold tabular-nums text-[var(--life-text)]">{meal?.totalCaloriesKcal == null ? "未估算" : `${meal.totalCaloriesKcal} kcal`}</span></div></div>;
 }
 
-export function LifeFoodPage() {
-  const params = useSearchParams();
+export function LifeFoodPage({ initialDate }: { initialDate?: string }) {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [role, setRole] = useState<AppRoleSwitchValue>("me");
-  const [date, setDate] = useState(() => params.get("date") || localIsoDate());
+  const [date, setDate] = useState(() => initialDate || localIsoDate());
   const [snackChooserOpen, setSnackChooserOpen] = useState(false);
   const partnerKey = (role === "me" ? mePartnerKey : taPartnerKey) as NutritionPartnerKey | null;
   const canEdit = role === "me";
