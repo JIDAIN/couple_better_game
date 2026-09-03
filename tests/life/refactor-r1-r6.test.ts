@@ -17,7 +17,7 @@ describe("R1-R6 refactor boundaries", () => {
   it("only offers own mood and sleep editing", () => {
     const mood = source("components/life/today/TodayMoodCard.tsx");
     const sleep = source("components/life/today/TodaySleepCard.tsx");
-    expect(mood).toContain("记录我的");
+    expect(mood).toContain('myMood ? "编辑" : "+ 记录"');
     expect(mood).toContain("mePartnerKey");
     expect(mood).not.toContain("MoodEditor label=\"Ta\"");
     expect(sleep).toContain("saveMine");
@@ -31,7 +31,7 @@ describe("R1-R6 refactor boundaries", () => {
     expect(food).toContain("SNACK_OPTIONS");
     expect(food).toContain("+ 新增加餐");
     expect(editor).not.toContain("AppRoleSwitch");
-    expect(editor).toContain("餐次由入口决定");
+    expect(editor).toContain("记录这一餐的时间、照片和食物");
   });
 
   it("enforces meal ownership server-side", () => {
@@ -57,8 +57,9 @@ describe("R1-R6 refactor boundaries", () => {
     expect(source("app/api/life/mailbox/[id]/route.ts")).toContain("getMailboxSender");
   });
 
-  it("loads the unified R6 visual adapter and keeps Vercel git deploy disabled", () => {
+  it("loads the unified visual adapters and keeps Vercel git deploy disabled", () => {
     expect(source("app/layout.tsx")).toContain("island-life-refactor.css");
+    expect(source("app/layout.tsx")).toContain("r8-ui-closeout.css");
     const vercel = JSON.parse(source("vercel.json")) as { git?: { deploymentEnabled?: boolean } };
     expect(vercel.git?.deploymentEnabled).toBe(false);
   });
