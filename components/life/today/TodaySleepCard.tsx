@@ -72,9 +72,9 @@ export function TodaySleepCard({
           <p className="mt-0.5 text-xs text-[var(--life-text-muted)]">8 小时为满环，时长一眼就能看见。</p>
         </div>
         {!readOnly ? (
-          <AppButton variant="ghost" className="life-home-action-pill" onClick={() => setEditing((value) => !value)}>
+          <button type="button" className="life-card-action" onClick={() => setEditing((value) => !value)}>
             {editing ? "收起" : mySleep ? "编辑" : "+ 记录"}
-          </AppButton>
+          </button>
         ) : null}
       </div>
 
