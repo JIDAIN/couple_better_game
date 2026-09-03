@@ -1,5 +1,4 @@
 const R10 = Object.freeze({
-  SHEET_ID: '1inEL4mXOQ2-w5UrkqtLoK6aU2o-4auCQSLlEGuA3cVo',
   PROGRAM_URL: 'https://couple-better-game.vercel.app',
   DAILY_BACKUP_FOLDER_ID: '1DmBM6Pfo7fUlhXnOpDwr8eingWiJCkpK',
   MONTHLY_BACKUP_FOLDER_ID: '1qU5floe7ORg-KbfAPR9h55TmijgSfjGP',
@@ -12,10 +11,24 @@ function r10Props_() {
   return PropertiesService.getScriptProperties();
 }
 
-function r10Secret_(name) {
+function r10Required_(name) {
   const value = r10Props_().getProperty(name);
   if (!value) throw new Error('Missing Script Property: ' + name);
   return value;
+}
+
+function r10BridgeId_() {
+  const value = r10Required_('BRIDGE_ID');
+  if (value !== 'cat' && value !== 'fish') throw new Error('BRIDGE_ID must be cat or fish');
+  return value;
+}
+
+function r10SheetId_() {
+  return r10Required_('SHEET_ID');
+}
+
+function r10IsBackupLeader_() {
+  return (r10Props_().getProperty('BACKUP_LEADER') || '').toLowerCase() === 'true';
 }
 
 function r10Uuid_() {
@@ -32,7 +45,7 @@ function r10Hex_(bytes) {
 function r10Sign_(rawBody) {
   const timestamp = String(Math.floor(Date.now() / 1000));
   const digest = r10Hex_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, rawBody, Utilities.Charset.UTF_8));
-  const mac = Utilities.computeHmacSha256Signature(timestamp + '.' + digest, r10Secret_('BRIDGE_SECRET'), Utilities.Charset.UTF_8);
+  const mac = Utilities.computeHmacSha256Signature(timestamp + '.' + digest, r10Required_('BRIDGE_SECRET'), Utilities.Charset.UTF_8);
   const signature = Utilities.base64EncodeWebSafe(mac).replace(/=+$/, '');
   return { timestamp: timestamp, signature: signature };
 }
@@ -46,6 +59,7 @@ function r10Post_(path, payload) {
     payload: rawBody,
     muteHttpExceptions: true,
     headers: {
+      'x-life-bridge-id': r10BridgeId_(),
       'x-life-bridge-timestamp': signed.timestamp,
       'x-life-bridge-signature': signed.signature,
     },
@@ -60,7 +74,7 @@ function r10Post_(path, payload) {
 }
 
 function r10Sheet_(name) {
-  const sheet = SpreadsheetApp.openById(R10.SHEET_ID).getSheetByName(name);
+  const sheet = SpreadsheetApp.openById(r10SheetId_()).getSheetByName(name);
   if (!sheet) throw new Error('Missing sheet: ' + name);
   return sheet;
 }
@@ -83,6 +97,12 @@ function r10WriteMeta_(key, value) {
     }
   }
   sheet.appendRow([key, value]);
+}
+
+function r10AssertSnapshotIdentity_(snapshot) {
+  const actual = snapshot && snapshot.identity ? snapshot.identity.me : '';
+  const expected = r10BridgeId_();
+  if (actual !== expected) throw new Error('Bridge identity mismatch: expected ' + expected + ', got ' + actual);
 }
 
 function r10ParseArgs_(value) {
@@ -129,16 +149,22 @@ function processPendingCommands() {
       if ((row[header.map.status] || '').toLowerCase() !== 'pending') continue;
       const commandId = row[header.map.command_id] || '';
       if (!commandId) continue;
-      pending.push({
-        rowNumber: i + 1,
-        command: {
-          commandId: commandId,
-          tool: row[header.map.tool] || '',
-          args: r10ParseArgs_(row[header.map.args_json] || '{}'),
-          userText: row[header.map.user_text] || '',
-          originalDriveFileId: header.map.original_drive_file_id == null ? null : (row[header.map.original_drive_file_id] || null),
-        },
-      });
+      try {
+        pending.push({
+          rowNumber: i + 1,
+          command: {
+            commandId: commandId,
+            tool: row[header.map.tool] || '',
+            args: r10ParseArgs_(row[header.map.args_json] || '{}'),
+            userText: row[header.map.user_text] || '',
+            originalDriveFileId: header.map.original_drive_file_id == null ? null : (row[header.map.original_drive_file_id] || null),
+          },
+        });
+      } catch (error) {
+        const errorColumn = header.map.error == null ? null : header.map.error + 1;
+        sheet.getRange(i + 1, header.map.status + 1).setValue('failed');
+        if (errorColumn) sheet.getRange(i + 1, errorColumn).setValue(String(error && error.message ? error.message : error));
+      }
     }
     if (!pending.length) return { ok: true, processed: 0 };
 
@@ -199,6 +225,7 @@ function r10FlattenSettings_(settings) {
 function refreshSnapshot() {
   const response = r10Post_('/api/drive-bridge/snapshot', { includeLegacy: false });
   const snapshot = response.snapshot || {};
+  r10AssertSnapshotIdentity_(snapshot);
   const user = snapshot.lifeExport && snapshot.lifeExport.user ? snapshot.lifeExport.user : {};
   r10ReplaceObjects_('STATE_MOOD', user.mood_entries || []);
   r10ReplaceObjects_('STATE_SLEEP', user.sleep_records || []);
@@ -223,8 +250,10 @@ function r10UpsertJsonFile_(folderId, name, data) {
 }
 
 function createDailyBackup() {
+  if (!r10IsBackupLeader_()) return { ok: true, skipped: 'not_backup_leader' };
   const response = r10Post_('/api/drive-bridge/snapshot', { includeLegacy: true });
   const snapshot = response.snapshot || {};
+  r10AssertSnapshotIdentity_(snapshot);
   const now = new Date();
   const day = Utilities.formatDate(now, 'Asia/Shanghai', 'yyyy-MM-dd');
   const month = Utilities.formatDate(now, 'Asia/Shanghai', 'yyyy-MM');
@@ -233,7 +262,7 @@ function createDailyBackup() {
     r10UpsertJsonFile_(R10.MONTHLY_BACKUP_FOLDER_ID, month + '.json', snapshot);
   }
   r10WriteMeta_('last_backup_at', new Date().toISOString());
-  return { ok: true, day: day };
+  return { ok: true, day: day, bridgeId: r10BridgeId_() };
 }
 
 function renewDriveWatch() {
@@ -255,10 +284,10 @@ function renewDriveWatch() {
     } catch (error) {}
   }
 
-  const channelId = r10Uuid_();
+  const channelId = r10BridgeId_() + '-' + r10Uuid_();
   const expiration = Date.now() + R10.WATCH_TTL_MS;
   const response = UrlFetchApp.fetch(
-    'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(R10.SHEET_ID) + '/watch?supportsAllDrives=true',
+    'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(r10SheetId_()) + '/watch?supportsAllDrives=true',
     {
       method: 'post',
       contentType: 'application/json',
@@ -266,7 +295,7 @@ function renewDriveWatch() {
         id: channelId,
         type: 'web_hook',
         address: R10.PROGRAM_URL + '/api/drive-bridge/watch',
-        token: r10Secret_('WATCH_TOKEN'),
+        token: r10Required_('WATCH_TOKEN'),
         expiration: expiration,
       }),
       muteHttpExceptions: true,
@@ -283,7 +312,7 @@ function renewDriveWatch() {
     WATCH_EXPIRES_AT: String(Number(data.expiration || expiration)),
   });
   r10WriteMeta_('last_watch_renewed_at', new Date().toISOString());
-  return { ok: true, expiration: Number(data.expiration || expiration) };
+  return { ok: true, bridgeId: r10BridgeId_(), expiration: Number(data.expiration || expiration) };
 }
 
 function setupR10Triggers() {
@@ -293,17 +322,17 @@ function setupR10Triggers() {
   });
   ScriptApp.newTrigger('processPendingCommands').timeBased().everyMinutes(1).create();
   ScriptApp.newTrigger('renewDriveWatch').timeBased().everyHours(6).create();
-  ScriptApp.newTrigger('createDailyBackup').timeBased().atHour(4).everyDays(1).create();
+  if (r10IsBackupLeader_()) ScriptApp.newTrigger('createDailyBackup').timeBased().atHour(4).everyDays(1).create();
   refreshSnapshot();
-  createDailyBackup();
+  if (r10IsBackupLeader_()) createDailyBackup();
   renewDriveWatch();
-  return { ok: true };
+  return { ok: true, bridgeId: r10BridgeId_(), backupLeader: r10IsBackupLeader_() };
 }
 
 function doPost(e) {
   let body = {};
   try { body = JSON.parse(e && e.postData ? e.postData.contents : '{}'); } catch (error) {}
-  if (!body || body.secret !== r10Secret_('WAKE_SECRET')) {
+  if (!body || body.secret !== r10Required_('WAKE_SECRET') || body.bridgeId !== r10BridgeId_()) {
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'unauthorized' })).setMimeType(ContentService.MimeType.JSON);
   }
   let result;
