@@ -1,0 +1,66 @@
+/* R8.2 mailbox polish for the existing mailbox DOM. */
+.life-toolbar:has(.life-mailbox-format-filter) {
+  border: 1px solid var(--life-border-soft) !important;
+  border-radius: 18px !important;
+  background: rgb(255 255 255 / .42) !important;
+  padding: .78rem !important;
+  box-shadow: none !important;
+}
+.life-toolbar:has(.life-mailbox-format-filter) > div:first-child > div:first-child {
+  border-radius: 14px !important;
+  background: var(--life-surface-soft) !important;
+  padding: .2rem !important;
+}
+.life-toolbar:has(.life-mailbox-format-filter) > div:first-child > div:first-child button {
+  border-radius: 11px !important;
+  padding-block: .48rem !important;
+  font-size: .67rem !important;
+  box-shadow: none !important;
+}
+.life-toolbar:has(.life-mailbox-format-filter) > div:first-child > button {
+  border-radius: 12px !important;
+  padding: .55rem .82rem !important;
+  font-size: .67rem !important;
+  box-shadow: none !important;
+}
+.life-mailbox-format-filter {
+  border-radius: 13px !important;
+  background: var(--life-surface-soft) !important;
+  padding: .18rem !important;
+}
+.life-mailbox-format-filter button { border-radius: 10px !important; padding-block: .44rem !important; box-shadow: none !important; }
+.life-mailbox-filter { border-top: 1px solid var(--life-border-soft); padding-top: .65rem; }
+.life-mailbox-month-select { border-radius: 12px !important; background: rgb(255 255 255 / .55) !important; padding-block: .5rem !important; font-size: .66rem !important; box-shadow: none !important; }
+.life-letter-preview-main > div:first-child > p { color: #887f71 !important; font-size: .58rem !important; font-weight: 760 !important; letter-spacing: .02em; }
+.life-letter-preview.is-letter .life-letter-preview-main h2 {
+  margin-top: .7rem !important;
+  color: #4f4b43 !important;
+  font-family: ui-serif, "Songti SC", "STSong", serif !important;
+  font-size: .92rem !important;
+  font-weight: 820 !important;
+  letter-spacing: .025em;
+  line-height: 1.45 !important;
+}
+.life-letter-preview.is-letter .life-letter-preview-main h2 + p {
+  margin-top: .36rem !important;
+  color: #666056 !important;
+  font-family: ui-serif, "Songti SC", "STSong", serif !important;
+  font-size: .68rem !important;
+  line-height: 1.65 !important;
+}
+.life-letter-preview.is-postcard .life-letter-preview-main > p { margin-top: .7rem !important; color: #9d927f !important; font-size: .54rem !important; font-weight: 800 !important; letter-spacing: .18em !important; }
+.life-letter-preview.is-postcard .life-letter-preview-main h2 {
+  margin-top: .28rem !important;
+  color: #4f4b43 !important;
+  font-family: ui-serif, "Songti SC", "STSong", serif !important;
+  font-size: .86rem !important;
+  font-weight: 760 !important;
+  line-height: 1.55 !important;
+}
+.life-letter-reader > p.whitespace-pre-wrap {
+  font-family: ui-serif, "Songti SC", "STSong", serif !important;
+  font-size: .82rem !important;
+  line-height: 2 !important;
+  letter-spacing: .025em;
+}
+@media (max-width: 380px) { .life-letter-preview { height: 8.7rem !important; } }

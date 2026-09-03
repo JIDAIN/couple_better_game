@@ -6,6 +6,8 @@ import "./globals.css";
 import "./island-life-tokens.css";
 import "./island-life-refactor.css";
 import "./r8-ui-closeout.css";
+import "./r8-2-ui-calibration.css";
+import "./r8-2-mailbox.css";
 
 export const metadata: Metadata = {
   applicationName: "岛屿生活",

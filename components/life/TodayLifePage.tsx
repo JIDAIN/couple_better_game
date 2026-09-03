@@ -70,8 +70,12 @@ export function TodayLifePage() {
     <AppPageShell
       title={dayHeading(date)}
       subtitle={(
-        <div className="grid gap-0.5">
-          {togetherDay ? <span className="life-together-days">♡ 一起度过的第 {togetherDay} 天</span> : null}
+        <div className="life-today-subtitle grid gap-1">
+          {togetherDay ? (
+            <span className="life-together-days">
+              一起度过的第 <strong>{togetherDay}</strong> 天 <span className="life-together-heart" aria-hidden>♡</span>
+            </span>
+          ) : null}
           <span>把普通日子里的小事，轻轻收好。</span>
         </div>
       )}

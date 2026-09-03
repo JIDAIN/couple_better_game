@@ -3,6 +3,18 @@ const DEFAULT_SPACE_SLUG = "couple-better-game";
 
 type RpcErrorBody = { message?: string };
 
+export type LifeBackupScope = "user" | "config" | "full";
+export type LifeBackupReason = "manual" | "scheduled" | "pre_restore" | "import";
+export type LifeBackupSnapshot = {
+  id: string;
+  scope: LifeBackupScope;
+  reason: LifeBackupReason;
+  schemaVersion: number;
+  rowCounts: Record<string, number>;
+  createdBy: "cat" | "fish" | null;
+  createdAt: string;
+};
+
 export class LifeDataManagementError extends Error {
   constructor(message: string) {
     super(message);
@@ -74,6 +86,37 @@ export function getLifeExport() {
 
 export function getLifeFullExport() {
   return callRpc<Record<string, unknown>>("get_life_full_export", {
+    p_space_slug: coupleSpaceSlug(),
+  });
+}
+
+export function listLifeBackupSnapshots() {
+  return callRpc<LifeBackupSnapshot[]>("list_life_backup_snapshots", {
+    p_space_slug: coupleSpaceSlug(),
+  });
+}
+
+export function createLifeBackupSnapshot(actor: "cat" | "fish", scope: LifeBackupScope = "full") {
+  return callRpc<LifeBackupSnapshot>("create_life_backup_snapshot", {
+    p_scope: scope,
+    p_reason: "manual",
+    p_created_by: actor,
+    p_space_slug: coupleSpaceSlug(),
+  });
+}
+
+export function restoreLifeBackupSnapshot(snapshotId: string, actor: "cat" | "fish") {
+  return callRpc<Record<string, unknown>>("restore_life_backup_snapshot", {
+    p_snapshot_id: snapshotId,
+    p_created_by: actor,
+    p_space_slug: coupleSpaceSlug(),
+  });
+}
+
+export function importLifeFullData(payload: Record<string, unknown>, actor: "cat" | "fish") {
+  return callRpc<Record<string, unknown>>("import_life_full_data", {
+    p_payload: payload,
+    p_created_by: actor,
     p_space_slug: coupleSpaceSlug(),
   });
 }

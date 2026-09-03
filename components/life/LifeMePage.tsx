@@ -65,11 +65,14 @@ export function LifeMePage() {
             </div>
           </section>
 
-          <section className="life-surface life-section-card mt-3">
-            <h2 className="text-sm font-extrabold">数据管理</h2>
-            <p className="mt-2 text-xs leading-5 text-[var(--life-text-muted)]">新版生活数据由各领域 API 写入云端。旧“变美变瘦大作战”的 JSON 备份与恢复能力仍留在旧游戏本身，不在“我的”重复再做一套。</p>
-            <Link href="/nest/game-machine" className="mt-3 inline-flex rounded-full bg-[var(--life-surface-soft)] px-4 py-2.5 text-xs font-extrabold text-[var(--life-teal-strong)]">去游戏机</Link>
-          </section>
+          <Link href="/me/data" className="life-surface mt-3 flex items-center gap-3 rounded-[var(--life-radius-card)] p-4">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[15px] bg-[var(--life-surface-soft)] text-lg text-[var(--life-teal-strong)]" aria-hidden>🛟</div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-extrabold text-[var(--life-text)]">数据管理</p>
+              <p className="mt-1 text-[10px] leading-4 text-[var(--life-text-muted)]">创建恢复点、导出完整 JSON、导入备份，或恢复到以前的生活数据。</p>
+            </div>
+            <span className="text-lg font-bold text-[var(--life-teal-strong)]" aria-hidden>›</span>
+          </Link>
 
           <button type="button" onClick={() => void logout()} className="mt-4 w-full rounded-full border border-[color:color-mix(in_srgb,var(--life-coral)_35%,var(--life-border-soft))] bg-white/70 px-4 py-3 text-sm font-extrabold text-[var(--life-danger)]">退出当前账号</button>
         </>
