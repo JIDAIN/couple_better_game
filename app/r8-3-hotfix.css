@@ -1,0 +1,76 @@
+/* Production hotfix based on 2026-09-03 mobile screenshots. */
+
+/* Relationship line: readable sentence, brighter day number, visual-language double hearts. */
+.life-together-days {
+  gap: .2rem !important;
+  color: #6f7975 !important;
+  font-size: .9rem !important;
+  font-weight: 760 !important;
+  line-height: 1.5 !important;
+}
+.life-together-days strong {
+  color: #d17f96 !important;
+  font-size: 1.08rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .01em;
+  line-height: 1;
+}
+.life-together-heart {
+  display: inline-flex;
+  width: 1.45rem;
+  height: 1.15rem;
+  margin-left: .08rem !important;
+  align-items: center;
+  justify-content: center;
+  color: #d78ca0 !important;
+  transform: translateY(.08rem) !important;
+}
+.life-together-heart svg { width: 100%; height: 100%; overflow: visible; }
+.life-together-heart svg path:first-child { fill: rgb(215 140 160 / .18); stroke: currentColor; stroke-width: 1.45; }
+.life-together-heart svg path:last-child { fill: rgb(215 140 160 / .38); stroke: currentColor; stroke-width: 1.25; }
+
+/* The icon panel must stay above bottom navigation and expose every icon. */
+.life-activity-icon-popover {
+  z-index: 70 !important;
+  overflow: visible !important;
+}
+.life-activity-icon-grid {
+  max-height: min(19rem, 48vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: .12rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--life-border) transparent;
+}
+.life-activity-icon-grid::-webkit-scrollbar { width: 4px; }
+.life-activity-icon-grid::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--life-border); }
+
+@media (max-width: 640px) {
+  .life-activity-icon-popover {
+    position: fixed !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: calc(4.9rem + env(safe-area-inset-bottom)) !important;
+    left: 50% !important;
+    width: min(22rem, calc(100vw - 1.5rem)) !important;
+    max-height: min(28rem, calc(100dvh - 8.5rem));
+    transform: translateX(-50%);
+    overflow: hidden !important;
+    border-radius: 19px !important;
+    box-shadow: 0 16px 42px rgb(48 67 60 / .2) !important;
+  }
+  .life-activity-icon-grid {
+    max-height: min(21rem, calc(100dvh - 13rem));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding-bottom: .2rem;
+  }
+  .life-activity-icon-grid button { min-height: 2.55rem; }
+}
+
+@media (max-width: 380px) {
+  .life-together-days { font-size: .84rem !important; }
+  .life-together-days strong { font-size: 1.02rem !important; }
+  .life-together-heart { width: 1.35rem; height: 1.05rem; }
+  .life-activity-icon-popover { width: calc(100vw - 1rem) !important; }
+  .life-activity-icon-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
