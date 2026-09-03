@@ -1,68 +1,94 @@
-# R10：ChatGPT Project × Google Drive 双向桥与灾备
+# R10：Harbor Cat / Harbor Fish × Google Drive 双向桥与灾备
 
-## 1. 目标
+## 1. 最终目标
 
-R10 的唯一主目标是：不升级 ChatGPT 套餐，在一个固定 ChatGPT Project 中，任意新聊天窗口都能通过已经连接的 Google Drive / Google Sheets App 读取并修改 Couple Better Game。
-
-R10 不把 Google Sheets 当数据库。事实源仍然是 Supabase；Sheet 只是 ChatGPT 可读写的命令总线与只读状态镜像。
+R10 的正式入口不是程序内 `/ai`，而是两个 ChatGPT Project：
 
 ```text
-ChatGPT Project（固定身份：cat）
-        ↓ Google Drive / Sheets App
-Couple Better Game AI Bridge Sheet
-        ↓
-Apps Script Worker
-        ↓ HMAC
-Vercel /api/drive-bridge/*
-        ↓
-life_query / life_mutate
-        ↓
-Supabase Database + Storage
+Harbor Cat  -> 固定身份 cat
+Harbor Fish -> 固定身份 fish
 ```
 
-R9 的程序内 `/ai` 与 R8 `/mcp` 保留为备用入口，但不再是个人 Plus 方案的主路径。
+两个 Project 访问的是**同一个 Couple Better Game、同一个 Supabase、同一个共同生活空间**。它们不是两个岛，也不是两份数据库，只是两个身份固定的 AI 港口。
 
-## 2. 可行性结论
+```text
+Harbor Cat                         Harbor Fish
+   |                                  |
+Cat Bridge Sheet                 Fish Bridge Sheet
+   |                                  |
+Cat Apps Script                  Fish Apps Script
+   |                                  |
+   +------------- Vercel -------------+
+                    |
+          life_query / life_mutate
+                    |
+          Supabase Database/Storage
+                    |
+            one shared life space
+```
 
-### 2.1 已验证可行
+R9 `/ai` 与 R8 `/mcp` 保留为备用能力层；R10 复用 R9 的 canonical tool registry 和权限规则。
 
-- 当前 ChatGPT 账号已经连接 Google Drive，并具备 Google Sheets 的读取与写入动作；
-- Google Sheet 可以作为追加式 `COMMANDS` 总线；
-- Google Drive API 支持文件变化 push notification；
-- Google Apps Script 支持 1 分钟时间触发器，可作为 webhook 丢失时的兜底；
-- Apps Script 可以调用 Vercel HTTPS API；
-- Vercel 可以复用 R9 的 `life_query / life_mutate`，无需复制业务规则；
-- 原图可以先进入 Drive，再由 Vercel 通过 Drive API 下载并使用现有 Sharp 压缩器生成程序展示图；
-- Supabase 完整 V2 export 可作为 Drive 每日/每月 JSON 备份源。
+## 2. 数据管理原则
 
-### 2.2 仍需生产端验收
+永久遵守以下优先级：
 
-以下项目只有在 R10 Production 激活后才能真实验证：
+```text
+Supabase Database = 唯一结构化事实源
+Supabase Storage  = 程序展示用压缩照片
+Google Drive      = ChatGPT Bridge + 原图档案 + 灾备
+Google Sheets     = 命令总线 + 可重建状态镜像
+GitHub            = 代码 / migration / 文档 / 测试
+```
 
-1. ChatGPT Project 新建多个聊天时是否稳定继承 Google Drive App 调用习惯；
-2. ChatGPT 是否能按 Project Instructions 正确追加 `COMMANDS`，而不是直接改 `STATE_*`；
-3. Drive push notification 的实际到达延迟；
-4. Apps Script Web App、Drive watch 与 Vercel webhook 的真实互通；
-5. Service Account 对 `Originals/Meals` 的只读下载；
-6. 一张真实手机原图从 Drive → 600px WebP → Supabase Storage → 程序显示的完整链路。
+禁止把 `STATE_*`、Drive backup 或 GitHub 当成第二数据库。
 
-因此 R10 在部署前只能标记为“代码/架构可行”，不能标记为“Production 已验证”。
+## 3. 双 Project 身份模型
 
-## 3. 已创建 Google Drive 结构
+### Harbor Cat
 
-根目录：`Couple Better Game`
+```text
+我 = cat
+Ta = fish
+bridge_id = cat
+```
+
+### Harbor Fish
+
+```text
+我 = fish
+Ta = cat
+bridge_id = fish
+```
+
+身份不允许由模型、COMMANDS 的 payload 或用户文字自行切换。
+
+Apps Script 每个实例持有自己的 `BRIDGE_ID` 和 `BRIDGE_SECRET`；请求带：
+
+```text
+x-life-bridge-id
+x-life-bridge-timestamp
+x-life-bridge-signature
+```
+
+Vercel 根据 `x-life-bridge-id` 选择对应 secret，验证 HMAC 后才创建固定 `FixedLifeIdentity`。
+
+因此 Cat secret 无法签成 Fish；Fish secret 也无法签成 Cat。
+
+## 4. Google Drive 正式目录
 
 ```text
 Couple Better Game/
 ├─ AI-Bridge/
-│  ├─ Couple Better Game AI Bridge（Google Sheet）
-│  ├─ Archive/
-│  ├─ Scripts/
-│  ├─ Temp/
-│  ├─ Snapshots/
-│  └─ Logs/
+│  ├─ Cat/
+│  │  └─ Couple Better Game AI Bridge - Cat
+│  ├─ Fish/
+│  │  └─ Couple Better Game AI Bridge - Fish
+│  └─ Archive / Scripts / Temp / Snapshots / Logs
 ├─ Originals/
 │  └─ Meals/
+│     ├─ Cat/
+│     └─ Fish/
 ├─ Backups/
 │  ├─ Daily/
 │  ├─ Monthly/
@@ -70,74 +96,119 @@ Couple Better Game/
 │  ├─ Recovery/
 │  └─ Exports/
 └─ Trash/
-   ├─ Photos/
-   └─ Data/
 ```
 
-Bridge Sheet：
+### 已创建资源
 
-- ID：`1inEL4mXOQ2-w5UrkqtLoK6aU2o-4auCQSLlEGuA3cVo`
-- URL：`https://docs.google.com/spreadsheets/d/1inEL4mXOQ2-w5UrkqtLoK6aU2o-4auCQSLlEGuA3cVo/edit`
-- 时区：`Asia/Shanghai`
-
-关键文件夹：
-
-- Drive root：`11X4-Ge20uRm4z7ioALs2Kz6BTQNv25J8`
-- AI-Bridge：`1tzEsJIKTHIYp4yh_5M8Iu7fjDAQJUvHu`
-- Originals：`1RkOV-9ospJge9d7yu141yC1844I2Ig5C`
-- Originals/Meals：`1nyDWkdE67xPgCSee4WC937PLxO2wuGcg`
-- Backups/Daily：`1DmBM6Pfo7fUlhXnOpDwr8eingWiJCkpK`
-- Backups/Monthly：`1qU5floe7ORg-KbfAPR9h55TmijgSfjGP`
-- Trash：`1EvWd3za_9m25yOhgDDwSp-q8ukM33lgV`
-
-这些 ID 不是密码；真正的 HMAC secret、Service Account private key 不进入 GitHub。
-
-## 4. Bridge Sheet 设计
-
-### 4.1 控制页
-
-- `README`：AI 与人工都可读的操作规则；
-- `META`：schema version、绑定身份、同步时间、备份时间、watch 状态；
-- `COMMANDS`：ChatGPT 只能在这里追加写命令；
-- `RECEIPTS`：程序执行后的回执；
-- `ASSETS`：Drive 原图和程序记录的映射辅助表。
-
-### 4.2 状态镜像
-
-- `STATE_MOOD`
-- `STATE_SLEEP`
-- `STATE_ACTIVITY`
-- `STATE_MEALS`
-- `STATE_MEAL_ITEMS`
-- `STATE_WEIGHT`
-- `STATE_MEDICINE`
-- `STATE_MAILBOX`
-- `STATE_SETTINGS`
-- `STATE_PARTNERS`
-- `STATE_LEGACY`
-
-`STATE_*` 是 Supabase 快照，不是事实源，ChatGPT 不得直接修改这些 Sheet 来假装程序数据已经改变。
-
-## 5. 身份模型
-
-当前 R10 Bridge 固定绑定：
+Cat Bridge Sheet：
 
 ```text
-LIFE_DRIVE_BRIDGE_ACTOR=cat
+1inEL4mXOQ2-w5UrkqtLoK6aU2o-4auCQSLlEGuA3cVo
 ```
 
-因此：
+Fish Bridge Sheet：
 
 ```text
-ChatGPT Project 中的“我” = cat
-Ta = fish
+1OsRnN8vC6yDetxaymVmafMEwTADashyjm9BsHqwDobs
 ```
 
-Apps Script 发来的命令不能携带一个可被信任的 `actor` 来切换身份。Vercel 根据环境变量固定生成 `FixedLifeIdentity`，继续复用 R9 的权限规则。
+AI-Bridge/Cat：
 
-如果未来 fish 也要使用独立 ChatGPT Project，应复制一套 Bridge，并把另一套 Production Bridge 固定绑定 fish，而不是在同一张 Sheet 中允许 AI 自选身份。
+```text
+1PGvX4N2nUeUtBFpC6oFTq22qxkrmU8Fd
+```
 
-## 6. COMMANDS 协议
+AI-Bridge/Fish：
+
+```text
+1sfOcySr_4VBte4PHz21B3Thg3FaBQzgx
+```
+
+Originals/Meals/Cat：
+
+```text
+1w3gPsOT64O9YZwmdFidboc0-MD2geAc4
+```
+
+Originals/Meals/Fish：
+
+```text
+1UOHJeodhzdtXhUWIqpOEzwoehseglHst
+```
+
+Daily/Monthly backup 仍然各只有一套，不按用户复制。
+
+## 5. 两张 Bridge Sheet
+
+两张 Sheet 结构一致：
+
+```text
+README
+META
+COMMANDS
+RECEIPTS
+STATE_MOOD
+STATE_SLEEP
+STATE_ACTIVITY
+STATE_MEALS
+STATE_MEAL_ITEMS
+STATE_WEIGHT
+STATE_MEDICINE
+STATE_MAILBOX
+STATE_SETTINGS
+STATE_PARTNERS
+STATE_LEGACY
+ASSETS
+```
+
+区别只有固定身份、Project 名、原图目录和独立凭证。
+
+`META.schema_version`：
+
+```text
+r10-v2
+```
+
+Cat：
+
+```text
+project_name = Harbor Cat
+bridge_id = cat
+bound_actor = cat
+backup_role = leader
+```
+
+Fish：
+
+```text
+project_name = Harbor Fish
+bridge_id = fish
+bound_actor = fish
+backup_role = follower
+```
+
+## 6. STATE_* 与正式数据的关系
+
+两张 Bridge 都可以拥有相同的家庭状态快照，例如双方体重、共同药箱、信箱等可查看数据。
+
+但：
+
+```text
+STATE_* = read model / cache
+Supabase = truth
+```
+
+直接手工改 `STATE_WEIGHT` 不会修改程序体重。
+
+只有：
+
+```text
+COMMANDS -> Apps Script -> signed Vercel API -> life_mutate -> Supabase
+```
+
+才算真正写入。
+
+## 7. COMMANDS 协议
 
 列：
 
@@ -155,7 +226,7 @@ processed_at
 error
 ```
 
-`tool` 只能是：
+允许工具：
 
 ```text
 life_capabilities
@@ -163,243 +234,240 @@ life_query
 life_mutate
 ```
 
-示例：记录体重
+删除和高风险覆盖必须保留用户当前原话到 `user_text`，服务端继续执行 R9 的删除意图 / `确认覆盖游戏数据` 校验。
 
-```json
-{
-  "commandId": "UUID",
-  "tool": "life_mutate",
-  "args": {
-    "resource": "weight",
-    "action": "create",
-    "payload": {
-      "measurementDate": "2026-09-03",
-      "weightKg": 63.4
-    }
-  },
-  "userText": "我今天63.4kg，帮我记一下"
-}
-```
+## 8. 双身份持久幂等
 
-删除、旧游戏覆盖等操作必须把用户原话保存在 `user_text`，因为最终安全判断在 Vercel 端再次执行。
-
-## 7. 持久幂等账本
-
-只靠 Sheet 的 `status` 不够安全。
-
-风险：
+R10 ledger 主键改为：
 
 ```text
-Supabase 写入成功
-→ 网络断开
-→ Sheet 没收到回执
-→ 下一分钟再次执行
-→ 可能重复新增
+(actor, command_id)
 ```
 
-R10 新增 server-only 表：
+而不是全局只有 `command_id`。
 
-```text
-life_drive_bridge_commands
-```
-
-以 `command_id` 为主键，记录：actor、tool、request hash、processing/succeeded/failed、receipt。
+这样 Harbor Cat 和 Harbor Fish 即使极端情况下生成相同 UUID，也不会互相占用；但同一个 actor 内重复 command ID 仍会被严格去重。
 
 规则：
 
-- 相同 command ID + 相同 payload：成功/失败回执直接复用，不重复执行；
-- 相同 command ID + 不同 payload：拒绝；
-- 命令已经进入 `processing` 但没有最终回执：不自动重放，避免双写；
-- AI 修正失败命令时必须产生新的 command ID。
+- actor + command ID + 相同 payload：复用已有 receipt；
+- actor + command ID + 不同 payload：拒绝；
+- processing 无最终 receipt：不盲目自动重放，优先避免双写；
+- 修正失败命令必须新建 command ID。
 
-该表不是生活数据事实源，只是桥接幂等/审计账本。
+## 9. 实时通知与兜底
 
-## 8. 实时通知与延迟
-
-主通道：
+每张 Bridge Sheet 独立建立 Drive file watch。
 
 ```text
-ChatGPT 写 COMMANDS
-↓
-Google Drive file watch
-↓ push notification
-/api/drive-bridge/watch
-↓
-Vercel 验证 x-goog-channel-token
-↓
-唤醒 Apps Script Web App
-↓
-processPendingCommands()
-↓
-/api/drive-bridge/execute
+Sheet changed
+-> Google Drive push notification
+-> /api/drive-bridge/watch
+-> 根据 watch token 识别 cat / fish
+-> 唤醒对应 Apps Script Web App
+-> processPendingCommands()
 ```
 
-目标体验：正常几秒级，工程目标约 2～10 秒；Google 不保证严格实时，因此不能承诺硬 SLA。
+正常目标体验：约 2～10 秒，但 Google 不提供严格实时 SLA。
 
-兜底：Apps Script 每 1 分钟运行 `processPendingCommands`。若 webhook 丢失，命令仍会在后续轮询中被发现。
+每个 Bridge 同时保留每分钟 `processPendingCommands` 时间触发器，因此 webhook 偶发丢失时仍有约一分钟级兜底。
 
-Drive watch 有有效期，脚本每 6 小时检查并在临近过期时自动续订；旧 channel 尽可能主动 stop。
+watch 每 6 小时检查，临近过期自动续订。
 
-## 9. 原图与程序展示图
+## 10. 原始照片
 
-### 9.1 ChatGPT 上传餐食照片
+### Harbor Cat
 
 ```text
-聊天原图
-↓ 原封不动上传
-Google Drive / Originals / Meals
-↓ fileId
-COMMANDS.original_drive_file_id
-↓
-Vercel Service Account（只读指定文件夹）
-↓
-下载原图
-↓
-Sharp
-rotate
-最长边 600px
+ChatGPT 原图
+-> Originals/Meals/Cat
+-> original_drive_file_id
+-> Cat Bridge command
+```
+
+### Harbor Fish
+
+```text
+ChatGPT 原图
+-> Originals/Meals/Fish
+-> original_drive_file_id
+-> Fish Bridge command
+```
+
+Vercel Service Account 使用 `drive.readonly`，服务端再次验证：
+
+```text
+Cat 请求的 fileId 必须直接属于 Cat 原图目录
+Fish 请求的 fileId 必须直接属于 Fish 原图目录
+```
+
+不能跨目录借 fileId 绕过身份。
+
+Drive 原图：不压缩、不重编码、不降质量。
+
+程序展示版：
+
+```text
+EXIF rotate
+最长边 600 px
 WebP q70
->120KB → 65 → 60 → 55
-↓
-Supabase Storage meal-photos
-↓
-数据库只保存 photo_path
+>120KB -> q65 -> q60 -> q55
+最低 q55
 ```
 
-Google Drive 原图不做 resize、不改编码、不降质量。
+网页普通上传仍限制 10MB；可信 Drive 原图压缩通道最多 25MB。
 
-网页手动上传仍保持 10MB 输入限制；可信 Drive 原图压缩通道单独允许最多 25MB，避免正常高像素手机原图因为网页入口限制而失败。
+## 11. 备份只保留一份
 
-### 9.2 安全范围
+不能让两个 Apps Script 都每天生成同一个家庭备份。
 
-Vercel 的 Google Service Account 只申请 `drive.readonly`，并在代码中再次校验原图必须直接位于配置的 `Originals/Meals` 文件夹，非图片、已进垃圾桶或其他 Drive 文件一律拒绝。
-
-## 10. 数据备份
-
-Apps Script 每天获取：
+因此：
 
 ```text
-get_life_export
+Harbor Cat  = backup leader
+Harbor Fish = backup follower
+```
+
+只有 Cat worker 创建：
+
+```text
+Backups/Daily/YYYY-MM-DD.json
+Backups/Monthly/YYYY-MM.json
+```
+
+备份单位是整个 `couple-better-game` 家庭空间，不是 cat/fish 两个账号。
+
+snapshot 使用：
+
+```text
+get_life_full_export
 + settings
 + legacy_home
 ```
 
-并保存为：
+其中 `get_life_full_export` 包含：
 
 ```text
-Backups/Daily/YYYY-MM-DD.json
+user + config
 ```
 
-每月 1 日同时写：
+因此 Drive 灾备是一份完整家庭结构化数据，而不是只备份某个人。
+
+原始照片本身已在共享 `Originals` 目录，不再复制一份到 Daily backup。
+
+## 12. Apps Script 同一代码、两套实例
+
+代码只维护一份：
 
 ```text
-Backups/Monthly/YYYY-MM.json
+scripts/google-apps-script/r10-drive-bridge/Code.gs
 ```
 
-Drive 保留：
-
-- 完整结构化 JSON 备份；
-- 原始餐食照片；
-- 旧照片迁移后的 legacy archive（后续一次性任务）。
-
-Supabase Storage 中的压缩图不必永久重复备份，因为可以用 Drive 原图和同一压缩器重建。旧历史照片如果不存在原图，应一次性复制到 `Backups/Legacy-Photos`。
-
-## 11. 服务端接口
+Cat Script Properties：
 
 ```text
-POST /api/drive-bridge/execute
-POST /api/drive-bridge/snapshot
-POST /api/drive-bridge/watch
+BRIDGE_ID=cat
+SHEET_ID=1inEL4mXOQ2-w5UrkqtLoK6aU2o-4auCQSLlEGuA3cVo
+BRIDGE_SECRET=<cat secret>
+WATCH_TOKEN=<cat watch token>
+WAKE_SECRET=<cat wake secret>
+BACKUP_LEADER=true
 ```
 
-`execute` / `snapshot`：
-
-- Apps Script 对 raw body 做 SHA-256；
-- 签名串 `${timestamp}.${bodyDigest}`；
-- HMAC-SHA256 + base64url；
-- headers：`x-life-bridge-timestamp`、`x-life-bridge-signature`；
-- Vercel 允许最大 5 分钟时钟偏差。
-
-`watch`：验证 Google channel token 后再唤醒 Apps Script。
-
-## 12. Production 环境变量
-
-激活 R10 时需要：
+Fish：
 
 ```text
-LIFE_DRIVE_BRIDGE_SECRET=<随机独立 secret>
-LIFE_DRIVE_BRIDGE_ACTOR=cat
-LIFE_DRIVE_WATCH_TOKEN=<随机独立 token>
-LIFE_DRIVE_APPS_SCRIPT_URL=<部署后的 Apps Script Web App URL>
-LIFE_DRIVE_APPS_SCRIPT_WAKE_SECRET=<随机独立 secret>
-LIFE_DRIVE_SERVICE_ACCOUNT_EMAIL=<Google Service Account>
-LIFE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY=<private key>
-LIFE_DRIVE_ORIGINALS_MEALS_FOLDER_ID=1nyDWkdE67xPgCSee4WC937PLxO2wuGcg
+BRIDGE_ID=fish
+SHEET_ID=1OsRnN8vC6yDetxaymVmafMEwTADashyjm9BsHqwDobs
+BRIDGE_SECRET=<fish secret>
+WATCH_TOKEN=<fish watch token>
+WAKE_SECRET=<fish wake secret>
+BACKUP_LEADER=false
 ```
 
-这些 secret 不写进 Google Sheet、GitHub 或 Project Instructions。
+两个实例都同步 STATE、处理 COMMANDS、维护自己的 watch；只有 leader 创建灾备。
 
-Apps Script Script Properties：
+## 13. Production 环境变量
+
+生产激活时需要：
 
 ```text
-BRIDGE_SECRET=<与 LIFE_DRIVE_BRIDGE_SECRET 相同>
-WATCH_TOKEN=<与 LIFE_DRIVE_WATCH_TOKEN 相同>
-WAKE_SECRET=<与 LIFE_DRIVE_APPS_SCRIPT_WAKE_SECRET 相同>
+LIFE_DRIVE_CAT_BRIDGE_SECRET
+LIFE_DRIVE_CAT_WATCH_TOKEN
+LIFE_DRIVE_CAT_APPS_SCRIPT_URL
+LIFE_DRIVE_CAT_APPS_SCRIPT_WAKE_SECRET
+LIFE_DRIVE_CAT_ORIGINALS_MEALS_FOLDER_ID=1w3gPsOT64O9YZwmdFidboc0-MD2geAc4
+
+LIFE_DRIVE_FISH_BRIDGE_SECRET
+LIFE_DRIVE_FISH_WATCH_TOKEN
+LIFE_DRIVE_FISH_APPS_SCRIPT_URL
+LIFE_DRIVE_FISH_APPS_SCRIPT_WAKE_SECRET
+LIFE_DRIVE_FISH_ORIGINALS_MEALS_FOLDER_ID=1UOHJeodhzdtXhUWIqpOEzwoehseglHst
+
+LIFE_DRIVE_SERVICE_ACCOUNT_EMAIL
+LIFE_DRIVE_SERVICE_ACCOUNT_PRIVATE_KEY
 ```
 
-## 13. ChatGPT Project Instructions（生产激活后使用）
+所有 secret/private key 只能进入 Vercel env 或 Apps Script Script Properties，不能进入 GitHub、Sheet 单元格、Project Instructions 或普通聊天。
 
-建议 Project 名：`🐟🐱生活`
+## 14. Project Instructions 与 AI 人格
+
+两个 Project 的**数据操作技能规则**应保持一致，但 AI 人格可以完全不同。
+
+共享 skill / playbook 至少包含：
 
 ```text
-这是 Couple Better Game 的生活管理 Project。本 Project 固定代表 cat：我=cat，Ta=fish。
-
-涉及程序中的事实时，优先使用已连接的 Google Drive App 读取“Couple Better Game AI Bridge”中的 STATE_*，不要用聊天记忆猜数据库事实。
-
-STATE_* 是只读镜像，绝对不要直接修改 STATE_* 来代表程序写入。
-
-当我明确要求新增、记录、修改或删除程序数据时：
-1. 在 AI Bridge 的 COMMANDS 末尾追加一行；
-2. command_id 使用全新的 UUID；
-3. created_at 写当前 ISO 时间；
-4. tool 只能写 life_query / life_mutate / life_capabilities；
-5. args_json 写合法 JSON；
-6. user_text 必须保留我当前这句话的原意；删除操作必须保留明确的“删除/移除”等原始表述；
-7. status 写 pending；
-8. 不要改已有 command_id，也不要重用失败命令的 command_id；
-9. 写入后检查 RECEIPTS 或刷新后的 STATE_*，确认程序真正执行成功后再告诉我“已记录/已修改/已删除”。
-
-如果我发送餐食照片并要求记录：
-1. 先把原图原封不动上传到 Google Drive 的 Couple Better Game/Originals/Meals；
-2. 不要压缩、重编码或降低原图质量；
-3. 获取该 Drive 文件的 fileId；
-4. 追加 meal 的 life_mutate 命令，args_json 中 attachPhoto=true，同时在 original_drive_file_id 写入该 fileId；
-5. 等 RECEIPTS 成功后再确认记录完成。程序会自行生成 600px WebP 展示图。
-
-我只是询问或讨论时不要写 COMMANDS。涉及 Ta 的个人记录时遵守程序权限：可以查询允许查看的数据，不冒充 Ta 修改 Ta 的个人数据。
+identity
+life-data-read
+life-data-write
+meal-photo
+medicine
+mailbox
+delete-safety
+backup-awareness
+future-domain-extension
 ```
 
-## 14. 激活与验收顺序
+Harbor Cat 的 Project Instructions 固定引用 Cat Bridge 和 Cat 原图目录；Harbor Fish 固定引用 Fish Bridge 和 Fish 原图目录。
 
-R10 代码合并到 main 后仍不等于上线。正式激活必须按以下顺序：
+人格层则独立：
 
-1. 创建 Google Cloud Service Account，启用 Drive API；
-2. 把 `Originals/Meals` 只读分享给 Service Account；
-3. 创建 Apps Script Project，复制 `scripts/google-apps-script/r10-drive-bridge/`；
-4. 设置 Script Properties 三个 secret；
-5. 部署 Web App（execute as owner），记录 URL；
-6. 执行 Supabase R10 migration；
-7. 在 Vercel Production 配置 R10 env；
-8. **取得用户明确 Vercel Production 部署许可后**才部署；
-9. Apps Script 执行一次 `setupR10Triggers()`；
-10. 在 ChatGPT `🐟🐱生活` Project 填入上述 Instructions；
-11. 依次验收：查询药箱 → 新增无害测试记录 → 修改 → 删除 → 跨新聊天查询 → 真实餐食原图 → Drive backup → webhook 延迟 → 1 分钟 fallback；
-12. 验收后更新 `docs/09-status-roadmap.md` 的部署 ID 与测试结果。
+```text
+AI name
+说话风格
+称呼
+回答长度
+是否活泼/冷静
+对提醒的方式
+长期形成的 Project 内习惯
+```
 
-## 15. 免费额度与降级
+不能因为人格不同而修改共同的数据安全规则。
 
-R10 的设计面向两人私用，调用量远低于 Vercel Hobby、Apps Script、Drive API 与 Supabase Free 的常规免费额度。
+## 15. 仍需 Production 验收
 
-主要长期容量变量是 Google 账号的 Drive/Gmail/Photos 共用存储空间。后续应加容量提醒：70% 提示、85% 警告。
+当前双 Project 结构和 Drive 资源已建立，但在生产激活前仍不能声称真实端到端可用。
 
-若 push notification 临时失效：退化到 1 分钟轮询；若 Apps Script 暂时失败：Sheet 中 `pending` 命令不会凭空变成已成功；若 Supabase 写入后回执链路中断：durable ledger 阻止自动重复执行。
+最终验收包括：
+
+1. Harbor Cat 多个新聊天都能读 Cat Bridge；
+2. Harbor Fish 多个新聊天都能读 Fish Bridge；
+3. Cat 写自己的记录成功；
+4. Fish 写自己的记录成功；
+5. Cat 尝试冒充 Fish 写个人数据失败；
+6. Fish 尝试冒充 Cat 失败；
+7. 两边读取同一共享药箱成功；
+8. 两边状态镜像来自同一 Supabase；
+9. Cat/Fish 原图分别只进入自己的 Originals 子目录；
+10. Drive 原图 -> 600px WebP -> Supabase Storage -> 程序显示成功；
+11. 两个 watch 都能几秒级唤醒对应 worker；
+12. webhook 故障时一分钟 fallback 成功；
+13. 只有 Cat backup leader 写 Daily/Monthly；
+14. Daily backup 可用于恢复演练；
+15. `vercel.json git.deploymentEnabled=false` 继续保持。
+
+## 16. 部署纪律
+
+任何 Vercel Preview / Production deployment 都必须先取得用户明确许可。
+
+代码、文档、Google Drive 结构、CI、PR、merge 可以在部署前完成；Production migration、env 配置、Apps Script 正式 Web App 激活和 Vercel Production 发布统一放到获得许可后的激活阶段。
