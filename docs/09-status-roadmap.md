@@ -22,7 +22,7 @@ R8     数据管理 + MCP                          ✅
 R8.1   第一轮视觉/交互收口                       ✅ Production
 R8.2   Production 实机视觉二次校准               ✅ Production
 R8.3   信息减法 + UI hotfix                     ✅ Production
-R8.4   弱网缓存 + 持久导航 + App Shell            ✅ main，待部署许可
+R8.4   弱网缓存 + 持久导航 + App Shell            ✅ Production
 R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
 R10    双 Harbor + Worker Pairing 后端            ✅ Production
 R10    Cat/Fish Apps Script Workers              ⏳ 尚未激活
@@ -44,7 +44,7 @@ AI 昵称只用于会话识别；服务端权限始终绑定 `cat / fish`。
 
 Production 实机确认原 stale-while-revalidate 仍只有内存缓存，而且 `/api/auth/session` 临时失败会被误判为退出登录；底部导航也在每个页面 Shell 内重复挂载。
 
-R8.4 已完成：
+R8.4 已完成并上线：
 
 - `stale-query` 增加 cat/fish 身份隔离的 `localStorage` 持久读缓存；
 - `sessionStorage` 只保存当前标签页最近确认的 cat/fish scope；
@@ -68,19 +68,29 @@ Lint   ✅
 Build  ✅
 ```
 
-R8.4 尚未部署 Production，因为本轮没有新的 Vercel 部署许可。
-
 ## 4. 当前 Production
 
 ```text
 primary domain: https://couple-better-game.vercel.app
-deployment: dpl_B71YH8fSWiQYnckrmDXzzAftc3bz
+deployment: dpl_Vm4tYAk8Z6aeubqY8F5ET86gjrmB
 status: READY
+source commit: 3920e327daec26565bf069395433ac77aff1446f
 ```
 
-当前线上仍是 R8.3 hotfix；R8.4 只在 main。
+R8.4 Production 验证：
 
-`vercel.json` 保持：
+```text
+/                         200
+/life-sw.js               200
+PersistentLifeChrome      已在 Production HTML
+LifeServiceWorker         已在 Production bundle
+最近 30 分钟 runtime errors  0
+本次新增 Production 数量     1
+```
+
+本次采用一次受控 Git Production 触发：临时开启 `main` deployment，Production READY 后立即恢复关闭。
+
+`vercel.json` 当前保持：
 
 ```json
 {
@@ -119,9 +129,9 @@ life_drive_bridge_commands = 0 条真实命令
 Production 已有 Cat/Fish 两份提醒偏好：
 
 ```text
-daily reminder      21:15  enabled
-anniversary reminder 09:15 enabled
-offsets             [7,1,0]
+daily reminder       21:15  enabled
+anniversary reminder 09:15  enabled
+offsets              [7,1,0]
 ```
 
 后端已有：
@@ -176,8 +186,8 @@ AI：
 1. R8.4 刷新 / 弱网修复                      ✅
 2. R8.4 Test / Lint / Build                  ✅ CI #274
 3. PR #52 合并 main                           ✅ 3232f834...
-4. 等新许可后部署 R8.4 Production             <- 当前部署边界
-5. 激活 Harbor Cat / Fish Apps Script Workers
+4. R8.4 Production 部署                      ✅ dpl_Vm4tYAk8...
+5. 激活 Harbor Cat / Fish Apps Script Workers <- 下一步
 6. Harbor 读写 / 照片 / watch / fallback 验收
 7. Cat backup / restore 验收
 8. Cat/Fish PushPlus 真实微信验收
