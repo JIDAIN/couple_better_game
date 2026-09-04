@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LifePartnerKey } from "@/lib/life/life-service";
 import {
   forgetStaleQueryScope,
@@ -36,6 +36,8 @@ const LifeIdentityContext = createContext<LifeRelativeIdentity>({
   loading: true,
   refreshIdentity: async () => null,
 });
+
+const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export function oppositePartnerKey(key: LifePartnerKey): LifePartnerKey {
   return key === "cat" ? "fish" : "cat";
@@ -165,12 +167,18 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     return next;
   }, [applyIdentity, startInitialWarmup]);
 
-  useEffect(() => {
+  // Restore the last confirmed browser scope before paint. This is only a visual
+  // acceleration hint; the signed server cookie is still checked immediately
+  // afterwards and remains the sole authorization source.
+  useBrowserLayoutEffect(() => {
     const hint = readStaleQueryScopeHint();
     if (hint && !partnerRef.current) {
       applyIdentity(hint, false);
       startInitialWarmup(hint);
     }
+  }, [applyIdentity, startInitialWarmup]);
+
+  useEffect(() => {
     const task = window.setTimeout(() => { void refreshIdentity().catch(() => undefined); }, 0);
     const handleOnline = () => { void refreshIdentity().catch(() => undefined); };
     window.addEventListener("online", handleOnline);
@@ -178,7 +186,7 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(task);
       window.removeEventListener("online", handleOnline);
     };
-  }, [applyIdentity, refreshIdentity, startInitialWarmup]);
+  }, [refreshIdentity]);
 
   const value = useMemo<LifeRelativeIdentity>(() => ({
     currentPartnerKey: partnerKey,
