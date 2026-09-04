@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { DailyNutritionSummary } from "@/components/life/DailyNutritionSummary";
@@ -11,11 +11,11 @@ import { TodaySleepCard } from "@/components/life/today/TodaySleepCard";
 import { displayDate } from "@/components/life/today/today-life-model";
 import { fetchLifeDay, LifeApiError } from "@/lib/life/life-client";
 import { fetchMeals, MealApiError } from "@/lib/nutrition/meal-client";
+import { preloadMealPhotos } from "@/lib/nutrition/meal-photo-cache";
 import type { LifeDayRecord, LifePartnerKey } from "@/lib/life/life-service";
 import type { MealRecord, NutritionPartnerKey } from "@/lib/nutrition/meal-service";
 import { useStaleQuery } from "@/lib/client/use-stale-query";
 
-type CalendarDayBundle = { day: LifeDayRecord; meMeals: MealRecord[]; taMeals: MealRecord[] };
 const EMPTY_MEALS: MealRecord[] = [];
 
 function mealNames(meal: MealRecord) {
@@ -30,24 +30,53 @@ function calorieSummary(meals: MealRecord[]) {
 
 export function LifeCalendarDayPage({ date }: { date: string }) {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
-  const fetcher = useCallback(async (): Promise<CalendarDayBundle> => {
-    if (!mePartnerKey || !taPartnerKey) throw new Error("正在确认当前账号");
-    const [day, meMeals, taMeals] = await Promise.all([
-      fetchLifeDay(date),
-      fetchMeals({ mealDate: date, partnerKey: mePartnerKey as NutritionPartnerKey }),
-      fetchMeals({ mealDate: date, partnerKey: taPartnerKey as NutritionPartnerKey }),
-    ]);
-    return {
-      day,
-      meMeals: meMeals.filter((meal) => meal.deletedAt == null),
-      taMeals: taMeals.filter((meal) => meal.deletedAt == null),
-    };
-  }, [date, mePartnerKey, taPartnerKey]);
-  const query = useStaleQuery<CalendarDayBundle>({ key: `calendar-day:${date}:${mePartnerKey ?? "pending"}`, fetcher, staleMs: 30_000 });
-  const day = query.data?.day ?? null;
-  const meMeals = query.data?.meMeals ?? EMPTY_MEALS;
-  const taMeals = query.data?.taMeals ?? EMPTY_MEALS;
-  const error = query.error instanceof LifeApiError || query.error instanceof MealApiError ? query.error.message : query.error ? "这一天的生活记录暂时没有加载出来" : null;
+
+  const dayFetcher = useCallback(() => fetchLifeDay(date), [date]);
+  const dayQuery = useStaleQuery<LifeDayRecord>({
+    key: `life-day:${date}`,
+    fetcher: dayFetcher,
+    staleMs: 60_000,
+  });
+
+  const meMealsFetcher = useCallback(async () => {
+    if (!mePartnerKey) return [] as MealRecord[];
+    return (await fetchMeals({ mealDate: date, partnerKey: mePartnerKey as NutritionPartnerKey }))
+      .filter((meal) => !meal.deletedAt);
+  }, [date, mePartnerKey]);
+  const meMealsQuery = useStaleQuery<MealRecord[]>({
+    key: `meals:${mePartnerKey ?? "pending"}:${date}`,
+    fetcher: meMealsFetcher,
+    staleMs: 60_000,
+  });
+
+  const taMealsFetcher = useCallback(async () => {
+    if (!taPartnerKey) return [] as MealRecord[];
+    return (await fetchMeals({ mealDate: date, partnerKey: taPartnerKey as NutritionPartnerKey }))
+      .filter((meal) => !meal.deletedAt);
+  }, [date, taPartnerKey]);
+  const taMealsQuery = useStaleQuery<MealRecord[]>({
+    key: `meals:${taPartnerKey ?? "pending"}:${date}`,
+    fetcher: taMealsFetcher,
+    staleMs: 60_000,
+  });
+
+  const day = dayQuery.data ?? null;
+  const meMeals = meMealsQuery.data ?? EMPTY_MEALS;
+  const taMeals = taMealsQuery.data ?? EMPTY_MEALS;
+  const errors = [dayQuery.error, meMealsQuery.error, taMealsQuery.error].filter(Boolean) as Error[];
+  const error = errors[0] instanceof LifeApiError || errors[0] instanceof MealApiError
+    ? errors[0].message
+    : errors.length
+      ? "这一天的生活记录暂时没有加载出来"
+      : null;
+
+  const warmFoodPhotos = useCallback(() => {
+    void preloadMealPhotos([...meMeals, ...taMeals]);
+  }, [meMeals, taMeals]);
+
+  useEffect(() => {
+    if (meMeals.length || taMeals.length) warmFoodPhotos();
+  }, [meMeals.length, taMeals.length, warmFoodPhotos]);
 
   const people = useMemo(() => {
     if (!mePartnerKey || !taPartnerKey) return [] as Array<{ key: LifePartnerKey; label: "我" | "Ta" }>;
@@ -74,7 +103,13 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
           <section className="life-surface life-section-card life-calendar-food-card">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-extrabold text-[var(--life-text)]">🍚 饮食</p>
-              <Link href={`/food?date=${encodeURIComponent(date)}`} className="life-card-action inline-flex items-center">查看</Link>
+              <Link
+                href={`/food?date=${encodeURIComponent(date)}`}
+                className="life-card-action inline-flex items-center"
+                onPointerEnter={warmFoodPhotos}
+                onPointerDown={warmFoodPhotos}
+                onFocus={warmFoodPhotos}
+              >查看</Link>
             </div>
             <div className="mt-3 grid gap-3">
               {people.map((person) => {
@@ -92,7 +127,7 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
             </div>
           </section>
         </div>
-      ) : query.loading ? <section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在翻开这一天…</section> : null}
+      ) : dayQuery.loading ? <section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在翻开这一天…</section> : null}
     </AppPageShell>
   );
 }

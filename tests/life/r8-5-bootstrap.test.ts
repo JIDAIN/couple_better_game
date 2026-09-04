@@ -6,30 +6,32 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-describe("R8.5 startup prewarm", () => {
+describe("R8.5/R8.6 startup prewarm", () => {
   it("uses a one-time startup gate instead of exposing partial first render", () => {
     const identity = source("components/life/LifeIdentityContext.tsx");
     const chrome = source("components/life/PersistentLifeChrome.tsx");
     expect(identity).toContain("bootstrapReady");
     expect(identity).toContain("warmLifeEssentials");
     expect(identity).toContain("Promise.race");
-    expect(identity).toContain("2200");
+    expect(identity).toContain("2400");
     expect(chrome).toContain("LifeStartupSplash");
     expect(chrome).toContain("MIN_SPLASH_MS = 620");
     expect(chrome).toContain("小岛正在醒来");
   });
 
-  it("warms today, meals, month, settings and visible image assets before reveal", () => {
+  it("hydrates the whole current month into the canonical day and meal cache before reveal", () => {
     const identity = source("components/life/LifeIdentityContext.tsx");
-    expect(identity).toContain("fetchLifeDay(date)");
+    const bundle = source("lib/life/month-bundle.ts");
+    expect(identity).toContain("fetchLifeMonthBundle(month)");
+    expect(identity).toContain("hydrateLifeMonthBundle(bundle, me, ta)");
     expect(identity).toContain("fetchLifeMonth(month)");
-    expect(identity).toContain("fetchMeals({ mealDate: date, partnerKey: me })");
-    expect(identity).toContain("fetchMeals({ mealDate: date, partnerKey: ta })");
     expect(identity).toContain("fetchLifeSettings");
+    expect(bundle).toContain("life-day:${item.date}");
+    expect(bundle).toContain("meals:${me}:${item.date}");
+    expect(bundle).toContain("meals:${ta}:${item.date}");
     expect(identity).toContain("/illustrations/life/activity-girls.png");
     expect(identity).toContain("/illustrations/meals/breakfast.svg");
-    expect(identity).toContain("mealPhotoUrl");
-    expect(identity).toContain("preloadCurrentMealPhotos");
+    expect(identity).toContain("preloadTodayMealPhotos");
   });
 
   it("renders prewarmed local artwork through the same raw URLs", () => {
@@ -51,14 +53,23 @@ describe("R8.5 startup prewarm", () => {
     expect(identity).toContain("void Promise.allSettled");
   });
 
-  it("prewarms likely calendar detail bundles and warms a tapped day immediately", () => {
+  it("hydrates every opened calendar month and warms a tapped day's real meal photos", () => {
     const calendar = source("components/life/LifeCalendarPage.tsx");
+    expect(calendar).toContain("fetchLifeMonthBundle(month)");
+    expect(calendar).toContain("hydrateLifeMonthBundle(bundle, me, ta)");
     expect(calendar).toContain("const warmDay = useCallback");
-    expect(calendar).toContain("slice(-8)");
+    expect(calendar).toContain("preloadMealPhotos");
     expect(calendar).toContain("onPointerDown={() => warmDay(date)}");
     expect(calendar).toContain("onPointerEnter={() => warmDay(date)}");
-    expect(calendar).toContain("fetchLifeDay(date)");
-    expect(calendar).toContain("fetchMeals({ mealDate: date, partnerKey: me })");
+  });
+
+  it("calendar detail reuses the same life-day and meals cache keys as Today/Food instead of a private bundle key", () => {
+    const detail = source("components/life/LifeCalendarDayPage.tsx");
+    expect(detail).toContain("key: `life-day:${date}`");
+    expect(detail).toContain("key: `meals:${mePartnerKey ?? \"pending\"}:${date}`");
+    expect(detail).toContain("key: `meals:${taPartnerKey ?? \"pending\"}:${date}`");
+    expect(detail).toContain("preloadMealPhotos");
+    expect(detail).not.toContain("calendar-day:");
   });
 
   it("loads dedicated startup styling from the root layout", () => {

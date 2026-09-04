@@ -1,4 +1,5 @@
 import type { LifeMonthMoodRecord } from "./calendar-service";
+import type { LifeMonthBundle } from "./month-bundle";
 import type {
   ActivityRecord,
   ActivityWritePayload,
@@ -63,6 +64,13 @@ export async function fetchLifeMonth(month: string) {
     `/api/life/month?month=${encodeURIComponent(month)}`,
   );
   return result.month;
+}
+
+export async function fetchLifeMonthBundle(month: string) {
+  const result = await fetchJson<{ ok: true; bundle: LifeMonthBundle }>(
+    `/api/life/month-bundle?month=${encodeURIComponent(month)}`,
+  );
+  return result.bundle;
 }
 
 export async function saveMood(

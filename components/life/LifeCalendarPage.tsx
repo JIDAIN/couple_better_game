@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
-import { prefetchStaleQuery, useStaleQuery } from "@/lib/client/use-stale-query";
-import { fetchLifeDay, fetchLifeMonth, LifeApiError } from "@/lib/life/life-client";
+import { peekStaleQuery, prefetchStaleQuery, useStaleQuery } from "@/lib/client/use-stale-query";
+import { fetchLifeDay, fetchLifeMonth, fetchLifeMonthBundle, LifeApiError } from "@/lib/life/life-client";
+import { hydrateLifeMonthBundle } from "@/lib/life/month-bundle";
 import { fetchMeals } from "@/lib/nutrition/meal-client";
-import type { NutritionPartnerKey } from "@/lib/nutrition/meal-service";
+import { preloadMealPhotos } from "@/lib/nutrition/meal-photo-cache";
+import type { MealRecord, NutritionPartnerKey } from "@/lib/nutrition/meal-service";
 import type { LifeMonthMoodRecord } from "@/lib/life/calendar-service";
 import type { MoodKey } from "@/lib/life/life-service";
 import { moodVisual } from "@/components/life/today/today-life-model";
@@ -65,28 +67,37 @@ export function LifeCalendarPage() {
   const cells = useMemo(() => monthCells(month), [month]);
   const error = query.error instanceof LifeApiError ? query.error.message : query.error?.message ?? null;
 
+  useEffect(() => {
+    if (!mePartnerKey || !taPartnerKey) return;
+    const me = mePartnerKey;
+    const ta = taPartnerKey;
+    void prefetchStaleQuery({
+      key: `life-month-bundle:${month}`,
+      fetcher: () => fetchLifeMonthBundle(month),
+      staleMs: 60_000,
+    }).then((bundle) => hydrateLifeMonthBundle(bundle, me, ta)).catch(() => undefined);
+  }, [mePartnerKey, month, taPartnerKey]);
+
   const warmDay = useCallback((date: string) => {
     if (!mePartnerKey || !taPartnerKey) return;
     const me = mePartnerKey as NutritionPartnerKey;
     const ta = taPartnerKey as NutritionPartnerKey;
+    const cachedMeals = [
+      ...(peekStaleQuery<MealRecord[]>(`meals:${me}:${date}`) ?? []),
+      ...(peekStaleQuery<MealRecord[]>(`meals:${ta}:${date}`) ?? []),
+    ];
+    if (cachedMeals.length) void preloadMealPhotos(cachedMeals);
+
+    // If the monthly bundle is still arriving, these calls reuse the same canonical cache keys.
+    // The detail page reads these exact keys, so navigation never creates a second bundle cache.
     void Promise.allSettled([
-      prefetchStaleQuery({ key: `life-day:${date}`, fetcher: () => fetchLifeDay(date), staleMs: 20_000 }),
-      prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
-      prefetchStaleQuery({ key: `meals:${ta}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: ta })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
+      prefetchStaleQuery({ key: `life-day:${date}`, fetcher: () => fetchLifeDay(date), staleMs: 60_000 }),
+      prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 60_000 })
+        .then((meals) => preloadMealPhotos(meals)),
+      prefetchStaleQuery({ key: `meals:${ta}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: ta })).filter((meal) => !meal.deletedAt), staleMs: 60_000 })
+        .then((meals) => preloadMealPhotos(meals)),
     ]);
   }, [mePartnerKey, taPartnerKey]);
-
-  useEffect(() => {
-    if (!query.data) return;
-    // Prewarm the most recent recorded dates. This covers the dates users are most likely to open
-    // without turning a month view into 90 eager API calls.
-    const recent = query.data.days
-      .filter((day) => day.moods.length > 0)
-      .map((day) => day.date)
-      .sort()
-      .slice(-8);
-    for (const date of recent) warmDay(date);
-  }, [query.data, warmDay]);
 
   if (!mePartnerKey || !taPartnerKey) {
     return <AppPageShell title="日历" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;

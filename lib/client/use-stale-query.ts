@@ -21,7 +21,7 @@ type PersistedCache = {
 const queryCache = new Map<string, CacheEntry<unknown>>();
 const CACHE_PREFIX = "couple-better-game:life-query:v2:";
 const SCOPE_HINT_KEY = "couple-better-game:life-scope";
-const MAX_PERSISTED_ENTRIES = 120;
+const MAX_PERSISTED_ENTRIES = 220;
 const MAX_PERSISTED_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 let activeScope: string | null = null;
@@ -155,6 +155,14 @@ export function setStaleQueryData<T>(key: string, data: T) {
   persistCurrentScope();
 }
 
+export function setStaleQueryDataMany(entries: Array<{ key: string; data: unknown }>) {
+  const updatedAt = Date.now();
+  for (const entry of entries) {
+    queryCache.set(entry.key, { data: entry.data, updatedAt });
+  }
+  persistCurrentScope();
+}
+
 export function invalidateStaleQuery(prefix: string) {
   for (const [key, entry] of queryCache.entries()) {
     if (!key.startsWith(prefix)) continue;
@@ -183,10 +191,10 @@ export async function prefetchStaleQuery<T>({
   key: string;
   fetcher: () => Promise<T>;
   staleMs?: number;
-}) {
+}): Promise<T> {
   const cached = entryFor<T>(key);
   const fresh = cached?.data !== undefined && Date.now() - cached.updatedAt < staleMs;
-  if (fresh) return cached.data;
+  if (fresh) return cached.data as T;
   if (cached?.promise) return cached.promise;
 
   const promise = fetcher();
