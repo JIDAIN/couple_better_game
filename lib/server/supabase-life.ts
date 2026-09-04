@@ -1,4 +1,5 @@
 import type { LifeMonthMoodRecord } from "../life/calendar-service";
+import type { LifeMonthBundle } from "../life/month-bundle";
 import type {
   ActivityRecord,
   ActivityWritePayload,
@@ -101,6 +102,14 @@ export async function getLifeDay(recordDate: string) {
 export async function getLifeMonthMoods(monthStart: string) {
   return callRpc<LifeMonthMoodRecord>(
     "get_life_month_moods",
+    { p_month_start: monthStart, p_space_slug: coupleSpaceSlug() },
+    "read",
+  );
+}
+
+export async function getLifeMonthBundle(monthStart: string) {
+  return callRpc<LifeMonthBundle>(
+    "get_life_month_bundle",
     { p_month_start: monthStart, p_space_slug: coupleSpaceSlug() },
     "read",
   );
