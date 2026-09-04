@@ -5,12 +5,11 @@ import { useRouter } from "next/navigation";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { peekStaleQuery, prefetchStaleQuery, useStaleQuery } from "@/lib/client/use-stale-query";
-import { fetchLifeDay, fetchLifeMonth, fetchLifeMonthBundle, LifeApiError } from "@/lib/life/life-client";
-import { hydrateLifeMonthBundle } from "@/lib/life/month-bundle";
+import { fetchLifeDay, fetchLifeMonthBundle, LifeApiError } from "@/lib/life/life-client";
+import { hydrateLifeMonthBundle, type LifeMonthBundle } from "@/lib/life/month-bundle";
 import { fetchMeals } from "@/lib/nutrition/meal-client";
 import { preloadMealPhotos } from "@/lib/nutrition/meal-photo-cache";
 import type { MealRecord, NutritionPartnerKey } from "@/lib/nutrition/meal-service";
-import type { LifeMonthMoodRecord } from "@/lib/life/calendar-service";
 import type { MoodKey } from "@/lib/life/life-service";
 import { moodVisual } from "@/components/life/today/today-life-model";
 import { MoodIcon } from "@/components/ui/MoodIcon";
@@ -47,11 +46,7 @@ function MoodStamp({ moodKey, label, offset = false }: { moodKey?: MoodKey; labe
   const visual = moodVisual(moodKey);
   if (!visual) return null;
   return (
-    <span
-      title={`${label} · ${visual.label}`}
-      className={`life-calendar-mood ${offset ? "is-offset" : ""}`}
-      aria-label={`${label}：${visual.label}`}
-    >
+    <span title={`${label} · ${visual.label}`} className={`life-calendar-mood ${offset ? "is-offset" : ""}`} aria-label={`${label}：${visual.label}`}>
       <MoodIcon moodKey={visual.key} label="" />
     </span>
   );
@@ -62,22 +57,16 @@ export function LifeCalendarPage() {
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [month, setMonth] = useState(() => localMonth());
   const today = useMemo(() => localDate(), []);
-  const fetcher = useCallback(() => fetchLifeMonth(month), [month]);
-  const query = useStaleQuery<LifeMonthMoodRecord>({ key: `life-month:${month}`, fetcher, staleMs: 60_000 });
-  const byDate = useMemo(() => new Map((query.data?.days ?? []).map((day) => [day.date, day.moods])), [query.data]);
+  const fetcher = useCallback(() => fetchLifeMonthBundle(month), [month]);
+  const query = useStaleQuery<LifeMonthBundle>({ key: `life-month-bundle:${month}`, fetcher, staleMs: 60_000 });
+  const byDate = useMemo(() => new Map((query.data?.days ?? []).map((item) => [item.date, item.day.moods])), [query.data]);
   const cells = useMemo(() => monthCells(month), [month]);
   const error = query.error instanceof LifeApiError ? query.error.message : query.error?.message ?? null;
 
   useEffect(() => {
-    if (!mePartnerKey || !taPartnerKey) return;
-    const me = mePartnerKey;
-    const ta = taPartnerKey;
-    void prefetchStaleQuery({
-      key: `life-month-bundle:${month}`,
-      fetcher: () => fetchLifeMonthBundle(month),
-      staleMs: 60_000,
-    }).then((bundle) => hydrateLifeMonthBundle(bundle, me, ta)).catch(() => undefined);
-  }, [mePartnerKey, month, taPartnerKey]);
+    if (!query.data || !mePartnerKey || !taPartnerKey) return;
+    hydrateLifeMonthBundle(query.data, mePartnerKey, taPartnerKey);
+  }, [mePartnerKey, query.data, taPartnerKey]);
 
   const warmDay = useCallback((date: string) => {
     if (!mePartnerKey || !taPartnerKey) return;
@@ -91,10 +80,8 @@ export function LifeCalendarPage() {
 
     void Promise.allSettled([
       prefetchStaleQuery({ key: `life-day:${date}`, fetcher: () => fetchLifeDay(date), staleMs: 60_000 }),
-      prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 60_000 })
-        .then((meals) => preloadMealPhotos(meals)),
-      prefetchStaleQuery({ key: `meals:${ta}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: ta })).filter((meal) => !meal.deletedAt), staleMs: 60_000 })
-        .then((meals) => preloadMealPhotos(meals)),
+      prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 60_000 }).then((meals) => preloadMealPhotos(meals)),
+      prefetchStaleQuery({ key: `meals:${ta}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: ta })).filter((meal) => !meal.deletedAt), staleMs: 60_000 }).then((meals) => preloadMealPhotos(meals)),
     ]);
   }, [mePartnerKey, taPartnerKey]);
 
@@ -105,8 +92,6 @@ export function LifeCalendarPage() {
 
   const openDay = useCallback((date: string) => {
     warmDayRoute(date);
-    // A button + App Router push has no native-anchor fallback, so Android browsers do not
-    // start a full document navigation (the thin browser loading bar seen in Production).
     router.push(`/calendar/${date}`);
   }, [router, warmDayRoute]);
 
