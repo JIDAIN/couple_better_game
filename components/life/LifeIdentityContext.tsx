@@ -9,12 +9,13 @@ import {
   readStaleQueryScopeHint,
   rememberStaleQueryScope,
 } from "@/lib/client/use-stale-query";
-import { fetchLifeDay, fetchLifeMonth } from "@/lib/life/life-client";
+import { fetchLifeMonth, fetchLifeMonthBundle } from "@/lib/life/life-client";
+import { hydrateLifeMonthBundle } from "@/lib/life/month-bundle";
 import { fetchLifeSettings } from "@/lib/life/settings-client";
 import { fetchWeights } from "@/lib/life/weight-client";
 import { fetchMedicines } from "@/lib/life/medicine-client";
 import { fetchMailboxLetters } from "@/lib/life/mailbox-client";
-import { fetchMeals, mealPhotoUrl } from "@/lib/nutrition/meal-client";
+import { preloadMealPhotos } from "@/lib/nutrition/meal-photo-cache";
 import type { MealRecord } from "@/lib/nutrition/meal-service";
 
 export type LifeRelativeIdentity = {
@@ -62,7 +63,7 @@ const CORE_IMAGE_ASSETS = [
   "/illustrations/meals/snack.svg",
 ] as const;
 
-function preloadImage(src: string, timeoutMs = 1200) {
+function preloadStaticImage(src: string, timeoutMs = 1200) {
   if (typeof window === "undefined") return Promise.resolve();
   return new Promise<void>((resolve) => {
     const image = new window.Image();
@@ -81,13 +82,12 @@ function preloadImage(src: string, timeoutMs = 1200) {
   });
 }
 
-async function preloadCurrentMealPhotos(me: LifePartnerKey, ta: LifePartnerKey, date: string) {
+async function preloadTodayMealPhotos(me: LifePartnerKey, ta: LifePartnerKey, date: string) {
   const meals = [
     ...(peekStaleQuery<MealRecord[]>(`meals:${me}:${date}`) ?? []),
     ...(peekStaleQuery<MealRecord[]>(`meals:${ta}:${date}`) ?? []),
   ];
-  const urls = Array.from(new Set(meals.filter((meal) => meal.photoPath).map(mealPhotoUrl)));
-  await Promise.allSettled(urls.map((url) => preloadImage(url, 1400)));
+  await preloadMealPhotos(meals, 1400);
 }
 
 async function warmLifeEssentials(me: LifePartnerKey) {
@@ -95,17 +95,24 @@ async function warmLifeEssentials(me: LifePartnerKey) {
   const month = date.slice(0, 7);
   const ta = oppositePartnerKey(me);
 
+  const monthBundleTask = prefetchStaleQuery({
+    key: `life-month-bundle:${month}`,
+    fetcher: () => fetchLifeMonthBundle(month),
+    staleMs: 60_000,
+  }).then((bundle) => {
+    hydrateLifeMonthBundle(bundle, me, ta);
+    return bundle;
+  });
+
   const coreTasks = [
-    prefetchStaleQuery({ key: `life-day:${date}`, fetcher: () => fetchLifeDay(date), staleMs: 20_000 }),
+    monthBundleTask,
     prefetchStaleQuery({ key: `life-month:${month}`, fetcher: () => fetchLifeMonth(month), staleMs: 60_000 }),
-    prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
-    prefetchStaleQuery({ key: `meals:${ta}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: ta })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
     prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
-    ...CORE_IMAGE_ASSETS.map((src) => preloadImage(src)),
+    ...CORE_IMAGE_ASSETS.map((src) => preloadStaticImage(src)),
   ];
 
   await Promise.allSettled(coreTasks);
-  await preloadCurrentMealPhotos(me, ta, date);
+  await preloadTodayMealPhotos(me, ta, date);
 
   // Secondary pages keep warming after the app becomes interactive.
   void Promise.allSettled([
@@ -150,11 +157,11 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     }
 
     const warm = warmLifeEssentials(next);
-    // Never trap the user behind startup. If the network is poor, cached UI becomes available
-    // after a short grace period while the same warm-up continues in the background.
+    // R8.6 uses the startup grace period for a real monthly cache fill, not just today's page.
+    // Weak networks still escape after 2.4s and keep hydrating in the background.
     await Promise.race([
       warm,
-      new Promise<void>((resolve) => window.setTimeout(resolve, 2200)),
+      new Promise<void>((resolve) => window.setTimeout(resolve, 2400)),
     ]);
     setBootstrapReady(true);
     void warm.catch(() => undefined);
@@ -173,8 +180,7 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
       next = data.authenticated && validPartner(data.identity?.partnerKey) ? data.identity.partnerKey : null;
       authoritative = true;
     } catch {
-      // A temporary network/5xx failure must not turn a confirmed cat/fish session into "logged out".
-      // The server still validates every write; this fallback only keeps the local UI and cached reads usable.
+      // Temporary network/5xx failures must not turn a confirmed cat/fish session into logged-out UI.
       next = fallback;
     }
 
