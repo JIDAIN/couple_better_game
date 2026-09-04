@@ -219,9 +219,8 @@ function runStaleQueryFetch<T>({
   const requestRevision = cached?.revision ?? 0;
   const requestScopeSerial = scopeSerial;
   const rawPromise = fetcher();
-  let guardedPromise: Promise<T>;
 
-  guardedPromise = (async () => {
+  const guardedPromise: Promise<T> = (async () => {
     try {
       const data = await rawPromise;
       if (requestScopeSerial !== scopeSerial) throw new StaleQueryScopeChangedError();
@@ -231,7 +230,7 @@ function runStaleQueryFetch<T>({
         // A local/read-back write happened after this request started. Never let the
         // older response roll the UI back. If the key was invalidated, do one fresh
         // read that necessarily starts after the mutation instead.
-        if (latest.promise !== guardedPromise && latest.data !== undefined && latest.updatedAt > 0) {
+        if (latest.data !== undefined && latest.updatedAt > 0) {
           return latest.data;
         }
         if (retriesLeft > 0) {
@@ -246,17 +245,13 @@ function runStaleQueryFetch<T>({
         return latest.data !== undefined ? latest.data : data;
       }
 
-      if (latest?.promise && latest.promise !== guardedPromise && latest.data !== undefined) {
-        return latest.data;
-      }
-
       queryCache.set(key, { data, updatedAt: Date.now(), revision: requestRevision });
       persistCurrentScope();
       return data;
     } catch (cause) {
       if (!(cause instanceof StaleQueryScopeChangedError)) {
         const latest = entryFor<T>(key);
-        if (latest?.promise === guardedPromise) {
+        if (latest?.revision === requestRevision) {
           queryCache.set(key, {
             data: latest.data,
             updatedAt: latest.updatedAt,
