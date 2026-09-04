@@ -97,10 +97,6 @@ export function LifeCalendarPage() {
     ]);
   }, [mePartnerKey, taPartnerKey]);
 
-  if (!mePartnerKey || !taPartnerKey) {
-    return <AppPageShell title="日历" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;
-  }
-
   return (
     <AppPageShell>
       <section className="life-calendar-paper life-calendar-page">
@@ -121,8 +117,8 @@ export function LifeCalendarPage() {
           {cells.map((date, index) => {
             if (!date) return <div key={`empty-${index}`} className="h-[5.2rem]" />;
             const moods = byDate.get(date) ?? [];
-            const meMood = moods.find((item) => item.partnerKey === mePartnerKey)?.moodKey;
-            const taMood = moods.find((item) => item.partnerKey === taPartnerKey)?.moodKey;
+            const meMood = mePartnerKey ? moods.find((item) => item.partnerKey === mePartnerKey)?.moodKey : undefined;
+            const taMood = taPartnerKey ? moods.find((item) => item.partnerKey === taPartnerKey)?.moodKey : undefined;
             const isToday = date === today;
             return (
               <Link
