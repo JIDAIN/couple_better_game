@@ -63,23 +63,11 @@ const CORE_IMAGE_ASSETS = [
   "/illustrations/meals/snack.svg",
 ] as const;
 
-function preloadStaticImage(src: string, timeoutMs = 1200) {
-  if (typeof window === "undefined") return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const image = new window.Image();
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    const timer = window.setTimeout(finish, timeoutMs);
-    image.onload = () => { window.clearTimeout(timer); finish(); };
-    image.onerror = () => { window.clearTimeout(timer); finish(); };
-    image.decoding = "async";
-    image.src = src;
-    if (image.complete) { window.clearTimeout(timer); finish(); }
-  });
+function preloadStaticImage(src: string) {
+  if (typeof window === "undefined") return;
+  const image = new window.Image();
+  image.decoding = "async";
+  image.src = src;
 }
 
 async function preloadTodayMealPhotos(me: LifePartnerKey, ta: LifePartnerKey, date: string) {
@@ -95,6 +83,8 @@ async function warmLifeEssentials(me: LifePartnerKey) {
   const month = date.slice(0, 7);
   const ta = oppositePartnerKey(me);
 
+  for (const src of CORE_IMAGE_ASSETS) preloadStaticImage(src);
+
   const monthBundleTask = prefetchStaleQuery({
     key: `life-month-bundle:${month}`,
     fetcher: () => fetchLifeMonthBundle(month),
@@ -104,18 +94,10 @@ async function warmLifeEssentials(me: LifePartnerKey) {
     return bundle;
   });
 
-  const coreTasks = [
-    monthBundleTask,
+  void Promise.allSettled([
+    monthBundleTask.then(() => preloadTodayMealPhotos(me, ta, date)),
     prefetchStaleQuery({ key: `life-month:${month}`, fetcher: () => fetchLifeMonth(month), staleMs: 60_000 }),
     prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
-    ...CORE_IMAGE_ASSETS.map((src) => preloadStaticImage(src)),
-  ];
-
-  await Promise.allSettled(coreTasks);
-  await preloadTodayMealPhotos(me, ta, date);
-
-  // Secondary pages keep warming after the app becomes interactive.
-  void Promise.allSettled([
     prefetchStaleQuery({ key: `weights:${me}`, fetcher: () => fetchWeights(me) }),
     prefetchStaleQuery({ key: `weights:${ta}`, fetcher: () => fetchWeights(ta) }),
     prefetchStaleQuery({ key: "medicines", fetcher: fetchMedicines }),
@@ -148,23 +130,12 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const finishInitialBootstrap = useCallback(async (next: LifePartnerKey | null) => {
+  const finishInitialBootstrap = useCallback((next: LifePartnerKey | null) => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    if (!next || (typeof navigator !== "undefined" && !navigator.onLine)) {
-      setBootstrapReady(true);
-      return;
-    }
-
-    const warm = warmLifeEssentials(next);
-    // R8.6 uses the startup grace period for a real monthly cache fill, not just today's page.
-    // Weak networks still escape after 2.4s and keep hydrating in the background.
-    await Promise.race([
-      warm,
-      new Promise<void>((resolve) => window.setTimeout(resolve, 2400)),
-    ]);
     setBootstrapReady(true);
-    void warm.catch(() => undefined);
+    if (!next || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+    void warmLifeEssentials(next).catch(() => undefined);
   }, []);
 
   const refreshIdentity = useCallback(async () => {
@@ -180,13 +151,12 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
       next = data.authenticated && validPartner(data.identity?.partnerKey) ? data.identity.partnerKey : null;
       authoritative = true;
     } catch {
-      // Temporary network/5xx failures must not turn a confirmed cat/fish session into logged-out UI.
       next = fallback;
     }
 
     const alreadyBootstrapped = bootstrappedRef.current;
     applyIdentity(next, authoritative);
-    await finishInitialBootstrap(next);
+    finishInitialBootstrap(next);
     if (alreadyBootstrapped && next && (typeof navigator === "undefined" || navigator.onLine)) {
       void warmLifeEssentials(next).catch(() => undefined);
     }
@@ -195,7 +165,10 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const hint = readStaleQueryScopeHint();
-    if (hint && !partnerRef.current) applyIdentity(hint, false);
+    if (hint && !partnerRef.current) {
+      applyIdentity(hint, false);
+      finishInitialBootstrap(hint);
+    }
     const task = window.setTimeout(() => { void refreshIdentity().catch(() => { setBootstrapReady(true); }); }, 0);
     const handleOnline = () => { void refreshIdentity().catch(() => undefined); };
     window.addEventListener("online", handleOnline);
@@ -203,7 +176,7 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(task);
       window.removeEventListener("online", handleOnline);
     };
-  }, [applyIdentity, refreshIdentity]);
+  }, [applyIdentity, finishInitialBootstrap, refreshIdentity]);
 
   const value = useMemo<LifeRelativeIdentity>(() => ({
     currentPartnerKey: partnerKey,
