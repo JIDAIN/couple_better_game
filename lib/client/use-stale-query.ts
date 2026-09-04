@@ -191,10 +191,10 @@ export async function prefetchStaleQuery<T>({
   key: string;
   fetcher: () => Promise<T>;
   staleMs?: number;
-}) {
+}): Promise<T> {
   const cached = entryFor<T>(key);
   const fresh = cached?.data !== undefined && Date.now() - cached.updatedAt < staleMs;
-  if (fresh) return cached.data;
+  if (fresh) return cached.data as T;
   if (cached?.promise) return cached.promise;
 
   const promise = fetcher();
