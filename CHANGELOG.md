@@ -2,6 +2,17 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-04 — R8.8 缓存竞态收口与首屏无闪烁（PR #58）
+
+- 为 stale-query 增加 request revision barrier：早于本地/read-back 写入启动的旧请求不再有资格覆盖新缓存；途中 invalidate 会从 mutation 之后重新读取。
+- 月度 bundle 尚在飞行时发生心情写入，会显式失效旧快照，修复“刚改心情又被旧月历回滚”的竞态。
+- 浏览器绘制前恢复最近确认的 cat/fish scope 与持久读缓存；服务端签名 Cookie 仍是唯一权限依据。
+- 今日、饮食、日历移除用户可见的“第一次读取/正在确认账号”首屏文字；用稳定静态壳或月份网格承接首帧。
+- 饮食数据未恢复时使用中性照片位，不再先画默认餐图再切实拍图。
+- GitHub Actions：Test 221/221、Lint、Production Build 全部通过。
+- Production deployment `dpl_2WsHTaUJZYLht9J8mRZZQ4vjKLSf` READY；`/`、`/food`、`/calendar` 均为 200，部署后最近 30 分钟无 error/fatal runtime log。
+- 发布完成后已恢复 `vercel.json -> git.deploymentEnabled: false`，关闭提交未触发第二次部署。
+
 ## 2026-09-04 — R8.7 无阻塞启动与缓存一致性（PR #57）
 
 - 移除全屏启动 splash 与 620ms/2.4s 人为等待，缓存页面立即显示、数据后台校验。
@@ -10,7 +21,8 @@
 - 月度 bundle 同步生成月历缓存，避免同一月份并发读取 `get_life_month_moods` 和 `get_life_month_bundle`。
 - Life 写入 read-back 后原子同步 day/month/bundle 缓存，修复月历心情先显示旧值的问题。
 - 版本化餐食照片改为一年私有 immutable 缓存；餐食编辑/删除直接更新本地列表缓存。
-- 本地 Test 216/216、Lint、Production Build 与 `/`、`/food` HTTP smoke 均通过；尚未部署，需用户逐次许可后再做 Production 实机验收。
+- Test 216/216、Lint、Production Build 与 HTTP smoke 均通过；Production deployment `dpl_4n8MPK4N5ZQjNTCmj6gXLijYZupe` READY。
+- Production 实机复查暴露出“旧 in-flight 请求可能覆盖新缓存”和剩余首屏占位闪烁，后续由 R8.8 收口。
 
 ## 2026-09-02 — P2.5 同日饮食与游戏记录关联
 
