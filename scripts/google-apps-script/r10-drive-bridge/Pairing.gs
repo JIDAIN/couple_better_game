@@ -32,6 +32,15 @@ function r10PairingSetMeta_(sheet, key, value) {
   sheet.appendRow([key, value]);
 }
 
+function r10PairingWebAppUrl_() {
+  const raw = String(ScriptApp.getService().getUrl() || '').trim();
+  if (!raw) return '';
+
+  // Google can return the development-mode /dev endpoint depending on execution
+  // context. The Bridge wake callback must always use the deployed /exec endpoint.
+  return raw.replace(/\/dev(?:\?.*)?$/, '/exec');
+}
+
 function setupR10Pairing() {
   const meta = r10PairingMetaSheet_();
   const bridgeId = r10PairingMetaValue_(meta.sheet, 'bridge_id');
@@ -43,9 +52,12 @@ function setupR10Pairing() {
   if (!pairingCode) throw new Error('META pairing_code is missing or already consumed');
   if (expectedSheetId && expectedSheetId !== sheetId) throw new Error('This Apps Script is bound to the wrong Harbor Bridge Sheet');
 
-  const webAppUrl = ScriptApp.getService().getUrl();
+  const webAppUrl = r10PairingWebAppUrl_();
   if (!webAppUrl) {
     throw new Error('Deploy this Apps Script as a Web App first, then run setupR10Pairing() again.');
+  }
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec(?:\?.*)?$/.test(webAppUrl)) {
+    throw new Error('Google returned an unexpected Web App URL: ' + webAppUrl);
   }
 
   const response = UrlFetchApp.fetch(R10.PROGRAM_URL + '/api/drive-bridge/bootstrap', {
