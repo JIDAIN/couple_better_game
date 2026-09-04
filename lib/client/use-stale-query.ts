@@ -21,7 +21,7 @@ type PersistedCache = {
 const queryCache = new Map<string, CacheEntry<unknown>>();
 const CACHE_PREFIX = "couple-better-game:life-query:v2:";
 const SCOPE_HINT_KEY = "couple-better-game:life-scope";
-const MAX_PERSISTED_ENTRIES = 120;
+const MAX_PERSISTED_ENTRIES = 220;
 const MAX_PERSISTED_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 let activeScope: string | null = null;
@@ -152,6 +152,14 @@ export function peekStaleQuery<T>(key: string) {
 
 export function setStaleQueryData<T>(key: string, data: T) {
   queryCache.set(key, { data, updatedAt: Date.now() });
+  persistCurrentScope();
+}
+
+export function setStaleQueryDataMany(entries: Array<{ key: string; data: unknown }>) {
+  const updatedAt = Date.now();
+  for (const entry of entries) {
+    queryCache.set(entry.key, { data: entry.data, updatedAt });
+  }
   persistCurrentScope();
 }
 
