@@ -23,7 +23,8 @@ R8.1   第一轮视觉/交互收口                       ✅ Production
 R8.2   Production 实机视觉二次校准               ✅ Production
 R8.3   信息减法 + UI hotfix                     ✅ Production
 R8.4   弱网缓存 + 持久导航 + App Shell            ✅ Production
-R8.7   无阻塞启动 + 图片缓存 + 日历即时同步          🧪 PR #57，待部署实机验收
+R8.7   无阻塞启动 + 图片缓存 + 日历即时同步          ✅ Production
+R8.8   缓存竞态收口 + 首页/饮食/日历无闪烁           ✅ Production
 R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
 R10    双 Harbor + Worker Pairing 后端            ✅ Production
 R10    Cat/Fish Apps Script Workers              ⏳ 尚未激活
@@ -69,52 +70,56 @@ Lint   ✅
 Build  ✅
 ```
 
-## 4. R8.7 无感加载修复（开发中）
+## 4. R8.7-R8.8 无感加载与缓存一致性（已上线）
 
-R8.4-R8.6 虽已有持久读缓存与月度 bundle，但 Production 实机仍能看到全屏启动进度、餐食默认图切换到实拍图、心情写入后月历短暂显示旧值。PR #57 的第一版只删除遮罩、提高图片优先级并标记月历缓存过期，CI 失败且“标记过期”仍会造成旧值先闪现，因此不能作为完成状态。
+R8.4-R8.6 已有持久读缓存与月度 bundle，但 Production 实机仍能看到启动进度、餐食默认图切换到实拍图、心情写入后月历短暂显示旧值。R8.7 先移除人为启动 gate、统一 canonical 预热和图片版本缓存；Production 复查后又确认存在一个更深层竞态：早于写入启动的旧请求可能在更晚返回后把新缓存覆盖回旧数据。R8.8 针对这个竞态和剩余首屏闪烁完成最后收口。
 
-当前修订版：
+当前已上线能力：
 
 - 删除全屏启动 gate 及其 CSS，页面壳不再被 620ms/2.4s 人为阻塞；
-- 最近确认身份的 scope hint 改为跨应用重开的本地提示，缓存页面可立即恢复；
-- 启动首批预热只使用 Today/Food 的 canonical keys，挂载页面复用同一 promise，月历、体重、药箱、信箱延后 1.2s，避免首屏 RPC 争抢；
-- 月度 bundle 直接生成 `life-month:*` 月历缓存，月历不再同时请求 month 与 bundle；
-- 心情/睡眠/活动写入 read-back 后同步更新 day、month、bundle 三层缓存，月历立即看到新心情，而不是先显示旧值再刷新；
-- 餐食照片 URL 已带 `updatedAt` 版本，响应改为 `private, max-age=31536000, immutable`，看过的版本可长期命中本机私有缓存；
-- 餐食编辑/删除直接更新当日列表缓存，不再返回饮食页后先显示旧餐食。
+- 最近确认身份的 scope hint 跨应用重开保留，浏览器绘制前恢复身份提示和持久读缓存；真实权限仍由签名 Cookie 决定；
+- 启动首批预热只使用 Today/Food 的 canonical keys，月历、体重、药箱、信箱延后，降低首屏 RPC 争抢；
+- 月度 bundle 直接生成 `life-month:*` 月历缓存；
+- 心情/睡眠/活动写入 read-back 后同步更新 day、month、bundle 三层缓存；
+- stale-query 增加 request revision barrier：旧 in-flight 响应不能覆盖 mutation 后的新缓存；invalidate 发生在飞行请求途中时会从 mutation 之后重新读取；
+- 月度 bundle 尚在请求途中时发生 day/mood 写入，会显式使旧 bundle 快照失效，避免月历回滚；
+- 餐食照片 URL 带 `updatedAt` 版本，响应为 `private, max-age=31536000, immutable`；
+- 餐食编辑/删除直接更新当日列表缓存；
+- 今日页首帧使用固定尺寸静态壳，不显示“第一次读取今天的记录”；
+- 饮食页身份/数据恢复期间不显示“正在确认当前账号”，餐食记录未恢复时使用中性图片位，避免默认餐图再切实拍图；
+- 日历直接首屏渲染月份网格，身份和心情只增量补齐，不再整页从加载态切换。
 
-本地验证：
+PR #58 最终 CI：
 
 ```text
-Test   ✅ 216/216
+Test   ✅ 221/221
 Lint   ✅
 Build  ✅ Next.js production build
-HTTP   ✅ / 200；/food 200；startup overlay 0
 ```
 
-尚未执行 Vercel Preview 或 Production 部署。只有得到用户对本次部署的明确许可后，才进行 Production 实机冷/热启动、三餐照片二次进入和心情写入→月历回看验收。
+Production 验收：
+
+```text
+/             200
+/food         200
+/calendar     200
+首页首屏       无“第一次读取今天的记录”文字
+饮食首屏       无“正在确认当前账号”文字
+日历首屏       直接渲染 2026 年 9 月网格
+runtime       部署后最近 30 分钟 error/fatal = 0
+```
 
 ## 5. 当前 Production
 
 ```text
 primary domain: https://couple-better-game.vercel.app
-deployment: dpl_758rLkFSFdDTncPKBVY5ZT5LwENH
+deployment: dpl_2WsHTaUJZYLht9J8mRZZQ4vjKLSf
 status: READY
-source commit: a58d50f829d31042fa6de500d9966047b5518f8d
+source commit: 0cffc3bf906a7a2bfdb8d878af3b9d544bed2eb1
+release: R8.8
 ```
 
-R8.6 Production 当前实况：
-
-```text
-/                         200
-/life-sw.js               200
-PersistentLifeChrome      已在 Production HTML
-LifeServiceWorker         已在 Production bundle
-最近 30 分钟 runtime errors  0
-最近 24 小时 runtime errors   0
-```
-
-本次采用一次受控 Git Production 触发：临时开启 `main` deployment，Production READY 后立即恢复关闭。
+本次采用一次受控 Git Production 触发：临时开启 `main` deployment，Production READY 后立即恢复关闭；关闭提交之后确认没有触发第二次 Vercel deployment。
 
 `vercel.json` 当前保持：
 
@@ -209,14 +214,13 @@ AI：
 ## 9. 当前执行顺序
 
 ```text
-1. R8.7 修订版 Test / Lint / Build             ✅ 本地
-2. 更新 PR #57 并等待 GitHub CI                <- 当前
-3. 获得逐次部署许可后执行 Production 部署
-4. Production 冷/热启动、照片、心情回看验收
-5. 激活 Harbor Cat / Fish Apps Script Workers
-6. Harbor 读写 / 照片 / watch / fallback 验收
-7. Cat backup / restore 验收
-8. Cat/Fish PushPlus 真实微信验收
+1. R8.7 / R8.8 无感加载与缓存竞态修复       ✅ Production
+2. Production 首页 / 饮食 / 日历 smoke      ✅
+3. 自动部署保护恢复                         ✅
+4. 激活 Harbor Cat / Fish Apps Script Workers <- 下一步
+5. Harbor 读写 / 照片 / watch / fallback 验收
+6. Cat backup / restore 验收
+7. Cat/Fish PushPlus 真实微信验收
 ```
 
 ## 10. 部署纪律
