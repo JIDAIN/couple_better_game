@@ -1,6 +1,7 @@
-import { setStaleQueryDataMany } from "@/lib/client/use-stale-query";
+import { peekStaleQuery, setStaleQueryDataMany } from "../client/use-stale-query";
+import type { LifeMonthMoodRecord } from "./calendar-service";
 import type { LifeDayRecord, LifePartnerKey } from "./life-service";
-import type { MealRecord } from "@/lib/nutrition/meal-service";
+import type { MealRecord } from "../nutrition/meal-service";
 
 export type LifeMonthBundleDay = {
   date: string;
@@ -12,6 +13,13 @@ export type LifeMonthBundle = {
   month: string;
   days: LifeMonthBundleDay[];
 };
+
+export function lifeMonthMoodsFromBundle(bundle: LifeMonthBundle): LifeMonthMoodRecord {
+  return {
+    month: bundle.month,
+    days: bundle.days.map((item) => ({ date: item.date, moods: item.day.moods })),
+  };
+}
 
 export function hydrateLifeMonthBundle(
   bundle: LifeMonthBundle,
@@ -31,6 +39,29 @@ export function hydrateLifeMonthBundle(
         data: item.meals.filter((meal) => meal.partnerKey === ta && !meal.deletedAt),
       },
     );
+  }
+  entries.push({ key: `life-month:${bundle.month}`, data: lifeMonthMoodsFromBundle(bundle) });
+  setStaleQueryDataMany(entries);
+}
+
+export function syncLifeDayCaches(date: string, day: LifeDayRecord) {
+  const month = date.slice(0, 7);
+  const entries: Array<{ key: string; data: unknown }> = [{ key: `life-day:${date}`, data: day }];
+  const monthCache = peekStaleQuery<LifeMonthMoodRecord>(`life-month:${month}`);
+  if (monthCache) {
+    const days = monthCache.days.filter((item) => item.date !== date);
+    days.push({ date, moods: day.moods });
+    days.sort((left, right) => left.date.localeCompare(right.date));
+    entries.push({ key: `life-month:${month}`, data: { ...monthCache, days } });
+  }
+
+  const bundleCache = peekStaleQuery<LifeMonthBundle>(`life-month-bundle:${month}`);
+  if (bundleCache) {
+    const existing = bundleCache.days.find((item) => item.date === date);
+    const days = bundleCache.days.filter((item) => item.date !== date);
+    days.push({ date, day, meals: existing?.meals ?? [] });
+    days.sort((left, right) => left.date.localeCompare(right.date));
+    entries.push({ key: `life-month-bundle:${month}`, data: { ...bundleCache, days } });
   }
   setStaleQueryDataMany(entries);
 }

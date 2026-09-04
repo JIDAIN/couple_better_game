@@ -23,6 +23,7 @@ R8.1   第一轮视觉/交互收口                       ✅ Production
 R8.2   Production 实机视觉二次校准               ✅ Production
 R8.3   信息减法 + UI hotfix                     ✅ Production
 R8.4   弱网缓存 + 持久导航 + App Shell            ✅ Production
+R8.7   无阻塞启动 + 图片缓存 + 日历即时同步          🧪 PR #57，待部署实机验收
 R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
 R10    双 Harbor + Worker Pairing 后端            ✅ Production
 R10    Cat/Fish Apps Script Workers              ⏳ 尚未激活
@@ -47,7 +48,7 @@ Production 实机确认原 stale-while-revalidate 仍只有内存缓存，而且
 R8.4 已完成并上线：
 
 - `stale-query` 增加 cat/fish 身份隔离的 `localStorage` 持久读缓存；
-- `sessionStorage` 只保存当前标签页最近确认的 cat/fish scope；
+- `localStorage` 保存最近确认的 cat/fish 非授权 scope hint，使安装后的应用重新打开时能立刻恢复对应的本地读缓存；真实权限仍由服务端签名 Cookie 确认；
 - 网络/5xx 失败不再自动变成“退出登录”，服务器明确 unauthenticated 才清身份；
 - 网络恢复后自动重新确认 session 并后台刷新；
 - 今日、月历、饮食、体重、药箱、信箱、设置均可在已有缓存时继续显示旧数据；
@@ -68,16 +69,41 @@ Lint   ✅
 Build  ✅
 ```
 
-## 4. 当前 Production
+## 4. R8.7 无感加载修复（开发中）
+
+R8.4-R8.6 虽已有持久读缓存与月度 bundle，但 Production 实机仍能看到全屏启动进度、餐食默认图切换到实拍图、心情写入后月历短暂显示旧值。PR #57 的第一版只删除遮罩、提高图片优先级并标记月历缓存过期，CI 失败且“标记过期”仍会造成旧值先闪现，因此不能作为完成状态。
+
+当前修订版：
+
+- 删除全屏启动 gate 及其 CSS，页面壳不再被 620ms/2.4s 人为阻塞；
+- 最近确认身份的 scope hint 改为跨应用重开的本地提示，缓存页面可立即恢复；
+- 启动首批预热只使用 Today/Food 的 canonical keys，挂载页面复用同一 promise，月历、体重、药箱、信箱延后 1.2s，避免首屏 RPC 争抢；
+- 月度 bundle 直接生成 `life-month:*` 月历缓存，月历不再同时请求 month 与 bundle；
+- 心情/睡眠/活动写入 read-back 后同步更新 day、month、bundle 三层缓存，月历立即看到新心情，而不是先显示旧值再刷新；
+- 餐食照片 URL 已带 `updatedAt` 版本，响应改为 `private, max-age=31536000, immutable`，看过的版本可长期命中本机私有缓存；
+- 餐食编辑/删除直接更新当日列表缓存，不再返回饮食页后先显示旧餐食。
+
+本地验证：
+
+```text
+Test   ✅ 216/216
+Lint   ✅
+Build  ✅ Next.js production build
+HTTP   ✅ / 200；/food 200；startup overlay 0
+```
+
+尚未执行 Vercel Preview 或 Production 部署。只有得到用户对本次部署的明确许可后，才进行 Production 实机冷/热启动、三餐照片二次进入和心情写入→月历回看验收。
+
+## 5. 当前 Production
 
 ```text
 primary domain: https://couple-better-game.vercel.app
-deployment: dpl_Vm4tYAk8Z6aeubqY8F5ET86gjrmB
+deployment: dpl_758rLkFSFdDTncPKBVY5ZT5LwENH
 status: READY
-source commit: 3920e327daec26565bf069395433ac77aff1446f
+source commit: a58d50f829d31042fa6de500d9966047b5518f8d
 ```
 
-R8.4 Production 验证：
+R8.6 Production 当前实况：
 
 ```text
 /                         200
@@ -85,7 +111,7 @@ R8.4 Production 验证：
 PersistentLifeChrome      已在 Production HTML
 LifeServiceWorker         已在 Production bundle
 最近 30 分钟 runtime errors  0
-本次新增 Production 数量     1
+最近 24 小时 runtime errors   0
 ```
 
 本次采用一次受控 Git Production 触发：临时开启 `main` deployment，Production READY 后立即恢复关闭。
@@ -100,7 +126,7 @@ LifeServiceWorker         已在 Production bundle
 }
 ```
 
-## 5. R10 AI 当前真实状态
+## 6. R10 AI 当前真实状态
 
 代码/协议已经具备：
 
@@ -124,7 +150,7 @@ life_drive_bridge_commands = 0 条真实命令
 
 因此 Harbor AI **后端设计足够，但目前还不能称为真实可用**。必须先激活并 pair 两个 Apps Script Worker，再做真实读写、照片、watch、fallback 和 backup 验收。
 
-## 6. 微信提醒当前真实状态
+## 7. 微信提醒当前真实状态
 
 Production 已有 Cat/Fish 两份提醒偏好：
 
@@ -151,7 +177,7 @@ life_notification_deliveries = 0
 
 且两个 Apps Script Worker 尚未激活，因此 **微信提醒还没有真正发送过一条测试消息**。
 
-## 7. 达到“日常实用”的最后验收
+## 8. 达到“日常实用”的最后验收
 
 AI：
 
@@ -180,19 +206,19 @@ AI：
 
 这些验收通过后，当前架构对两个人的私人日常使用已经足够，不需要再增加数据库、消息队列或额外付费基础设施。长期最可能的容量瓶颈是 Google Drive 原始照片空间。
 
-## 8. 当前执行顺序
+## 9. 当前执行顺序
 
 ```text
-1. R8.4 刷新 / 弱网修复                      ✅
-2. R8.4 Test / Lint / Build                  ✅ CI #274
-3. PR #52 合并 main                           ✅ 3232f834...
-4. R8.4 Production 部署                      ✅ dpl_Vm4tYAk8...
-5. 激活 Harbor Cat / Fish Apps Script Workers <- 下一步
+1. R8.7 修订版 Test / Lint / Build             ✅ 本地
+2. 更新 PR #57 并等待 GitHub CI                <- 当前
+3. 获得逐次部署许可后执行 Production 部署
+4. Production 冷/热启动、照片、心情回看验收
+5. 激活 Harbor Cat / Fish Apps Script Workers
 6. Harbor 读写 / 照片 / watch / fallback 验收
 7. Cat backup / restore 验收
 8. Cat/Fish PushPlus 真实微信验收
 ```
 
-## 9. 部署纪律
+## 10. 部署纪律
 
 **任何后续 Vercel Preview 或 Production deployment 都必须逐次获得用户明确许可。**

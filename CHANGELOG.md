@@ -2,6 +2,16 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-04 — R8.7 无阻塞启动与缓存一致性（PR #57）
+
+- 移除全屏启动 splash 与 620ms/2.4s 人为等待，缓存页面立即显示、数据后台校验。
+- 最近确认身份作为非授权本地 scope hint 跨应用重开保留；服务端签名 Cookie 仍是唯一权限依据。
+- 启动预热改为 canonical day/meal/settings keys，月历与小窝数据延后，减少首屏重复 RPC 与资源争抢。
+- 月度 bundle 同步生成月历缓存，避免同一月份并发读取 `get_life_month_moods` 和 `get_life_month_bundle`。
+- Life 写入 read-back 后原子同步 day/month/bundle 缓存，修复月历心情先显示旧值的问题。
+- 版本化餐食照片改为一年私有 immutable 缓存；餐食编辑/删除直接更新本地列表缓存。
+- 本地 Test 216/216、Lint、Production Build 与 `/`、`/food` HTTP smoke 均通过；尚未部署，需用户逐次许可后再做 Production 实机验收。
+
 ## 2026-09-02 — P2.5 同日饮食与游戏记录关联
 
 - 在现有「今日 → 饮食小记」中新增“当天合在一起看”，不新增第五个主 Tab。

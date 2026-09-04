@@ -8,6 +8,7 @@ import { fetchLifeSettings } from "@/lib/life/settings-client";
 import { daysTogether, type LifeSettings } from "@/lib/life/settings-service";
 import type { LifeDayRecord } from "@/lib/life/life-service";
 import { useStaleQuery } from "@/lib/client/use-stale-query";
+import { syncLifeDayCaches } from "@/lib/life/month-bundle";
 import { TodayActivityCard } from "./today/TodayActivityCard";
 import { TodayMoodCard } from "./today/TodayMoodCard";
 import { TodaySleepCard } from "./today/TodaySleepCard";
@@ -48,7 +49,9 @@ export function TodayLifePage() {
   const reload = useCallback(async () => {
     setActionError(null);
     try {
-      await query.refresh(true);
+      const next = await fetchLifeDay(date);
+      syncLifeDayCaches(date, next);
+      query.update(next);
     } catch (cause) {
       if (cause instanceof LifeApiError && cause.status === 401) {
         router.replace("/login");
@@ -56,7 +59,7 @@ export function TodayLifePage() {
       }
       setActionError(cause instanceof Error ? cause.message : "读取今天的生活记录失败");
     }
-  }, [query, router]);
+  }, [date, query, router]);
 
   if (queryNeedsLogin) {
     return (

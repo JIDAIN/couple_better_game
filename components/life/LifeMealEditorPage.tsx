@@ -10,7 +10,7 @@ import { AppInput } from "@/components/ui/AppInput";
 import { AppNutritionBar } from "@/components/ui/AppNutritionBar";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppTextarea } from "@/components/ui/AppTextarea";
-import { invalidateStaleQuery, peekStaleQuery } from "@/lib/client/use-stale-query";
+import { invalidateStaleQuery, peekStaleQuery, setStaleQueryData } from "@/lib/client/use-stale-query";
 import { createMealRecord, deleteMealPhoto, deleteMealRecord, fetchMeals, mealPhotoUrl, MealApiError, updateMealRecord, uploadMealPhoto } from "@/lib/nutrition/meal-client";
 import type { MealItemRecord, MealRecord, MealType, MealWritePayload, NutritionPartnerKey, SnackPeriod } from "@/lib/nutrition/meal-service";
 
@@ -108,7 +108,20 @@ export function LifeMealEditorPage() {
       let saved = meal ? await updateMealRecord(meal.id, payload) : await createMealRecord(payload);
       try { if (photoFile) saved = await uploadMealPhoto(saved.id, photoFile); else if (removePhoto && saved.photoPath) saved = await deleteMealPhoto(saved.id); }
       catch (cause) { setError(cause instanceof MealApiError ? `餐食已经保存，但照片没有保存：${cause.message}` : "餐食已经保存，但照片没有保存成功"); return; }
-      invalidateStaleQuery(`meals:${partnerKey}:${date}`); router.push("/food");
+      const targetKey = `meals:${partnerKey}:${saved.mealDate}`;
+      const targetCache = peekStaleQuery<MealRecord[]>(targetKey);
+      if (targetCache) {
+        setStaleQueryData(targetKey, [...targetCache.filter((record) => record.id !== saved.id), saved]);
+      } else {
+        invalidateStaleQuery(targetKey);
+      }
+      if (meal && meal.mealDate !== saved.mealDate) {
+        const previousKey = `meals:${partnerKey}:${meal.mealDate}`;
+        const previousCache = peekStaleQuery<MealRecord[]>(previousKey);
+        if (previousCache) setStaleQueryData(previousKey, previousCache.filter((record) => record.id !== saved.id));
+      }
+      invalidateStaleQuery(`life-month-bundle:${saved.mealDate.slice(0, 7)}`);
+      router.push(`/food?date=${encodeURIComponent(saved.mealDate)}`);
     } catch (cause) { setError(cause instanceof MealApiError ? cause.message : "这餐暂时没有保存成功"); }
     finally { setSaving(false); }
   }
@@ -116,7 +129,15 @@ export function LifeMealEditorPage() {
   async function removeMeal() {
     if (!meal || !canEdit || !window.confirm(`删除这条${title}记录吗？`)) return;
     setSaving(true);
-    try { await deleteMealRecord(meal.id); invalidateStaleQuery(`meals:${partnerKey}:${date}`); router.push("/food"); }
+    try {
+      await deleteMealRecord(meal.id);
+      const key = `meals:${partnerKey}:${meal.mealDate}`;
+      const cached = peekStaleQuery<MealRecord[]>(key);
+      if (cached) setStaleQueryData(key, cached.filter((record) => record.id !== meal.id));
+      else invalidateStaleQuery(key);
+      invalidateStaleQuery(`life-month-bundle:${meal.mealDate.slice(0, 7)}`);
+      router.push(`/food?date=${encodeURIComponent(meal.mealDate)}`);
+    }
     catch (cause) { setError(cause instanceof MealApiError ? cause.message : "删除失败"); }
     finally { setSaving(false); }
   }
