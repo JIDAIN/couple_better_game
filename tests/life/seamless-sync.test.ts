@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { invalidateStaleQuery, peekStaleQuery, setStaleQueryData } from "../../lib/client/use-stale-query";
+import { syncLifeDayCaches } from "../../lib/life/month-bundle";
+import type { LifeDayRecord } from "../../lib/life/life-service";
 
 function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
@@ -32,12 +34,29 @@ describe("life seamless synchronization", () => {
   it("persists safe read caches per cat/fish browser scope", () => {
     const cache = source("lib/client/use-stale-query.ts");
     expect(cache).toContain("window.localStorage");
-    expect(cache).toContain("window.sessionStorage");
+    expect(cache).toContain("window.localStorage.getItem(SCOPE_HINT_KEY)");
     expect(cache).toContain("rememberStaleQueryScope");
     expect(cache).toContain("MAX_PERSISTED_AGE_MS");
     expect(cache).toContain('key === "medicines"');
     expect(cache).toContain('key === "mailbox"');
     expect(cache).toContain('key === "life-settings"');
+  });
+
+  it("updates the visible month cache immediately after a mood write", () => {
+    const date = "2098-11-03";
+    const monthKey = "life-month:2098-11";
+    setStaleQueryData(monthKey, { month: "2098-11", days: [{ date, moods: [] }] });
+    const day: LifeDayRecord = {
+      date,
+      moods: [{
+        id: crypto.randomUUID(), partnerKey: "cat", moodDate: date, moodKey: "happy",
+        source: "manual", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }],
+      sleeps: [],
+      activities: [],
+    };
+    syncLifeDayCaches(date, day);
+    expect(peekStaleQuery<{ days: Array<{ moods: Array<{ moodKey: string }> }> }>(monthKey)?.days[0].moods[0].moodKey).toBe("happy");
   });
 
   it("does not treat a temporary session fetch failure as logout", () => {
@@ -77,6 +96,13 @@ describe("life seamless synchronization", () => {
     ]) {
       expect(source(path), path).not.toContain("life-sync-pill");
     }
+  });
+
+  it("keeps versioned meal photos in the private browser cache", () => {
+    const photoRoute = source("app/api/meals/[id]/photo/route.ts");
+    const client = source("lib/nutrition/meal-client.ts");
+    expect(client).toContain("?v=${encodeURIComponent(meal.updatedAt)}");
+    expect(photoRoute).toContain('private, max-age=31536000, immutable');
   });
 
   it("hydrates meal editing from the list cache", () => {

@@ -52,7 +52,10 @@ function shouldPersistKey(key: string) {
 export function readStaleQueryScopeHint() {
   if (!browserReady()) return null;
   try {
-    const value = window.sessionStorage.getItem(SCOPE_HINT_KEY);
+    // This is only a non-authoritative cache scope hint. The signed server cookie
+    // still decides access, but localStorage lets an installed app reopen without
+    // briefly losing the last confirmed cat/fish UI and its cached data.
+    const value = window.localStorage.getItem(SCOPE_HINT_KEY);
     return validScope(value) ? value : null;
   } catch {
     return null;
@@ -122,7 +125,7 @@ export function setStaleQueryScope(scope: "cat" | "fish" | null) {
 export function rememberStaleQueryScope(scope: "cat" | "fish") {
   if (browserReady()) {
     try {
-      window.sessionStorage.setItem(SCOPE_HINT_KEY, scope);
+      window.localStorage.setItem(SCOPE_HINT_KEY, scope);
     } catch {
       // Ignore storage restrictions.
     }
@@ -133,7 +136,7 @@ export function rememberStaleQueryScope(scope: "cat" | "fish") {
 export function forgetStaleQueryScope() {
   if (browserReady()) {
     try {
-      window.sessionStorage.removeItem(SCOPE_HINT_KEY);
+      window.localStorage.removeItem(SCOPE_HINT_KEY);
     } catch {
       // Ignore storage restrictions.
     }

@@ -9,13 +9,14 @@ import {
   readStaleQueryScopeHint,
   rememberStaleQueryScope,
 } from "@/lib/client/use-stale-query";
-import { fetchLifeMonth, fetchLifeMonthBundle } from "@/lib/life/life-client";
+import { fetchLifeDay, fetchLifeMonthBundle } from "@/lib/life/life-client";
 import { hydrateLifeMonthBundle } from "@/lib/life/month-bundle";
 import { fetchLifeSettings } from "@/lib/life/settings-client";
 import { fetchWeights } from "@/lib/life/weight-client";
 import { fetchMedicines } from "@/lib/life/medicine-client";
 import { fetchMailboxLetters } from "@/lib/life/mailbox-client";
 import { preloadMealPhotos } from "@/lib/nutrition/meal-photo-cache";
+import { fetchMeals } from "@/lib/nutrition/meal-client";
 import type { MealRecord } from "@/lib/nutrition/meal-service";
 
 export type LifeRelativeIdentity = {
@@ -24,7 +25,6 @@ export type LifeRelativeIdentity = {
   taPartnerKey: LifePartnerKey | null;
   authenticated: boolean;
   loading: boolean;
-  bootstrapReady: boolean;
   refreshIdentity: () => Promise<LifePartnerKey | null>;
 };
 
@@ -34,7 +34,6 @@ const LifeIdentityContext = createContext<LifeRelativeIdentity>({
   taPartnerKey: null,
   authenticated: false,
   loading: true,
-  bootstrapReady: false,
   refreshIdentity: async () => null,
 });
 
@@ -70,39 +69,44 @@ function preloadStaticImage(src: string) {
   image.src = src;
 }
 
-async function preloadTodayMealPhotos(me: LifePartnerKey, ta: LifePartnerKey, date: string) {
-  const meals = [
-    ...(peekStaleQuery<MealRecord[]>(`meals:${me}:${date}`) ?? []),
-    ...(peekStaleQuery<MealRecord[]>(`meals:${ta}:${date}`) ?? []),
-  ];
-  await preloadMealPhotos(meals, 1400);
-}
-
-async function warmLifeEssentials(me: LifePartnerKey) {
+function warmLifeEssentials(me: LifePartnerKey) {
   const date = localDate();
   const month = date.slice(0, 7);
   const ta = oppositePartnerKey(me);
 
   for (const src of CORE_IMAGE_ASSETS) preloadStaticImage(src);
 
-  const monthBundleTask = prefetchStaleQuery({
-    key: `life-month-bundle:${month}`,
-    fetcher: () => fetchLifeMonthBundle(month),
-    staleMs: 60_000,
-  }).then((bundle) => {
-    hydrateLifeMonthBundle(bundle, me, ta);
-    return bundle;
+  // Warm only canonical keys used by Today/Food first. Mounted screens reuse the
+  // same promises, so opening the app no longer creates parallel duplicate reads.
+  const essentialTasks = [
+    prefetchStaleQuery({ key: `life-day:${date}`, fetcher: () => fetchLifeDay(date), staleMs: 20_000 }),
+    prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
+    prefetchStaleQuery({ key: `meals:${ta}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: ta })).filter((meal) => !meal.deletedAt), staleMs: 20_000 }),
+    prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
+  ];
+  void Promise.allSettled(essentialTasks).then(() => {
+    const meals = [
+      ...(peekStaleQuery<MealRecord[]>(`meals:${me}:${date}`) ?? []),
+      ...(peekStaleQuery<MealRecord[]>(`meals:${ta}:${date}`) ?? []),
+    ];
+    return preloadMealPhotos(meals, 1400);
   });
 
-  void Promise.allSettled([
-    monthBundleTask.then(() => preloadTodayMealPhotos(me, ta, date)),
-    prefetchStaleQuery({ key: `life-month:${month}`, fetcher: () => fetchLifeMonth(month), staleMs: 60_000 }),
-    prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
-    prefetchStaleQuery({ key: `weights:${me}`, fetcher: () => fetchWeights(me) }),
-    prefetchStaleQuery({ key: `weights:${ta}`, fetcher: () => fetchWeights(ta) }),
-    prefetchStaleQuery({ key: "medicines", fetcher: fetchMedicines }),
-    prefetchStaleQuery({ key: "mailbox", fetcher: fetchMailboxLetters }),
-  ]);
+  // Month/detail and Nest datasets are useful prefetches, but must not compete
+  // with the first visible screen. They start after the initial paint window.
+  window.setTimeout(() => {
+    void Promise.allSettled([
+      prefetchStaleQuery({
+        key: `life-month-bundle:${month}`,
+        fetcher: () => fetchLifeMonthBundle(month),
+        staleMs: 60_000,
+      }).then((bundle) => hydrateLifeMonthBundle(bundle, me, ta)),
+      prefetchStaleQuery({ key: `weights:${me}`, fetcher: () => fetchWeights(me) }),
+      prefetchStaleQuery({ key: `weights:${ta}`, fetcher: () => fetchWeights(ta) }),
+      prefetchStaleQuery({ key: "medicines", fetcher: fetchMedicines }),
+      prefetchStaleQuery({ key: "mailbox", fetcher: fetchMailboxLetters }),
+    ]);
+  }, 1200);
 }
 
 function validPartner(value: unknown): value is LifePartnerKey {
@@ -113,7 +117,6 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
   const [partnerKey, setPartnerKey] = useState<LifePartnerKey | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [bootstrapReady, setBootstrapReady] = useState(false);
   const partnerRef = useRef<LifePartnerKey | null>(null);
   const bootstrappedRef = useRef(false);
 
@@ -130,12 +133,11 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const finishInitialBootstrap = useCallback((next: LifePartnerKey | null) => {
+  const startInitialWarmup = useCallback((next: LifePartnerKey | null) => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    setBootstrapReady(true);
     if (!next || (typeof navigator !== "undefined" && !navigator.onLine)) return;
-    void warmLifeEssentials(next).catch(() => undefined);
+    warmLifeEssentials(next);
   }, []);
 
   const refreshIdentity = useCallback(async () => {
@@ -156,27 +158,27 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
 
     const alreadyBootstrapped = bootstrappedRef.current;
     applyIdentity(next, authoritative);
-    finishInitialBootstrap(next);
+    startInitialWarmup(next);
     if (alreadyBootstrapped && next && (typeof navigator === "undefined" || navigator.onLine)) {
-      void warmLifeEssentials(next).catch(() => undefined);
+      warmLifeEssentials(next);
     }
     return next;
-  }, [applyIdentity, finishInitialBootstrap]);
+  }, [applyIdentity, startInitialWarmup]);
 
   useEffect(() => {
     const hint = readStaleQueryScopeHint();
     if (hint && !partnerRef.current) {
       applyIdentity(hint, false);
-      finishInitialBootstrap(hint);
+      startInitialWarmup(hint);
     }
-    const task = window.setTimeout(() => { void refreshIdentity().catch(() => { setBootstrapReady(true); }); }, 0);
+    const task = window.setTimeout(() => { void refreshIdentity().catch(() => undefined); }, 0);
     const handleOnline = () => { void refreshIdentity().catch(() => undefined); };
     window.addEventListener("online", handleOnline);
     return () => {
       window.clearTimeout(task);
       window.removeEventListener("online", handleOnline);
     };
-  }, [applyIdentity, finishInitialBootstrap, refreshIdentity]);
+  }, [applyIdentity, refreshIdentity, startInitialWarmup]);
 
   const value = useMemo<LifeRelativeIdentity>(() => ({
     currentPartnerKey: partnerKey,
@@ -184,9 +186,8 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     taPartnerKey: partnerKey ? oppositePartnerKey(partnerKey) : null,
     authenticated,
     loading,
-    bootstrapReady,
     refreshIdentity,
-  }), [authenticated, bootstrapReady, loading, partnerKey, refreshIdentity]);
+  }), [authenticated, loading, partnerKey, refreshIdentity]);
 
   return <LifeIdentityContext.Provider value={value}>{children}</LifeIdentityContext.Provider>;
 }

@@ -6,17 +6,15 @@ function source(path: string) {
   return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
-describe("R8.5/R8.6 startup prewarm", () => {
-  it("uses a one-time startup gate instead of exposing partial first render", () => {
+describe("R8.7 non-blocking startup and prewarm", () => {
+  it("renders the app immediately without a timed startup gate", () => {
     const identity = source("components/life/LifeIdentityContext.tsx");
     const chrome = source("components/life/PersistentLifeChrome.tsx");
-    expect(identity).toContain("bootstrapReady");
     expect(identity).toContain("warmLifeEssentials");
-    expect(identity).toContain("Promise.race");
-    expect(identity).toContain("2400");
-    expect(chrome).toContain("LifeStartupSplash");
-    expect(chrome).toContain("MIN_SPLASH_MS = 620");
-    expect(chrome).toContain("小岛正在醒来");
+    expect(identity).not.toContain("Promise.race");
+    expect(identity).not.toContain("bootstrapReady");
+    expect(chrome).not.toContain("LifeStartupSplash");
+    expect(chrome).not.toContain("MIN_SPLASH_MS");
   });
 
   it("hydrates the whole current month into the canonical day and meal cache before reveal", () => {
@@ -24,14 +22,14 @@ describe("R8.5/R8.6 startup prewarm", () => {
     const bundle = source("lib/life/month-bundle.ts");
     expect(identity).toContain("fetchLifeMonthBundle(month)");
     expect(identity).toContain("hydrateLifeMonthBundle(bundle, me, ta)");
-    expect(identity).toContain("fetchLifeMonth(month)");
     expect(identity).toContain("fetchLifeSettings");
     expect(bundle).toContain("life-day:${item.date}");
     expect(bundle).toContain("meals:${me}:${item.date}");
     expect(bundle).toContain("meals:${ta}:${item.date}");
+    expect(bundle).toContain("life-month:${bundle.month}");
     expect(identity).toContain("/illustrations/life/activity-girls.png");
     expect(identity).toContain("/illustrations/meals/breakfast.svg");
-    expect(identity).toContain("preloadTodayMealPhotos");
+    expect(identity).toContain("preloadMealPhotos(meals, 1400)");
   });
 
   it("renders prewarmed local artwork through the same raw URLs", () => {
@@ -42,7 +40,7 @@ describe("R8.5/R8.6 startup prewarm", () => {
     expect(mood).toContain("<Image unoptimized");
     expect(activity).toContain('<Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png"');
     expect(nest).toContain('<Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png"');
-    expect(food).toContain("<Image unoptimized src={src}");
+    expect(food).toContain("<Image unoptimized priority={Boolean(customPhoto)}");
   });
 
   it("keeps heavier secondary screens warming after the app is interactive", () => {
@@ -51,12 +49,13 @@ describe("R8.5/R8.6 startup prewarm", () => {
     expect(identity).toContain("fetchMedicines");
     expect(identity).toContain("fetchMailboxLetters");
     expect(identity).toContain("void Promise.allSettled");
+    expect(identity).toContain("}, 1200)");
   });
 
   it("hydrates every opened calendar month and warms a tapped day's real meal photos", () => {
     const calendar = source("components/life/LifeCalendarPage.tsx");
     expect(calendar).toContain("fetchLifeMonthBundle(month)");
-    expect(calendar).toContain("hydrateLifeMonthBundle(bundle, me, ta)");
+    expect(calendar).toContain("hydrateLifeMonthBundle(bundle, mePartnerKey, taPartnerKey)");
     expect(calendar).toContain("const warmDay = useCallback");
     expect(calendar).toContain("preloadMealPhotos");
     expect(calendar).toContain("onPointerDown={() => warmDay(date)}");
@@ -72,12 +71,9 @@ describe("R8.5/R8.6 startup prewarm", () => {
     expect(detail).not.toContain("calendar-day:");
   });
 
-  it("loads dedicated startup styling from the root layout", () => {
+  it("does not load the obsolete full-screen startup styling", () => {
     const layout = source("app/layout.tsx");
-    const css = source("app/r8-5-bootstrap.css");
-    expect(layout).toContain('import "./r8-5-bootstrap.css"');
-    expect(css).toContain(".life-startup-splash");
-    expect(css).toContain("life-island-float");
-    expect(css).toContain("prefers-reduced-motion");
+    expect(layout).not.toContain("r8-5-bootstrap.css");
+    expect(layout).not.toContain("life-startup-splash");
   });
 });

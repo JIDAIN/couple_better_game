@@ -59,7 +59,9 @@ export async function GET(request: Request, context: RouteContext) {
       status: 200,
       headers: {
         "Content-Type": storageResponse.headers.get("content-type") || "image/webp",
-        "Cache-Control": "private, max-age=300",
+        // mealPhotoUrl includes the meal updatedAt value. A changed/deleted photo
+        // therefore gets a new URL, so previously viewed versions are safe to keep.
+        "Cache-Control": "private, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
       },
     });

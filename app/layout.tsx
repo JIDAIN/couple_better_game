@@ -12,7 +12,6 @@ import "./r8-2-ui-calibration.css";
 import "./r8-2-mailbox.css";
 import "./r8-3-visual-polish.css";
 import "./r8-3-hotfix.css";
-import "./r8-5-bootstrap.css";
 
 export const metadata: Metadata = {
   applicationName: "岛屿生活",
