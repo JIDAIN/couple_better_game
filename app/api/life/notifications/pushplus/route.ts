@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     if (!result.ok) {
       return lifeJsonError(result.error || "PushPlus 测试发送失败", 502, "PUSHPLUS_TEST_FAILED");
     }
-    return NextResponse.json({ ok: true, ...result }, { headers: LIFE_NO_STORE_HEADERS });
+    return NextResponse.json(result, { headers: LIFE_NO_STORE_HEADERS });
   } catch (error) {
     return reminderError(error);
   }
