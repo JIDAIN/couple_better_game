@@ -103,6 +103,35 @@ Pairing.gs
 11. Cat 建立单一家庭备份；
 12. 刷新 `STATE_*` snapshot。
 
+## Fast Wake：解决分钟级等待
+
+实际 Cat 验收确认：`life_query` / `life_mutate` 到 Supabase 的正式执行通常约 1 秒，主要延迟发生在“ChatGPT 用 Google Sheets API 写入 COMMANDS”到“Apps Script 被唤醒”之间。
+
+Google 官方限制说明：脚本执行和 API 请求不会触发 Apps Script 的 `onEdit` / installable edit trigger，因此不能依靠 Spreadsheet edit trigger 把 API 写入变成即时执行。
+
+R10.2 增加 Project Fast Wake：
+
+```text
+ChatGPT Project
+  -> 向 COMMANDS 追加 pending 行
+  -> 立即 GET /api/drive-bridge/kick?bridgeId=...&commandId=...&token=...
+  -> 服务端校验 bridge 固定身份 + 派生的 wake-only token
+  -> 服务端使用未暴露的 apps_script_wake_secret POST Apps Script Web App
+  -> processPendingCommands()
+  -> life_query / life_mutate
+  -> RECEIPTS
+```
+
+安全边界：
+
+- Project 使用的 kick token 是由 Drive watch token 单向派生的 **wake-only capability**；
+- Project Instructions 不保存 `bridge_secret`、`watch_token` 或 `apps_script_wake_secret`；
+- Fast Wake 不能自行创建或修改生活数据，只能让已经配对的固定 actor Worker 立即处理 Sheet 中现有 pending COMMANDS；
+- `commandId` 必须是 UUID；
+- Drive push 和每 1 分钟 time trigger 继续保留，作为 Fast Wake 失败时的双重兜底。
+
+目标体验从当前常见的几十秒到 2 分钟，降低为正常情况下十几秒级；真实值以 Production 验收为准。
+
 ## 一次性配对码生命周期
 
 - 明文只临时出现在对应 Bridge Sheet `META`；
@@ -117,7 +146,7 @@ Pairing.gs
 Cat 配对后先验证：
 
 ```text
-读取今天记录 -> 写一条心情 -> 再读取确认 -> 上传一张餐食照片 -> 查询药箱
+读取今天记录 -> 写一条活动 -> 精确删除该活动 -> 上传一张餐食照片 -> 查询药箱
 ```
 
 Fish 同样执行，并额外确认：
@@ -148,9 +177,12 @@ ChatGPT / Drive 原图
 - [x] Cat/Fish Bridge Sheets 已建立；
 - [x] R10.1 已解除微信提醒依赖；
 - [x] Worker 只需 Code.gs + Pairing.gs；
-- [ ] 本批 CI 全绿并合并 main；
-- [ ] 用户明确授权后部署包含本批网页/API 的 Vercel Production；
-- [ ] Cat Worker 手工一次性激活并配对成功；
-- [ ] Fish Worker 手工一次性激活并配对成功；
-- [ ] 两条 `apps_script_url` 非空；
-- [ ] Cat/Fish 分别完成真实读写、照片、药箱、身份隔离验收。
+- [x] Cat Worker 一次性激活并配对成功；
+- [x] Cat 完成真实查询、新增、精确删除闭环；
+- [x] Cat 身份固定为 `cat`；
+- [x] Fast Wake 代码与 wake-only token 安全模型已实现；
+- [ ] Fast Wake CI 全绿并合并 main；
+- [ ] 用户明确授权后部署 Fast Wake Vercel Production；
+- [ ] Cat Production Fast Wake 延迟验收；
+- [ ] Fish Worker 一次性激活并配对成功；
+- [ ] Fish 完成真实读写、照片、药箱、身份隔离验收。
