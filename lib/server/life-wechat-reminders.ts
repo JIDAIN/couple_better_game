@@ -17,6 +17,18 @@ export type WechatReminderMessage = {
   content: string;
 };
 
+export type LifePushplusStatus = {
+  actor: LifeReminderActor;
+  configured: boolean;
+};
+
+export type LifePushplusTestResult = {
+  actor: LifeReminderActor;
+  ok: boolean;
+  providerMessageId: string | null;
+  error: string | null;
+};
+
 type RpcErrorBody = { message?: string };
 type JsonRecord = Record<string, unknown>;
 
@@ -95,6 +107,62 @@ function isUuid(value: string) {
 
 export function harborAiName(actor: LifeReminderActor) {
   return actor === "cat" ? "团子" : "仔仔";
+}
+
+export function parseLifePushplusStatus(value: unknown): LifePushplusStatus | null {
+  const row = asRecord(value);
+  const actor = row.actor;
+  if (actor !== "cat" && actor !== "fish") return null;
+  if (typeof row.configured !== "boolean") return null;
+  return { actor, configured: row.configured };
+}
+
+export function parseLifePushplusTestResult(value: unknown): LifePushplusTestResult | null {
+  const row = asRecord(value);
+  const actor = row.actor;
+  if (actor !== "cat" && actor !== "fish") return null;
+  if (typeof row.ok !== "boolean") return null;
+  return {
+    actor,
+    ok: row.ok,
+    providerMessageId: nullableString(row.providerMessageId),
+    error: nullableString(row.error),
+  };
+}
+
+export async function getLifePushplusStatus(actor: LifeReminderActor) {
+  const payload = await callRpc<unknown>("get_life_pushplus_status", { p_actor: actor });
+  const status = parseLifePushplusStatus(payload);
+  if (!status) throw new LifeWechatReminderError("微信提醒状态格式不正确");
+  return status;
+}
+
+export async function setLifePushplusToken(actor: LifeReminderActor, token: string) {
+  const normalized = token.trim();
+  if (normalized.length < 10 || normalized.length > 256) {
+    throw new LifeWechatReminderError("PushPlus token 格式不正确");
+  }
+  const payload = await callRpc<unknown>("set_life_pushplus_token", {
+    p_actor: actor,
+    p_token: normalized,
+  });
+  const status = parseLifePushplusStatus(payload);
+  if (!status) throw new LifeWechatReminderError("微信提醒保存结果格式不正确");
+  return status;
+}
+
+export async function clearLifePushplusToken(actor: LifeReminderActor) {
+  const payload = await callRpc<unknown>("clear_life_pushplus_token", { p_actor: actor });
+  const status = parseLifePushplusStatus(payload);
+  if (!status) throw new LifeWechatReminderError("微信提醒清除结果格式不正确");
+  return status;
+}
+
+export async function testLifePushplus(actor: LifeReminderActor) {
+  const payload = await callRpc<unknown>("test_life_pushplus", { p_actor: actor });
+  const result = parseLifePushplusTestResult(payload);
+  if (!result) throw new LifeWechatReminderError("微信提醒测试结果格式不正确");
+  return result;
 }
 
 export function parseClaimedLifeReminder(value: unknown): ClaimedLifeReminder | null {

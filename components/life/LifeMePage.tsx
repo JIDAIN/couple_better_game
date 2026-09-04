@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
+import { LifeWechatReminderCard } from "@/components/life/LifeWechatReminderCard";
 
 export function LifeMePage() {
   const router = useRouter();
@@ -43,6 +44,8 @@ export function LifeMePage() {
               <span className="life-status-dot">已连接</span>
             </div>
           </section>
+
+          <LifeWechatReminderCard actor={currentPartnerKey} />
 
           <Link href="/me/data" className="life-surface life-me-data-card flex items-center gap-3 rounded-[var(--life-radius-card)] p-4">
             <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[15px] bg-[var(--life-surface-soft)] text-lg text-[var(--life-teal-strong)]" aria-hidden>🛟</div>

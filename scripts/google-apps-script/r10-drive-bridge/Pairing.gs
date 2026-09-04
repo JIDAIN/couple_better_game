@@ -1,6 +1,9 @@
 // One-time Harbor worker pairing. Run only after this bound Apps Script project
 // has been deployed as a Web App. Long-lived credentials are returned over HTTPS
 // and stored only in Script Properties; the one-time Sheet pairing code is then cleared.
+//
+// R10.1: WeChat reminders are delivered directly by Supabase -> PushPlus, so this
+// worker only needs the AI/Drive bridge triggers. Reminder.gs is no longer required.
 
 function r10PairingMetaSheet_() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -86,8 +89,9 @@ function setupR10Pairing() {
   r10PairingSetMeta_(meta.sheet, 'pairing_status', 'paired');
   r10PairingSetMeta_(meta.sheet, 'apps_script_url', String(config.webAppUrl || webAppUrl));
   r10PairingSetMeta_(meta.sheet, 'paired_at', String(config.pairedAt || new Date().toISOString()));
+  r10PairingSetMeta_(meta.sheet, 'wechat_reminder_status', 'supabase_direct');
 
-  const result = setupR10All();
+  const result = setupR10Triggers();
   return {
     ok: true,
     bridgeId: bridgeId,

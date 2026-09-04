@@ -27,7 +27,9 @@ R8.7   无阻塞启动 + 图片缓存 + 日历即时同步          ✅ Producti
 R8.8   缓存竞态收口 + 首页/饮食/日历无闪烁           ✅ Production
 R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
 R10    双 Harbor + Worker Pairing 后端            ✅ Production
-R10    Cat/Fish Apps Script Workers              ⏳ 尚未激活
+R10.1  Supabase -> PushPlus 微信调度后端           ✅ Production DB
+R10.1  微信绑定/测试网页                         ⏳ 等待一次授权 Production 部署
+R10.1  Cat/Fish Apps Script AI Workers           ⏳ 尚未激活
 ```
 
 ## 2. 固定身份与 Harbor
@@ -109,7 +111,7 @@ Production 验收：
 runtime       部署后最近 30 分钟 error/fatal = 0
 ```
 
-## 5. 当前 Production
+## 5. 当前 Vercel Production
 
 ```text
 primary domain: https://couple-better-game.vercel.app
@@ -119,7 +121,7 @@ source commit: 0cffc3bf906a7a2bfdb8d878af3b9d544bed2eb1
 release: R8.8
 ```
 
-本次采用一次受控 Git Production 触发：临时开启 `main` deployment，Production READY 后立即恢复关闭；关闭提交之后确认没有触发第二次 Vercel deployment。
+本轮 R10.1 尚未获得新的 Vercel Production 授权，因此网页/API 变更不会擅自上线。
 
 `vercel.json` 当前保持：
 
@@ -135,8 +137,8 @@ release: R8.8
 
 代码/协议已经具备：
 
+- Production `/mcp` 与 canonical `life_query / life_mutate`；
 - Cat/Fish 独立 HMAC 固定身份；
-- canonical `life_query / life_mutate`；
 - 个人数据写权限隔离；
 - 共享药箱 / 设置；
 - `(actor, command_id)` 幂等 ledger；
@@ -145,7 +147,9 @@ release: R8.8
 - Drive watch + 一分钟 fallback；
 - Cat 单一家庭备份 leader。
 
-但 Production 数据库实况仍为：
+截至 2026-09-04，OpenAI 对个人 Plus 仍未开放自定义 MCP 的完整写入能力，因此当前 Plus 的可执行兼容路径仍是 Harbor Drive Bridge。R10.1 已把微信提醒从该 Worker 移除，使 AI Worker 只承担 AI/Drive 工作。
+
+Production 数据库实况仍为：
 
 ```text
 cat  apps_script_url = empty / paired_at = null
@@ -153,34 +157,35 @@ fish apps_script_url = empty / paired_at = null
 life_drive_bridge_commands = 0 条真实命令
 ```
 
-因此 Harbor AI **后端设计足够，但目前还不能称为真实可用**。必须先激活并 pair 两个 Apps Script Worker，再做真实读写、照片、watch、fallback 和 backup 验收。
+因此 Harbor AI **后端已经准备好，但还不能称为真实可用**。下一步只剩两个 bound Apps Script Web App 的一次性人工激活，然后由系统自动 pairing，再做真实读写、照片、watch、fallback 和 backup 验收。
 
 ## 7. 微信提醒当前真实状态
 
-Production 已有 Cat/Fish 两份提醒偏好：
+Production DB 已完成 R10.1：
 
 ```text
 daily reminder       21:15  enabled
 anniversary reminder 09:15  enabled
 offsets              [7,1,0]
+cron                  */5 * * * * active
+provider              Supabase http -> PushPlus -> WeChat
+cat token             未配置
+fish token            未配置
 ```
 
-后端已有：
+已验证：
 
-- daily no-record 判定；
-- 纪念日提醒；
-- delivery ledger 防重复；
-- claim 超时恢复；
-- PushPlus 失败最多 3 次重试；
-- PushPlus accepted 后 complete 失败时避免重复发送。
+- Supabase Vault 可用；
+- `http` extension 可用；
+- `pg_cron` 可用；
+- `life-pushplus-reminders-v1` active；
+- cron 已至少真实执行一次且状态 `succeeded`；
+- 未配置 token 时 Cat/Fish 都安全 no-op；
+- 不会因为没有 token 就生成假的 delivery reservation。
 
-但当前：
+网页已经加入“我的 -> 微信提醒”卡片，可保存 / 替换 token、测试发送和解绑。token 只进入服务端并加密保存到 Vault，网页只能获取布尔状态。
 
-```text
-life_notification_deliveries = 0
-```
-
-且两个 Apps Script Worker 尚未激活，因此 **微信提醒还没有真正发送过一条测试消息**。
+目前唯一未完成的是：网页代码尚未获得本轮 Vercel Production 授权，因此还不能在生产站绑定 token；也就尚未做 Cat/Fish 两条真实微信测试。
 
 ## 8. 达到“日常实用”的最后验收
 
@@ -188,8 +193,8 @@ AI：
 
 ```text
 1. 创建并发布 Cat / Fish Apps Script Web App
-2. 分别完成 pairing + setupR10All()
-3. Harbor Cat / Fish 绑定各自 Bridge
+2. 分别完成 setupR10Pairing()（内部调用 setupR10Triggers()）
+3. Harbor Cat / Fish 自动回填 apps_script_url
 4. 两边真实 query / mutate
 5. 跨身份写入拒绝
 6. 餐食原图完整链路
@@ -202,25 +207,27 @@ AI：
 微信：
 
 ```text
-1. 两个 Worker 分别配置本人的 PUSHPLUS_TOKEN
-2. Cat / Fish 各发送一条真实测试消息
-3. 已有当天记录时不发送 daily reminder
-4. 同 dedupe key 不重复发送
-5. 模拟一次失败后重试成功
+1. 获得一次明确 Vercel Production 授权并上线“我的 -> 微信提醒”
+2. Cat 登录后绑定 cat PushPlus token，发送真实测试微信
+3. Fish 登录后绑定 fish PushPlus token，发送真实测试微信
+4. 已有当天记录时不发送 daily reminder
+5. 同 dedupe key 不重复发送
+6. 模拟一次失败后重试成功
 ```
 
-这些验收通过后，当前架构对两个人的私人日常使用已经足够，不需要再增加数据库、消息队列或额外付费基础设施。长期最可能的容量瓶颈是 Google Drive 原始照片空间。
+这些验收通过后，当前架构对两个人的私人日常使用已经足够，不需要再增加数据库、消息队列或额外付费基础设施。长期最可能的容量瓶颈仍是 Google Drive 原始照片空间。
 
 ## 9. 当前执行顺序
 
 ```text
 1. R8.7 / R8.8 无感加载与缓存竞态修复       ✅ Production
-2. Production 首页 / 饮食 / 日历 smoke      ✅
-3. 自动部署保护恢复                         ✅
-4. 激活 Harbor Cat / Fish Apps Script Workers <- 下一步
-5. Harbor 读写 / 照片 / watch / fallback 验收
-6. Cat backup / restore 验收
-7. Cat/Fish PushPlus 真实微信验收
+2. R10.1 Supabase 微信调度                   ✅ Production DB
+3. R10.1 网页绑定/测试代码 + CI              ⏳ PR #59
+4. 获得授权后做一次受控 Vercel Production      ⏳
+5. Cat / Fish 分别绑定 PushPlus + 真微信测试    ⏳
+6. 激活 Harbor Cat / Fish Apps Script Workers ⏳
+7. Harbor 读写 / 照片 / watch / fallback 验收  ⏳
+8. Cat backup / restore 验收                  ⏳
 ```
 
 ## 10. 部署纪律
