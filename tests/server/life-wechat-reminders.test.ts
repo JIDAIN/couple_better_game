@@ -3,6 +3,8 @@ import {
   buildWechatReminderMessage,
   harborAiName,
   parseClaimedLifeReminder,
+  parseLifePushplusStatus,
+  parseLifePushplusTestResult,
 } from "../../lib/server/life-wechat-reminders";
 
 const DELIVERY_ID = "123e4567-e89b-42d3-a456-426614174000";
@@ -78,5 +80,31 @@ describe("life WeChat reminders", () => {
     expect(parseClaimedLifeReminder({ deliveryId: "bad", kind: "daily_record", localDate: "2026-09-03" })).toBeNull();
     expect(parseClaimedLifeReminder({ deliveryId: DELIVERY_ID, kind: "unknown", localDate: "2026-09-03" })).toBeNull();
     expect(parseClaimedLifeReminder({ deliveryId: DELIVERY_ID, kind: "daily_record", localDate: "09/03/2026" })).toBeNull();
+  });
+
+  it("never requires a PushPlus token to be returned to the client", () => {
+    expect(parseLifePushplusStatus({ actor: "cat", configured: true, token: "must-not-be-used" })).toEqual({
+      actor: "cat",
+      configured: true,
+    });
+    expect(parseLifePushplusStatus({ actor: "other", configured: true })).toBeNull();
+    expect(parseLifePushplusStatus({ actor: "fish", configured: "yes" })).toBeNull();
+  });
+
+  it("parses PushPlus test results without exposing credentials", () => {
+    expect(
+      parseLifePushplusTestResult({
+        actor: "fish",
+        ok: true,
+        providerMessageId: "message-1",
+        error: null,
+      }),
+    ).toEqual({
+      actor: "fish",
+      ok: true,
+      providerMessageId: "message-1",
+      error: null,
+    });
+    expect(parseLifePushplusTestResult({ actor: "cat", ok: "yes" })).toBeNull();
   });
 });
