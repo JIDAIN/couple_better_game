@@ -15,7 +15,7 @@ type NestIconName = "weight" | "mailbox" | "medicine" | "game";
 
 const tiles: ReadonlyArray<{ href: string; icon: NestIconName; title: string; note: string; tone: string }> = [
   { href: "/nest/weight", icon: "weight", title: "体重", note: "看见变化，也保留每一次记录", tone: "is-blue" },
-  { href: "/nest/mailbox", icon: "mailbox", title: "小信箱", note: "信纸和明信片都收在这里", tone: "is-pink" },
+  { href: "/nest/mailbox", icon: "mailbox", title: "小信箱", note: "手札和明信片都收在这里", tone: "is-pink" },
   { href: "/nest/medicine", icon: "medicine", title: "家庭药箱", note: "一起维护数量和有效期", tone: "is-mint" },
   { href: "/nest/game-machine", icon: "game", title: "游戏机", note: "小游戏和旧玩法都从这里进入", tone: "is-yellow" },
 ];
@@ -61,7 +61,7 @@ export function LifeNestPage() {
           <div className="life-nest-window" aria-hidden><span className="life-window-cloud" /><span className="life-window-sun" /></div>
           <div className="life-nest-plant" aria-hidden><i /><i /><i /><i /><span /></div>
           <div className="life-nest-sofa" aria-hidden />
-          <Image src="/illustrations/life/activity-girls.png" alt="" width={360} height={240} className="life-nest-people" />
+          <Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png" alt="" width={360} height={240} className="life-nest-people" />
           <div className="life-nest-rug" aria-hidden />
           <div className="life-nest-caption"><strong>我们的生活角落</strong><span>一起生活的日子，会慢慢把这里填满。</span></div>
         </section>
@@ -97,7 +97,7 @@ export function LifeNestPage() {
             <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-[var(--life-border)]" />
             <div className="text-center">
               <p id="anniversary-title" className="text-lg font-black text-[var(--life-text)]">我们的纪念日</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--life-text-muted)]">这是两个人共享的设置，猫猫和鱼鱼都可以修改；首页会据此计算“一起度过的第 N 天”。</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--life-text-muted)]">这是两个人共享的设置，小猫和小鱼都可以修改；首页会据此计算“一起度过的第 N 天”。</p>
             </div>
             <label className="mt-5 grid gap-1.5 text-xs font-bold text-[var(--life-text-body)]">纪念日<AppInput type="date" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} /></label>
             {error ? <p className="mt-3 rounded-2xl bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2 text-xs text-[var(--life-danger)]">{error}</p> : null}
