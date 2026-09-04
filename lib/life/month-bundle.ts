@@ -1,4 +1,4 @@
-import { peekStaleQuery, setStaleQueryDataMany } from "../client/use-stale-query";
+import { invalidateStaleQuery, peekStaleQuery, setStaleQueryDataMany } from "../client/use-stale-query";
 import type { LifeMonthMoodRecord } from "./calendar-service";
 import type { LifeDayRecord, LifePartnerKey } from "./life-service";
 import type { MealRecord } from "../nutrition/meal-service";
@@ -46,6 +46,7 @@ export function hydrateLifeMonthBundle(
 
 export function syncLifeDayCaches(date: string, day: LifeDayRecord) {
   const month = date.slice(0, 7);
+  const bundleKey = `life-month-bundle:${month}`;
   const entries: Array<{ key: string; data: unknown }> = [{ key: `life-day:${date}`, data: day }];
   const monthCache = peekStaleQuery<LifeMonthMoodRecord>(`life-month:${month}`);
   if (monthCache) {
@@ -55,13 +56,18 @@ export function syncLifeDayCaches(date: string, day: LifeDayRecord) {
     entries.push({ key: `life-month:${month}`, data: { ...monthCache, days } });
   }
 
-  const bundleCache = peekStaleQuery<LifeMonthBundle>(`life-month-bundle:${month}`);
+  const bundleCache = peekStaleQuery<LifeMonthBundle>(bundleKey);
   if (bundleCache) {
     const existing = bundleCache.days.find((item) => item.date === date);
     const days = bundleCache.days.filter((item) => item.date !== date);
     days.push({ date, day, meals: existing?.meals ?? [] });
     days.sort((left, right) => left.date.localeCompare(right.date));
-    entries.push({ key: `life-month-bundle:${month}`, data: { ...bundleCache, days } });
+    entries.push({ key: bundleKey, data: { ...bundleCache, days } });
   }
   setStaleQueryDataMany(entries);
+
+  // The bundle can already be in flight without having data yet. Mark that request
+  // stale so its older snapshot cannot arrive after a mood write and roll the
+  // calendar back. The cache layer will transparently retry it after the write.
+  if (!bundleCache) invalidateStaleQuery(bundleKey);
 }
