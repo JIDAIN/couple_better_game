@@ -19,6 +19,16 @@ function dayHeading(date: string) {
   return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(value);
 }
 
+function TodayInitialShell() {
+  return (
+    <div className="grid gap-3" aria-hidden>
+      <div className="life-surface life-section-card min-h-32" />
+      <div className="life-surface life-section-card min-h-28" />
+      <div className="life-surface life-section-card min-h-32" />
+    </div>
+  );
+}
+
 export function TodayLifePage() {
   const router = useRouter();
   const [date] = useState(() => localIsoDate());
@@ -97,7 +107,7 @@ export function TodayLifePage() {
           <TodayActivityCard date={date} day={query.data} onChanged={reload} onError={setActionError} />
         </div>
       ) : query.loading ? (
-        <div className="life-surface life-section-card text-center text-sm text-[var(--life-text-muted)]">第一次读取今天的记录…</div>
+        <TodayInitialShell />
       ) : (
         <div className="life-surface life-section-card text-center text-sm text-[var(--life-text-muted)]">今天的记录暂时没有加载出来。</div>
       )}
