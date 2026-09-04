@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { peekStaleQuery, prefetchStaleQuery, useStaleQuery } from "@/lib/client/use-stale-query";
@@ -58,6 +58,7 @@ function MoodStamp({ moodKey, label, offset = false }: { moodKey?: MoodKey; labe
 }
 
 export function LifeCalendarPage() {
+  const router = useRouter();
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
   const [month, setMonth] = useState(() => localMonth());
   const today = useMemo(() => localDate(), []);
@@ -88,8 +89,6 @@ export function LifeCalendarPage() {
     ];
     if (cachedMeals.length) void preloadMealPhotos(cachedMeals);
 
-    // If the monthly bundle is still arriving, these calls reuse the same canonical cache keys.
-    // The detail page reads these exact keys, so navigation never creates a second bundle cache.
     void Promise.allSettled([
       prefetchStaleQuery({ key: `life-day:${date}`, fetcher: () => fetchLifeDay(date), staleMs: 60_000 }),
       prefetchStaleQuery({ key: `meals:${me}:${date}`, fetcher: async () => (await fetchMeals({ mealDate: date, partnerKey: me })).filter((meal) => !meal.deletedAt), staleMs: 60_000 })
@@ -98,6 +97,18 @@ export function LifeCalendarPage() {
         .then((meals) => preloadMealPhotos(meals)),
     ]);
   }, [mePartnerKey, taPartnerKey]);
+
+  const warmDayRoute = useCallback((date: string) => {
+    warmDay(date);
+    router.prefetch(`/calendar/${date}`);
+  }, [router, warmDay]);
+
+  const openDay = useCallback((date: string) => {
+    warmDayRoute(date);
+    // A button + App Router push has no native-anchor fallback, so Android browsers do not
+    // start a full document navigation (the thin browser loading bar seen in Production).
+    router.push(`/calendar/${date}`);
+  }, [router, warmDayRoute]);
 
   if (!mePartnerKey || !taPartnerKey) {
     return <AppPageShell title="日历" subtitle="正在确认当前账号…"><section className="life-surface life-section-card text-sm text-[var(--life-text-muted)]">正在确认当前账号…</section></AppPageShell>;
@@ -127,14 +138,15 @@ export function LifeCalendarPage() {
             const taMood = moods.find((item) => item.partnerKey === taPartnerKey)?.moodKey;
             const isToday = date === today;
             return (
-              <Link
+              <button
+                type="button"
                 key={date}
-                href={`/calendar/${date}`}
-                className="life-calendar-day"
+                className="life-calendar-day border-0 bg-transparent p-0 text-inherit"
                 aria-label={`${date}${isToday ? "，今天" : ""}`}
-                onPointerEnter={() => warmDay(date)}
-                onPointerDown={() => warmDay(date)}
-                onFocus={() => warmDay(date)}
+                onClick={() => openDay(date)}
+                onPointerEnter={() => warmDayRoute(date)}
+                onPointerDown={() => warmDayRoute(date)}
+                onFocus={() => warmDayRoute(date)}
               >
                 <span className={`life-calendar-date ${isToday ? "is-today" : ""}`}>
                   {isToday ? <span className="life-today-sun" aria-hidden>☀️</span> : null}
@@ -144,7 +156,7 @@ export function LifeCalendarPage() {
                   <MoodStamp moodKey={meMood} label="我" />
                   <MoodStamp moodKey={taMood} label="Ta" offset={Boolean(meMood && taMood)} />
                 </span>
-              </Link>
+              </button>
             );
           })}
         </div>
