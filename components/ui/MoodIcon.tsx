@@ -13,5 +13,5 @@ const MOOD_ASSETS: Record<MoodKey, string> = {
 };
 
 export function MoodIcon({ moodKey, label, className = "" }: { moodKey: MoodKey; label: string; className?: string }) {
-  return <Image unoptimized src={MOOD_ASSETS[moodKey]} alt={label} width={256} height={256} className={`select-none object-contain ${className}`.trim()} draggable={false} />;
+  return <Image unoptimized loading="eager" src={MOOD_ASSETS[moodKey]} alt={label} width={256} height={256} className={`select-none object-contain ${className}`.trim()} draggable={false} />;
 }
