@@ -19,12 +19,13 @@ describe("R8.5/R8.6 startup prewarm", () => {
     expect(chrome).toContain("小岛正在醒来");
   });
 
-  it("hydrates the whole current month into the canonical day and meal cache before reveal", () => {
+  it("uses one monthly bundle to hydrate the whole current month before reveal", () => {
     const identity = source("components/life/LifeIdentityContext.tsx");
     const bundle = source("lib/life/month-bundle.ts");
     expect(identity).toContain("fetchLifeMonthBundle(month)");
     expect(identity).toContain("hydrateLifeMonthBundle(bundle, me, ta)");
-    expect(identity).toContain("fetchLifeMonth(month)");
+    expect(identity).not.toContain("fetchLifeMonth(month)");
+    expect(identity).not.toContain('key: `life-month:${month}`');
     expect(identity).toContain("fetchLifeSettings");
     expect(bundle).toContain("life-day:${item.date}");
     expect(bundle).toContain("meals:${me}:${item.date}");
@@ -53,14 +54,15 @@ describe("R8.5/R8.6 startup prewarm", () => {
     expect(identity).toContain("void Promise.allSettled");
   });
 
-  it("hydrates every opened calendar month and warms a tapped day's real meal photos", () => {
+  it("renders calendar moods from the same monthly bundle and hydrates canonical day/meal keys", () => {
     const calendar = source("components/life/LifeCalendarPage.tsx");
     expect(calendar).toContain("fetchLifeMonthBundle(month)");
-    expect(calendar).toContain("hydrateLifeMonthBundle(bundle, me, ta)");
-    expect(calendar).toContain("const warmDay = useCallback");
+    expect(calendar).toContain("useStaleQuery<LifeMonthBundle>");
+    expect(calendar).toContain("item.day.moods");
+    expect(calendar).toContain("hydrateLifeMonthBundle(query.data, mePartnerKey, taPartnerKey)");
+    expect(calendar).not.toContain("fetchLifeMonth(month)");
     expect(calendar).toContain("preloadMealPhotos");
-    expect(calendar).toContain("onPointerDown={() => warmDay(date)}");
-    expect(calendar).toContain("onPointerEnter={() => warmDay(date)}");
+    expect(calendar).toContain("onPointerDown={() => warmDayRoute(date)}");
   });
 
   it("calendar detail reuses the same life-day and meals cache keys as Today/Food instead of a private bundle key", () => {
@@ -70,6 +72,12 @@ describe("R8.5/R8.6 startup prewarm", () => {
     expect(detail).toContain("key: `meals:${taPartnerKey ?? \"pending\"}:${date}`");
     expect(detail).toContain("preloadMealPhotos");
     expect(detail).not.toContain("calendar-day:");
+  });
+
+  it("persists the monthly bundle so reopening the site can hydrate without a blank calendar phase", () => {
+    const stale = source("lib/client/use-stale-query.ts");
+    expect(stale).toContain('key.startsWith("life-month-bundle:")');
+    expect(stale).toContain("MAX_PERSISTED_ENTRIES = 220");
   });
 
   it("loads dedicated startup styling from the root layout", () => {

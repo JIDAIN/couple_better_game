@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { useLifeIdentity } from "@/components/life/LifeIdentityContext";
 import { DailyNutritionSummary } from "@/components/life/DailyNutritionSummary";
@@ -29,19 +29,15 @@ function calorieSummary(meals: MealRecord[]) {
 }
 
 export function LifeCalendarDayPage({ date }: { date: string }) {
+  const router = useRouter();
   const { mePartnerKey, taPartnerKey } = useLifeIdentity();
 
   const dayFetcher = useCallback(() => fetchLifeDay(date), [date]);
-  const dayQuery = useStaleQuery<LifeDayRecord>({
-    key: `life-day:${date}`,
-    fetcher: dayFetcher,
-    staleMs: 60_000,
-  });
+  const dayQuery = useStaleQuery<LifeDayRecord>({ key: `life-day:${date}`, fetcher: dayFetcher, staleMs: 60_000 });
 
   const meMealsFetcher = useCallback(async () => {
     if (!mePartnerKey) return [] as MealRecord[];
-    return (await fetchMeals({ mealDate: date, partnerKey: mePartnerKey as NutritionPartnerKey }))
-      .filter((meal) => !meal.deletedAt);
+    return (await fetchMeals({ mealDate: date, partnerKey: mePartnerKey as NutritionPartnerKey })).filter((meal) => !meal.deletedAt);
   }, [date, mePartnerKey]);
   const meMealsQuery = useStaleQuery<MealRecord[]>({
     key: `meals:${mePartnerKey ?? "pending"}:${date}`,
@@ -51,8 +47,7 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
 
   const taMealsFetcher = useCallback(async () => {
     if (!taPartnerKey) return [] as MealRecord[];
-    return (await fetchMeals({ mealDate: date, partnerKey: taPartnerKey as NutritionPartnerKey }))
-      .filter((meal) => !meal.deletedAt);
+    return (await fetchMeals({ mealDate: date, partnerKey: taPartnerKey as NutritionPartnerKey })).filter((meal) => !meal.deletedAt);
   }, [date, taPartnerKey]);
   const taMealsQuery = useStaleQuery<MealRecord[]>({
     key: `meals:${taPartnerKey ?? "pending"}:${date}`,
@@ -74,9 +69,22 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
     void preloadMealPhotos([...meMeals, ...taMeals]);
   }, [meMeals, taMeals]);
 
+  const foodHref = `/food?date=${encodeURIComponent(date)}`;
+  const warmFoodRoute = useCallback(() => {
+    warmFoodPhotos();
+    router.prefetch(foodHref);
+  }, [foodHref, router, warmFoodPhotos]);
+
+  const openFood = useCallback(() => {
+    warmFoodRoute();
+    // R8.6 monthly hydration already filled the exact meals:<actor>:<date> keys used by Food.
+    // Keep this as a client router transition so the browser never performs a second document load.
+    router.push(foodHref);
+  }, [foodHref, router, warmFoodRoute]);
+
   useEffect(() => {
-    if (meMeals.length || taMeals.length) warmFoodPhotos();
-  }, [meMeals.length, taMeals.length, warmFoodPhotos]);
+    if (meMeals.length || taMeals.length) warmFoodRoute();
+  }, [meMeals.length, taMeals.length, warmFoodRoute]);
 
   const people = useMemo(() => {
     if (!mePartnerKey || !taPartnerKey) return [] as Array<{ key: LifePartnerKey; label: "我" | "Ta" }>;
@@ -92,7 +100,11 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
   }
 
   return (
-    <AppPageShell title={displayDate(date)} subtitle="翻开这一天，看看我们留下了什么。" actions={<Link href="/calendar" className="life-back-link">返回月历</Link>}>
+    <AppPageShell
+      title={displayDate(date)}
+      subtitle="翻开这一天，看看我们留下了什么。"
+      actions={<button type="button" className="life-back-link" onClick={() => router.push("/calendar")}>返回月历</button>}
+    >
       {error ? <div className="mb-3 rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
       {day ? (
         <div className="grid gap-3">
@@ -103,13 +115,14 @@ export function LifeCalendarDayPage({ date }: { date: string }) {
           <section className="life-surface life-section-card life-calendar-food-card">
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm font-extrabold text-[var(--life-text)]">🍚 饮食</p>
-              <Link
-                href={`/food?date=${encodeURIComponent(date)}`}
+              <button
+                type="button"
                 className="life-card-action inline-flex items-center"
-                onPointerEnter={warmFoodPhotos}
-                onPointerDown={warmFoodPhotos}
-                onFocus={warmFoodPhotos}
-              >查看</Link>
+                onClick={openFood}
+                onPointerEnter={warmFoodRoute}
+                onPointerDown={warmFoodRoute}
+                onFocus={warmFoodRoute}
+              >查看</button>
             </div>
             <div className="mt-3 grid gap-3">
               {people.map((person) => {

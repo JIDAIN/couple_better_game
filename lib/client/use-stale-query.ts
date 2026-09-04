@@ -42,6 +42,7 @@ function storageKey(scope: string) {
 function shouldPersistKey(key: string) {
   return key.startsWith("life-day:")
     || key.startsWith("life-month:")
+    || key.startsWith("life-month-bundle:")
     || key.startsWith("meals:")
     || key.startsWith("weights:")
     || key === "medicines"

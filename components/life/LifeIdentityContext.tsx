@@ -9,7 +9,7 @@ import {
   readStaleQueryScopeHint,
   rememberStaleQueryScope,
 } from "@/lib/client/use-stale-query";
-import { fetchLifeMonth, fetchLifeMonthBundle } from "@/lib/life/life-client";
+import { fetchLifeMonthBundle } from "@/lib/life/life-client";
 import { hydrateLifeMonthBundle } from "@/lib/life/month-bundle";
 import { fetchLifeSettings } from "@/lib/life/settings-client";
 import { fetchWeights } from "@/lib/life/weight-client";
@@ -95,6 +95,8 @@ async function warmLifeEssentials(me: LifePartnerKey) {
   const month = date.slice(0, 7);
   const ta = oppositePartnerKey(me);
 
+  // One monthly request is now the canonical bootstrap read for calendar + historical details + meals.
+  // It fills the exact life-day:* / meals:* keys that every downstream screen consumes.
   const monthBundleTask = prefetchStaleQuery({
     key: `life-month-bundle:${month}`,
     fetcher: () => fetchLifeMonthBundle(month),
@@ -106,7 +108,6 @@ async function warmLifeEssentials(me: LifePartnerKey) {
 
   const coreTasks = [
     monthBundleTask,
-    prefetchStaleQuery({ key: `life-month:${month}`, fetcher: () => fetchLifeMonth(month), staleMs: 60_000 }),
     prefetchStaleQuery({ key: "life-settings", fetcher: fetchLifeSettings, staleMs: 60_000 }),
     ...CORE_IMAGE_ASSETS.map((src) => preloadStaticImage(src)),
   ];
@@ -157,8 +158,8 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
     }
 
     const warm = warmLifeEssentials(next);
-    // R8.6 uses the startup grace period for a real monthly cache fill, not just today's page.
-    // Weak networks still escape after 2.4s and keep hydrating in the background.
+    // The startup screen has one job: give the current-month shared cache a short head start.
+    // Weak networks still escape after 2.4s and the same request keeps hydrating in background.
     await Promise.race([
       warm,
       new Promise<void>((resolve) => window.setTimeout(resolve, 2400)),
@@ -180,7 +181,6 @@ export function LifeIdentityProvider({ children }: { children: ReactNode }) {
       next = data.authenticated && validPartner(data.identity?.partnerKey) ? data.identity.partnerKey : null;
       authoritative = true;
     } catch {
-      // Temporary network/5xx failures must not turn a confirmed cat/fish session into logged-out UI.
       next = fallback;
     }
 
