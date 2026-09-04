@@ -205,7 +205,7 @@ export function clearStaleQueries({ persisted = false }: { persisted?: boolean }
   }
 }
 
-async function runStaleQueryFetch<T>({
+function runStaleQueryFetch<T>({
   key,
   fetcher,
   cached,
@@ -218,58 +218,63 @@ async function runStaleQueryFetch<T>({
 }): Promise<T> {
   const requestRevision = cached?.revision ?? 0;
   const requestScopeSerial = scopeSerial;
-  const promise = fetcher();
+  const rawPromise = fetcher();
+  let guardedPromise: Promise<T>;
+
+  guardedPromise = (async () => {
+    try {
+      const data = await rawPromise;
+      if (requestScopeSerial !== scopeSerial) throw new StaleQueryScopeChangedError();
+
+      const latest = entryFor<T>(key);
+      if (latest && latest.revision !== requestRevision) {
+        // A local/read-back write happened after this request started. Never let the
+        // older response roll the UI back. If the key was invalidated, do one fresh
+        // read that necessarily starts after the mutation instead.
+        if (latest.promise !== guardedPromise && latest.data !== undefined && latest.updatedAt > 0) {
+          return latest.data;
+        }
+        if (retriesLeft > 0) {
+          const retryBase: CacheEntry<T> = {
+            data: latest.data,
+            updatedAt: latest.updatedAt,
+            revision: latest.revision,
+          };
+          queryCache.set(key, retryBase);
+          return runStaleQueryFetch({ key, fetcher, cached: retryBase, retriesLeft: retriesLeft - 1 });
+        }
+        return latest.data !== undefined ? latest.data : data;
+      }
+
+      if (latest?.promise && latest.promise !== guardedPromise && latest.data !== undefined) {
+        return latest.data;
+      }
+
+      queryCache.set(key, { data, updatedAt: Date.now(), revision: requestRevision });
+      persistCurrentScope();
+      return data;
+    } catch (cause) {
+      if (!(cause instanceof StaleQueryScopeChangedError)) {
+        const latest = entryFor<T>(key);
+        if (latest?.promise === guardedPromise) {
+          queryCache.set(key, {
+            data: latest.data,
+            updatedAt: latest.updatedAt,
+            revision: latest.revision,
+          });
+        }
+      }
+      throw cause;
+    }
+  })();
+
   queryCache.set(key, {
     data: cached?.data,
     updatedAt: cached?.updatedAt ?? 0,
     revision: requestRevision,
-    promise,
+    promise: guardedPromise,
   });
-
-  try {
-    const data = await promise;
-    if (requestScopeSerial !== scopeSerial) throw new StaleQueryScopeChangedError();
-
-    const latest = entryFor<T>(key);
-    if (latest && latest.revision !== requestRevision) {
-      // A local/read-back write happened after this request started. Never let the
-      // older response roll the UI back. If the key was invalidated, do one fresh
-      // read that necessarily starts after the mutation instead.
-      if (latest.promise !== promise && latest.data !== undefined && latest.updatedAt > 0) {
-        return latest.data;
-      }
-      if (retriesLeft > 0) {
-        const retryBase: CacheEntry<T> = {
-          data: latest.data,
-          updatedAt: latest.updatedAt,
-          revision: latest.revision,
-        };
-        queryCache.set(key, retryBase);
-        return runStaleQueryFetch({ key, fetcher, cached: retryBase, retriesLeft: retriesLeft - 1 });
-      }
-      return latest.data !== undefined ? latest.data : data;
-    }
-
-    if (latest?.promise && latest.promise !== promise && latest.data !== undefined) {
-      return latest.data;
-    }
-
-    queryCache.set(key, { data, updatedAt: Date.now(), revision: requestRevision });
-    persistCurrentScope();
-    return data;
-  } catch (cause) {
-    if (!(cause instanceof StaleQueryScopeChangedError)) {
-      const latest = entryFor<T>(key);
-      if (latest?.promise === promise) {
-        queryCache.set(key, {
-          data: latest.data,
-          updatedAt: latest.updatedAt,
-          revision: latest.revision,
-        });
-      }
-    }
-    throw cause;
-  }
+  return guardedPromise;
 }
 
 export async function prefetchStaleQuery<T>({
@@ -344,15 +349,10 @@ export function useStaleQuery<T>({
   }, [fetcher, key, staleMs]);
 
   useBrowserLayoutEffect(() => {
-    let cancelled = false;
     const cached = peekStaleQuery<T>(key);
     setData(cached);
     setLoading(cached === undefined);
     void refresh(false).catch(() => undefined);
-    return () => {
-      cancelled = true;
-      void cancelled;
-    };
   }, [key, refresh]);
 
   useEffect(() => {
