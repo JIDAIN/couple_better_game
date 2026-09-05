@@ -429,6 +429,12 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'unauthorized' })).setMimeType(ContentService.MimeType.JSON);
   }
   let result;
-  try { result = processPendingCommands(); } catch (error) { result = { ok: false, error: String(error && error.message ? error.message : error) }; }
+  try {
+    result = body.commandId
+      ? processCommandByIdFast_(body.commandId)
+      : processPendingCommands();
+  } catch (error) {
+    result = { ok: false, error: String(error && error.message ? error.message : error) };
+  }
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
 }

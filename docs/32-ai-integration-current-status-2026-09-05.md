@@ -1,6 +1,6 @@
 # AI 接入当前状态总览（2026-09-05）
 
-> 用途：作为当前 AI 接入开发的“现在事实”入口。历史问题与过程记录保留在 26～35 文档中；发生冲突时，以本页和更晚的专项验收记录为准。
+> 用途：作为当前 AI 接入开发的“现在事实”入口。历史问题与过程记录保留在 26～36 文档中；发生冲突时，以本页和更晚的专项验收记录为准。
 
 ## 1. 当前架构基线
 
@@ -100,7 +100,30 @@ receiptReady                 true
 
 详细记录：`docs/35-harbor-r10-3-1-ledger-first-race.md`。
 
-## 5. Bridge Sheet 当前提示
+## 5. Harbor R10.4 Targeted Command Wake（开发完成，待 live Apps Script 验收）
+
+R10.3.1 后剩余的主要服务端等待位于 Fast Wake 开始到 `/api/drive-bridge/execute` 真正收到 command 之间。代码核验发现，显式 Fast Wake 虽然已经携带唯一 `commandId`，Apps Script 仍走通用 `processPendingCommands()`：最长等 Script Lock 5 秒、读取整张 COMMANDS、扫描批量 pending，并在同一 lock 下刷新全部 STATE snapshot。
+
+R10.4 在 Apps Script 增加 targeted processor：
+
+```text
+Fast Wake(commandId)
+→ 精确定位该 COMMAND
+→ 只 execute 这一条
+→ 写 receipt/status
+→ 释放 Script Lock
+→ best-effort refreshSnapshot
+```
+
+显式路径的 lock wait 降为 250ms；优先扫描末尾 64 行，必要时 exact TextFinder fallback；Sheet 可见性短轮询最长 1.2 秒。Drive Watch / 1 分钟 fallback 仍保留原批处理器。
+
+该优化只属于 Harbor Adapter，不修改 AI Access Core 或 canonical service。
+
+**重要部署边界**：R10.4 的关键代码位于 Google Apps Script。仅 Vercel Production deployment 不能让它生效；必须先将仓库的 `Code.gs` 与 `FastKick.gs` 同步到 Cat Apps Script project 并更新 Web App deployment，再做真实速度验收。
+
+详细记录：`docs/36-harbor-r10-4-targeted-command-wake.md`。
+
+## 6. Bridge Sheet 当前提示
 
 Harbor Cat Sheet README / META 已加入 fast-path 运行提示：
 
@@ -111,17 +134,18 @@ Harbor Cat Sheet README / META 已加入 fast-path 运行提示：
 
 这些是 Adapter 运行提示，不是业务 contract，也不写入 secret。
 
-## 6. 当前剩余体感延迟来源
+## 7. 当前剩余体感延迟来源
 
-现在主要延迟已不在 canonical business service，也不在 Apps Script 完整后处理等待：
+目前已经明确分层：
 
-- backend query/mutate 常约 1～1.5 秒；
-- Fast Wake 可在 authoritative receipt finalized 后立即结束；
-- 剩余主要来自 COMMAND 写入、Apps Script/Drive worker 启动、Google/ChatGPT 工具调用往返，以及 ChatGPT Project 是否严格遵守单 COMMAND / 单 Wake / 精确 RECEIPT fast path。
+- canonical backend query/mutate 常约 1～1.5 秒；
+- RECEIPT 后 Fast Wake 尾部等待已由 R10.3.1 消除；
+- R10.4 正在消除 Apps Script 显式 wake 的整表扫描、5 秒 lock queue 和 snapshot-under-lock；
+- 其余体感时间还包括 Google / ChatGPT 工具调用往返和 Project 是否严格遵守单 COMMAND / 单 Wake / 精确 RECEIPT fast path。
 
-因此后续性能优化应优先围绕 Adapter 启动与工具编排，而不是往 AI Access Core 添加特殊逻辑。
+后续性能优化继续只围绕 Adapter/transport，不往 AI Access Core 塞特殊逻辑。
 
-## 7. 未来 MCP 替换边界
+## 8. 未来 MCP 替换边界
 
 MCP 不继承：Sheet COMMANDS/RECEIPTS、Apps Script、Fast Wake、STATE_* AI 读取策略。
 
@@ -129,7 +153,7 @@ MCP 继续复用：AI Access Core、natural input normalization、clarification�
 
 Harbor 的目标始终是“一个可替换、逐步逼近 MCP 体验的临时 Adapter”。
 
-## 8. 当前部署规则
+## 9. 当前部署规则
 
 Production 自动部署默认关闭：
 
