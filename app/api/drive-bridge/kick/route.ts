@@ -27,6 +27,85 @@ function isRedirect(status: number) {
   return status >= 300 && status < 400;
 }
 
+type WakeAttempt = {
+  workerResponse: Response;
+  worker: Record<string, unknown>;
+  firstHop: ReturnType<typeof googleWebAppHop>;
+  finalHop: ReturnType<typeof googleWebAppHop>;
+  bodyKind: "json-like" | "html-like" | "other";
+};
+
+async function invokeWorker(options: {
+  scriptUrl: string;
+  wakeSecret: string;
+  bridgeId: "cat" | "fish";
+  commandId: string;
+  signal: AbortSignal;
+}): Promise<WakeAttempt> {
+  const { scriptUrl, wakeSecret, bridgeId, commandId, signal } = options;
+  const firstResponse = await fetch(scriptUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "CoupleBetterGame-HarborWake/1.0",
+    },
+    body: JSON.stringify({
+      type: "project-kick",
+      bridgeId,
+      commandId,
+      secret: wakeSecret,
+    }),
+    cache: "no-store",
+    redirect: "manual",
+    signal,
+  });
+
+  const firstHop = googleWebAppHop(firstResponse);
+  let workerResponse = firstResponse;
+
+  if (isRedirect(firstResponse.status)) {
+    const redirectUrl = parseAllowedGoogleWebAppRedirect(
+      firstResponse.headers.get("location"),
+      scriptUrl,
+    );
+    if (!redirectUrl) {
+      throw Object.assign(new Error("WORKER_REDIRECT_REJECTED"), { firstHop });
+    }
+
+    workerResponse = await fetch(redirectUrl, {
+      method: "GET",
+      cache: "no-store",
+      redirect: "follow",
+      signal,
+      headers: { "User-Agent": "CoupleBetterGame-HarborWake/1.0" },
+    });
+  }
+
+  const finalHop = googleWebAppHop(workerResponse);
+  const text = await workerResponse.text();
+  let worker: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(text || "{}");
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      worker = parsed as Record<string, unknown>;
+    }
+  } catch {
+    worker = {};
+  }
+
+  return {
+    workerResponse,
+    worker,
+    firstHop,
+    finalHop,
+    bodyKind: text.trim().startsWith("{")
+      ? "json-like"
+      : text.trim().startsWith("<")
+        ? "html-like"
+        : "other",
+  };
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const bridgeId = parseDriveBridgeId(url.searchParams.get("bridgeId")?.trim() ?? "");
@@ -51,77 +130,21 @@ export async function GET(request: Request) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
-    const firstResponse = await fetch(scriptUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "CoupleBetterGame-HarborWake/1.0",
-      },
-      body: JSON.stringify({
-        type: "project-kick",
-        bridgeId,
-        commandId,
-        secret: wakeSecret,
-      }),
-      cache: "no-store",
-      redirect: "manual",
+    const firstAttempt = await invokeWorker({
+      scriptUrl,
+      wakeSecret,
+      bridgeId,
+      commandId,
       signal: controller.signal,
     });
 
-    const firstHop = googleWebAppHop(firstResponse);
-    let workerResponse = firstResponse;
-
-    if (isRedirect(firstResponse.status)) {
-      const redirectUrl = parseAllowedGoogleWebAppRedirect(
-        firstResponse.headers.get("location"),
-        scriptUrl,
-      );
-      if (!redirectUrl) {
-        console.warn("[harbor-kick] rejected Google redirect", {
-          bridgeId,
-          commandId,
-          firstHop,
-        });
-        return json(
-          {
-            ok: false,
-            error: "worker redirect rejected",
-            bridgeId,
-            commandId,
-            diagnostics: { firstHop },
-          },
-          502,
-        );
-      }
-
-      workerResponse = await fetch(redirectUrl, {
-        method: "GET",
-        cache: "no-store",
-        redirect: "follow",
-        signal: controller.signal,
-        headers: { "User-Agent": "CoupleBetterGame-HarborWake/1.0" },
-      });
-    }
-
-    const finalHop = googleWebAppHop(workerResponse);
-    const text = await workerResponse.text();
-    let worker: Record<string, unknown> = {};
-    try {
-      const parsed = JSON.parse(text || "{}");
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        worker = parsed as Record<string, unknown>;
-      }
-    } catch {
-      worker = {};
-    }
-
-    if (!workerResponse.ok || worker.ok === false || worker.ok !== true) {
-      console.warn("[harbor-kick] Apps Script wake failed", {
+    if (!firstAttempt.workerResponse.ok) {
+      console.warn("[harbor-kick] Apps Script HTTP wake failed", {
         bridgeId,
         commandId,
-        firstHop,
-        finalHop,
-        bodyKind: text.trim().startsWith("{") ? "json-like" : text.trim().startsWith("<") ? "html-like" : "other",
+        firstHop: firstAttempt.firstHop,
+        finalHop: firstAttempt.finalHop,
+        bodyKind: firstAttempt.bodyKind,
       });
       return json(
         {
@@ -129,7 +152,53 @@ export async function GET(request: Request) {
           error: "worker wake failed",
           bridgeId,
           commandId,
-          diagnostics: { firstHop, finalHop },
+          diagnostics: {
+            firstHop: firstAttempt.firstHop,
+            finalHop: firstAttempt.finalHop,
+          },
+        },
+        502,
+      );
+    }
+
+    let finalAttempt = firstAttempt;
+    let retried = false;
+
+    // The worker can finish COMMANDS/RECEIPTS successfully and then fail while
+    // refreshing its non-authoritative STATE_* mirror. A second wake is safe:
+    // the command is idempotently no longer pending, so the worker immediately
+    // returns ok=true without duplicating the mutation.
+    if (firstAttempt.worker.ok === false) {
+      retried = true;
+      finalAttempt = await invokeWorker({
+        scriptUrl,
+        wakeSecret,
+        bridgeId,
+        commandId,
+        signal: controller.signal,
+      });
+    }
+
+    if (!finalAttempt.workerResponse.ok || finalAttempt.worker.ok !== true) {
+      console.warn("[harbor-kick] Apps Script wake failed", {
+        bridgeId,
+        commandId,
+        retried,
+        firstHop: finalAttempt.firstHop,
+        finalHop: finalAttempt.finalHop,
+        bodyKind: finalAttempt.bodyKind,
+      });
+      return json(
+        {
+          ok: false,
+          error: "worker wake failed",
+          bridgeId,
+          commandId,
+          retried,
+          diagnostics: {
+            firstHop: finalAttempt.firstHop,
+            finalHop: finalAttempt.finalHop,
+          },
         },
         502,
       );
@@ -139,11 +208,45 @@ export async function GET(request: Request) {
       ok: true,
       bridgeId,
       commandId,
-      processed: typeof worker.processed === "number" ? worker.processed : null,
-      skipped: typeof worker.skipped === "string" ? worker.skipped : null,
-      diagnostics: { firstHop, finalHop },
+      retried,
+      processed:
+        typeof firstAttempt.worker.processed === "number"
+          ? firstAttempt.worker.processed
+          : typeof finalAttempt.worker.processed === "number"
+            ? finalAttempt.worker.processed
+            : null,
+      skipped:
+        typeof finalAttempt.worker.skipped === "string"
+          ? finalAttempt.worker.skipped
+          : null,
+      diagnostics: {
+        firstHop: finalAttempt.firstHop,
+        finalHop: finalAttempt.finalHop,
+      },
     });
   } catch (error) {
+    const rejectedFirstHop =
+      error instanceof Error && "firstHop" in error
+        ? (error as Error & { firstHop?: unknown }).firstHop
+        : undefined;
+    if (error instanceof Error && error.message === "WORKER_REDIRECT_REJECTED") {
+      console.warn("[harbor-kick] rejected Google redirect", {
+        bridgeId,
+        commandId,
+        firstHop: rejectedFirstHop,
+      });
+      return json(
+        {
+          ok: false,
+          error: "worker redirect rejected",
+          bridgeId,
+          commandId,
+          diagnostics: { firstHop: rejectedFirstHop },
+        },
+        502,
+      );
+    }
+
     console.warn("[harbor-kick] wake unavailable", {
       bridgeId,
       commandId,
@@ -152,7 +255,10 @@ export async function GET(request: Request) {
     return json(
       {
         ok: false,
-        error: error instanceof Error && error.name === "AbortError" ? "worker wake timeout" : "worker wake unavailable",
+        error:
+          error instanceof Error && error.name === "AbortError"
+            ? "worker wake timeout"
+            : "worker wake unavailable",
         bridgeId,
         commandId,
       },
