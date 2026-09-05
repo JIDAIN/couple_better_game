@@ -1,12 +1,12 @@
 # Harbor R10.3.1 — Ledger-first Fast Wake Race
 
-> 状态：代码与自动化测试已完成，CI Test / Lint / Build 全部通过；尚未部署 Production。目标是消除“RECEIPT 已完成但 Fast Wake 仍等待 Apps Script 后处理”的额外延迟。
+> 状态：代码、自动化测试、CI 与 Production 速度验收均已完成。目标是消除“RECEIPT 已完成但 Fast Wake 仍等待 Apps Script 后处理”的额外延迟。
 
 ## 1. 问题
 
 R10.3 Production 速度验收确认：Worker 真正业务执行约 1.3 秒，RECEIPT 在 Fast Wake 开始后约 5.4 秒已 finalized，但 Vercel 仍会等待 Apps Script Web App 完整 HTTP 返回，造成用户侧额外等待。
 
-真实验收时间点：
+R10.3 真实验收时间点：
 
 ```text
 Fast Wake 开始       ≈ 15:11:38.49Z
@@ -79,7 +79,7 @@ Fast Wake 仍不返回正式 receipt body。Project 后续必须按同一 `comma
 
 已有 R10.3 lock policy 测试继续保留，防止 `locked` 场景重新引入第二次 wake。
 
-PR #71 首轮 CI：
+PR #71 CI：
 
 ```text
 Test  ✅
@@ -87,18 +87,70 @@ Lint  ✅
 Build ✅
 ```
 
-## 6. Production 验收标准
+## 6. Production 部署
 
-部署后用同一类只读 `life_query` 做真实速度复测，记录：
+受控 Production deployment：
 
 ```text
-Fast Wake request start
-command ledger received_at
-receipt finished_at
-Fast Wake HTTP response time
-ledgerFirst
-receiptReady
-wake count
+dpl_E7LxGVH2KjASMwXzsEPoZo62Qd4i
 ```
 
-目标：若 RECEIPT 在 Apps Script HTTP 完整结束前 finalized，则 Fast Wake 应接近 RECEIPT 完成时间返回，而不再等待 Apps Script snapshot / 后处理结束。
+结果：READY，正式域名 alias 已生效。部署后立即恢复 `vercel.json` 的 `git.deploymentEnabled=false`。
+
+本次授权只产生 1 次 Production deployment。
+
+## 7. Production 速度复测
+
+第一次复测时，后台 Drive Watch 已在 Fast Wake 调用前完成该 command，因此只用于确认 ledger-first 对“已 finalized command”可直接返回：
+
+```text
+ledgerFirst=true
+receiptReady=true
+commandStatus=succeeded
+```
+
+第二次复测成功命中真正的 race 场景。只读 `life_query(resource=day)`：
+
+```text
+Vercel Fast Wake request start ≈ 15:34:31.966Z
+ledger received_at             = 15:34:36.615Z
+RECEIPT finished_at            = 15:34:37.882Z
+Fast Wake HTTP response        ≈ 15:34:38Z
+```
+
+计算结果：
+
+```text
+backend business execution     ≈ 1.27 s
+Fast Wake start → receipt      ≈ 5.92 s
+receipt → Fast Wake response   ≈ 0.1 s 量级
+Fast Wake 总服务端等待         ≈ 6 s
+```
+
+Fast Wake 返回：
+
+```json
+{
+  "ok": true,
+  "reconciledFromLedger": true,
+  "ledgerFirst": true,
+  "commandStatus": "succeeded",
+  "receiptReady": true
+}
+```
+
+R10.3 基线中 Fast Wake HTTP 约等待到 16 秒左右；R10.3.1 在同类真实查询中已经缩短到约 6 秒，并且 HTTP 返回基本贴着 authoritative RECEIPT finalized 时间结束，不再继续等待 Apps Script snapshot / 后处理。
+
+## 8. 最终结论
+
+R10.3.1 Production 目标达成：
+
+```text
+业务执行                  ≈ 1.3 s
+COMMAND → authoritative receipt ≈ 6 s 内
+receipt 后额外 transport 等待   基本消除
+重复 wake                 0
+ledger-first              ✅
+```
+
+后续若继续优化体感时延，主要方向已不再是“等待 Apps Script 后处理”，而是 COMMAND 写入 / Google Apps Script 启动 / ChatGPT Project 工具调用编排等 Adapter 开销。
