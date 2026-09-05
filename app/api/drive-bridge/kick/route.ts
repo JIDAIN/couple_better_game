@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/drive-bridge-google-webapp";
 import { getDriveBridgeCommandLedger } from "@/lib/server/drive-bridge-ledger";
 import { shouldAvoidSecondHarborWake } from "@/lib/server/drive-bridge-kick-policy";
+import { raceHarborWorkerAndLedger } from "@/lib/server/drive-bridge-kick-race";
 import {
   isDriveProjectKickCommandId,
   verifyDriveProjectKickToken,
@@ -39,6 +40,11 @@ type WakeAttempt = {
   firstHop: ReturnType<typeof googleWebAppHop>;
   finalHop: ReturnType<typeof googleWebAppHop>;
   bodyKind: "json-like" | "html-like" | "other";
+};
+
+type FinalizedLedger = {
+  status: "succeeded" | "failed";
+  receipt: unknown;
 };
 
 async function invokeWorker(options: {
@@ -112,11 +118,14 @@ async function invokeWorker(options: {
   };
 }
 
-async function finalizedLedgerState(bridgeId: "cat" | "fish", commandId: string) {
+async function finalizedLedgerState(
+  bridgeId: "cat" | "fish",
+  commandId: string,
+): Promise<FinalizedLedger | null> {
   try {
     const row = await getDriveBridgeCommandLedger(bridgeId, commandId);
     if (!row || row.status === "processing" || row.receipt == null) return null;
-    return { status: row.status, receipt: row.receipt } as const;
+    return { status: row.status, receipt: row.receipt };
   } catch (error) {
     console.warn("[harbor-kick] ledger reconciliation unavailable", {
       bridgeId,
@@ -155,6 +164,7 @@ function reconciledSuccess(options: {
     commandId,
     retried,
     reconciledFromLedger: true,
+    ledgerFirst: false,
     commandStatus: ledgerStatus,
     receiptReady: true,
     processed: typeof attempt.worker.processed === "number" ? attempt.worker.processed : 0,
@@ -163,6 +173,26 @@ function reconciledSuccess(options: {
       firstHop: attempt.firstHop,
       finalHop: attempt.finalHop,
     },
+  });
+}
+
+function ledgerFirstSuccess(options: {
+  bridgeId: "cat" | "fish";
+  commandId: string;
+  ledgerStatus: "succeeded" | "failed";
+}) {
+  const { bridgeId, commandId, ledgerStatus } = options;
+  return json({
+    ok: true,
+    bridgeId,
+    commandId,
+    retried: false,
+    reconciledFromLedger: true,
+    ledgerFirst: true,
+    commandStatus: ledgerStatus,
+    receiptReady: true,
+    processed: 0,
+    skipped: null,
   });
 }
 
@@ -179,6 +209,7 @@ function acceptedWhileLocked(options: {
     commandId,
     retried: false,
     reconciledFromLedger: false,
+    ledgerFirst: false,
     commandStatus: "processing",
     receiptReady: false,
     processed: 0,
@@ -215,13 +246,38 @@ export async function GET(request: Request) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
-    const firstAttempt = await invokeWorker({
-      scriptUrl,
-      wakeSecret,
-      bridgeId,
-      commandId,
-      signal: controller.signal,
+    // R10.3.1: race the Apps Script HTTP request against the authoritative
+    // Supabase command ledger. The worker can finish the business command and
+    // write RECEIPT several seconds before Apps Script finishes snapshot/post-
+    // processing. As soon as a finalized receipt exists, stop waiting on that
+    // HTTP client request and let Harbor read the exact RECEIPT.
+    const firstRace = await raceHarborWorkerAndLedger({
+      worker: invokeWorker({
+        scriptUrl,
+        wakeSecret,
+        bridgeId,
+        commandId,
+        signal: controller.signal,
+      }),
+      readLedger: () => finalizedLedgerState(bridgeId, commandId),
+      abortWorker: () => controller.abort(),
+      maxLedgerWaitMs: 8_000,
+      pollIntervalMs: 250,
     });
+
+    if (firstRace.kind === "ledger") {
+      return ledgerFirstSuccess({
+        bridgeId,
+        commandId,
+        ledgerStatus: firstRace.ledger.status,
+      });
+    }
+
+    if (firstRace.kind === "worker-error") {
+      throw firstRace.error;
+    }
+
+    const firstAttempt = firstRace.worker;
 
     if (!firstAttempt.workerResponse.ok) {
       const ledger = await finalizedLedgerState(bridgeId, commandId);
@@ -341,6 +397,7 @@ export async function GET(request: Request) {
       commandId,
       retried,
       reconciledFromLedger: false,
+      ledgerFirst: false,
       receiptReady: true,
       processed:
         typeof firstAttempt.worker.processed === "number"
@@ -388,6 +445,7 @@ export async function GET(request: Request) {
         commandId,
         retried: false,
         reconciledFromLedger: true,
+        ledgerFirst: false,
         commandStatus: ledger.status,
         receiptReady: true,
         processed: 0,
