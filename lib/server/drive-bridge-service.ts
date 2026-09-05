@@ -1,5 +1,6 @@
 import type { FixedLifeIdentity } from "./fixed-life-auth";
 import { executeLifeAgentTool } from "./life-agent-registry";
+import { LifeClarificationError } from "../ai/life-input-normalizer";
 import { compressMealPhoto, DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES } from "./image-compression";
 import {
   deleteDriveBridgeStagedOriginal,
@@ -126,6 +127,7 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
     await finishDriveBridgeCommand(identity.partnerKey, command.commandId, "succeeded", receipt);
     return receipt;
   } catch (error) {
+    const clarification = error instanceof LifeClarificationError ? error : null;
     const receipt = {
       commandId: command.commandId,
       ok: false as const,
@@ -133,6 +135,15 @@ export async function executeDriveBridgeCommand(identity: FixedLifeIdentity, inp
       finishedAt: new Date().toISOString(),
       tool: command.tool,
       error: error instanceof Error ? error.message : "Drive Bridge 执行失败",
+      ...(clarification
+        ? {
+            errorCode: clarification.code,
+            clarification: {
+              question: clarification.question,
+              missing: clarification.missing,
+            },
+          }
+        : {}),
       originalDriveFileId: command.originalDriveFileId,
     };
     await finishDriveBridgeCommand(identity.partnerKey, command.commandId, "failed", receipt);
@@ -162,6 +173,12 @@ export async function executeDriveBridgeBatch(identity: FixedLifeIdentity, value
         finishedAt: new Date().toISOString(),
         tool: stringValue(row.tool),
         error: error instanceof Error ? error.message : "Drive Bridge 命令格式不正确",
+        ...(error instanceof LifeClarificationError
+          ? {
+              errorCode: error.code,
+              clarification: { question: error.question, missing: error.missing },
+            }
+          : {}),
         originalDriveFileId: stringValue(row.originalDriveFileId) || null,
       });
     }
@@ -176,7 +193,7 @@ export async function getDriveBridgeSnapshot(identity: FixedLifeIdentity, includ
     includeLegacy ? loadHomeSyncSnapshot() : Promise.resolve(null),
   ]);
   return {
-    schemaVersion: "r10-v3",
+    schemaVersion: "r10-v4",
     generatedAt: new Date().toISOString(),
     identity: { me: identity.partnerKey, displayName: identity.displayName },
     lifeExport,
