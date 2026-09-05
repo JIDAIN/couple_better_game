@@ -134,9 +134,8 @@ function normalizeClock(value: unknown, date: string, nextDay = false) {
     if (hour > 23 || minute > 59) return value;
     const base = new Date(`${date}T00:00:00+08:00`);
     if (nextDay) base.setUTCDate(base.getUTCDate() + 1);
-    const targetDate = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(base);
+    const parts = shanghaiParts(base);
+    const targetDate = `${parts.year}-${parts.month}-${parts.day}`;
     return `${targetDate}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00+08:00`;
   }
   return value;
@@ -183,7 +182,7 @@ function normalizeMealItem(input: unknown) {
   };
   if (portionDescription) result.portionDescription = portionDescription;
   const aliasNumbers: Array<[string, string[]]> = [
-    ["weightG", ["weightG", "grams", "weight"]],
+    ["estimatedWeightG", ["estimatedWeightG", "weightG", "grams", "weight"]],
     ["caloriesKcal", ["caloriesKcal", "calories", "kcal"]],
     ["proteinG", ["proteinG", "protein"]],
     ["carbsG", ["carbsG", "carbs", "carbohydrate"]],
@@ -227,6 +226,17 @@ export function normalizeLifeMutationArgs(args: unknown, context: NormalizeConte
   const action = normalizeAction(resource, row.action, id);
   const sourceData = record(row.data);
   const data: JsonRecord = { ...sourceData };
+
+  if (action === "delete") {
+    return {
+      ...row,
+      resource,
+      action,
+      ...(id ? { id } : {}),
+      data,
+    };
+  }
+
   const today = inferDate(first(sourceData, ["date", "mealDate", "moodDate", "sleepDate", "activityDate", "measurementDate"]), context.latestUserText, now);
 
   if (resource === "mood") {
