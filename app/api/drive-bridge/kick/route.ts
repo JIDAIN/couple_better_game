@@ -28,6 +28,10 @@ function isRedirect(status: number) {
   return status >= 300 && status < 400;
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 type WakeAttempt = {
   workerResponse: Response;
   worker: Record<string, unknown>;
@@ -122,6 +126,20 @@ async function finalizedLedgerState(bridgeId: "cat" | "fish", commandId: string)
   }
 }
 
+async function waitForFinalizedLedger(
+  bridgeId: "cat" | "fish",
+  commandId: string,
+  waitMs = 2400,
+) {
+  const started = Date.now();
+  while (Date.now() - started < waitMs) {
+    const ledger = await finalizedLedgerState(bridgeId, commandId);
+    if (ledger) return ledger;
+    await sleep(200);
+  }
+  return finalizedLedgerState(bridgeId, commandId);
+}
+
 function reconciledSuccess(options: {
   bridgeId: "cat" | "fish";
   commandId: string;
@@ -137,8 +155,34 @@ function reconciledSuccess(options: {
     retried,
     reconciledFromLedger: true,
     commandStatus: ledgerStatus,
+    receiptReady: true,
     processed: typeof attempt.worker.processed === "number" ? attempt.worker.processed : 0,
     skipped: typeof attempt.worker.skipped === "string" ? attempt.worker.skipped : null,
+    diagnostics: {
+      firstHop: attempt.firstHop,
+      finalHop: attempt.finalHop,
+    },
+  });
+}
+
+function acceptedWhileLocked(options: {
+  bridgeId: "cat" | "fish";
+  commandId: string;
+  attempt: WakeAttempt;
+}) {
+  const { bridgeId, commandId, attempt } = options;
+  return json({
+    ok: true,
+    accepted: true,
+    bridgeId,
+    commandId,
+    retried: false,
+    reconciledFromLedger: false,
+    commandStatus: "processing",
+    receiptReady: false,
+    processed: 0,
+    skipped: "locked",
+    retryAfterMs: 1000,
     diagnostics: {
       firstHop: attempt.firstHop,
       finalHop: attempt.finalHop,
@@ -215,10 +259,27 @@ export async function GET(request: Request) {
     let finalAttempt = firstAttempt;
     let retried = false;
 
-    // Apps Script can report ok=false after the authoritative command ledger has
-    // already finalized. Reconcile against Supabase before retrying so a finished
-    // command is never surfaced as a Fast Wake failure and no needless wake is sent.
     if (firstAttempt.worker.ok === false) {
+      const skipped = typeof firstAttempt.worker.skipped === "string" ? firstAttempt.worker.skipped : "";
+
+      // A script lock means another trigger/wake already owns command processing.
+      // Do not send a second wake and make it wait on the same lock. Instead, give
+      // the authoritative ledger a short window to finalize; if it is still busy,
+      // return an accepted/processing response and let the caller read RECEIPTS.
+      if (skipped === "locked") {
+        const ledger = await waitForFinalizedLedger(bridgeId, commandId);
+        if (ledger) {
+          return reconciledSuccess({
+            bridgeId,
+            commandId,
+            retried: false,
+            ledgerStatus: ledger.status,
+            attempt: firstAttempt,
+          });
+        }
+        return acceptedWhileLocked({ bridgeId, commandId, attempt: firstAttempt });
+      }
+
       const ledger = await finalizedLedgerState(bridgeId, commandId);
       if (ledger) {
         return reconciledSuccess({
@@ -282,6 +343,7 @@ export async function GET(request: Request) {
       commandId,
       retried,
       reconciledFromLedger: false,
+      receiptReady: true,
       processed:
         typeof firstAttempt.worker.processed === "number"
           ? firstAttempt.worker.processed
@@ -329,6 +391,7 @@ export async function GET(request: Request) {
         retried: false,
         reconciledFromLedger: true,
         commandStatus: ledger.status,
+        receiptReady: true,
         processed: 0,
         skipped: null,
       });
