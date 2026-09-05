@@ -1,6 +1,6 @@
 # Harbor R10.3.1 — Ledger-first Fast Wake Race
 
-> 状态：代码与自动化测试已实现，等待 CI / Production 验收。目标是消除“RECEIPT 已完成但 Fast Wake 仍等待 Apps Script 后处理”的额外延迟。
+> 状态：代码与自动化测试已完成，CI Test / Lint / Build 全部通过；尚未部署 Production。目标是消除“RECEIPT 已完成但 Fast Wake 仍等待 Apps Script 后处理”的额外延迟。
 
 ## 1. 问题
 
@@ -69,15 +69,23 @@ Fast Wake 仍不返回正式 receipt body。Project 后续必须按同一 `comma
 - ledger race 不创建第二条 COMMAND，也不发送第二次 Fast Wake；
 - 未来 MCP 不继承此 transport 优化。
 
-## 5. 自动化测试
+## 5. 自动化测试与 CI
 
-新增 `tests/server/drive-bridge-kick-race.test.ts`，至少覆盖：
+新增 `tests/server/drive-bridge-kick-race.test.ts`，覆盖：
 
 - finalized ledger 先出现时，ledger 胜出并 abort worker client wait；
 - ledger 未 finalized 时继续等待 worker；
 - worker 自身失败时不伪造 ledger success。
 
 已有 R10.3 lock policy 测试继续保留，防止 `locked` 场景重新引入第二次 wake。
+
+PR #71 首轮 CI：
+
+```text
+Test  ✅
+Lint  ✅
+Build ✅
+```
 
 ## 6. Production 验收标准
 
