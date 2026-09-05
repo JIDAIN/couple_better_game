@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MOOD_LABELS, moodLabel, withMoodLabel } from "@/lib/life/mood-labels";
+import { MOOD_LABELS, moodLabel, withMoodLabel } from "../../lib/life/mood-labels";
 
 describe("mood labels", () => {
   it("keeps the product mood semantics instead of English literal meanings", () => {
