@@ -22,21 +22,7 @@ Supabase Database / Storage
 
 AI Access Core 第一阶段已经完成统一 Production 验收。
 
-已通过：
-
-- 自然查询；
-- 自然新增；
-- 缺字段自然追问；
-- 中文 resource / action / person / meal type 等 alias；
-- 数量、单位、时间、体重字符串等格式归一；
-- moodKey → moodLabel 业务语义；
-- 三餐、体重、药箱、活动、信箱、设置等当前 AI 能力；
-- 餐食照片原图 → 压缩 → Storage → 绑定；
-- 餐食删除后的 Storage 清理；
-- partial update hydration：用户只说变化字段时服务端读取旧记录并 patch merge；
-- cat / fish ownership；
-- delete 明确意图保护；
-- command 幂等。
+已通过：自然查询、新增、缺字段追问、中文 aliases、日期/单位/时间归一、moodLabel、三餐/体重/药箱/活动/信箱/设置、照片链路、partial update hydration、ownership、delete safety、command 幂等。
 
 Partial update Production 实测：新增临时药品数量 1 → update 仅提交 quantity=2 → 药名与备注等旧字段完整保留 → Supabase 核验一致 → 测试记录归档清理。
 
@@ -48,86 +34,75 @@ Partial update Production 实测：新增临时药品数量 1 → update 仅提�
 - `docs/29-ai-access-core-unified-acceptance-2026-09-05.md`
 - `docs/30-ai-access-core-partial-update-hardening-2026-09-05.md`
 
-## 3. Harbor Fast Wake 最终状态
+## 3. Harbor Fast Wake 当前状态
 
-PR #69 修复了“命令其实已完成，但 Apps Script transport 返回异常导致 Fast Wake 502”的假阴性。
+PR #69 已解决“命令已完成但 transport 返回 502”的假阴性。
 
-当前判定规则：
+Production 专项验收：`dpl_9R7gRSwpvTw7Lgpu3X8Ehpja7mo9`。
 
-```text
-Apps Script 正常 ok=true
-→ Fast Wake 200
+已验证：Apps Script `locked` 时，authoritative ledger 可正确把 `succeeded` 和业务 `failed` 都识别为 transport 已完成，Fast Wake 返回 200，业务结果继续由 RECEIPT 表达。
 
-Apps Script ok=false / locked / HTTP 异常
-→ 查 Supabase authoritative command ledger
-→ finalized + receipt 存在
-→ Fast Wake 200 + reconciledFromLedger=true
+## 4. Harbor R10.3 交互 Fast Path（当前开发中）
 
-ledger 仍 processing / 不存在
-→ 才 retry / 返回真实 transport error
-```
+进一步分析发现，剩余体感延迟主要不在 AI Access Core：backend 真正 query/mutate 常约 1 秒，较长等待来自 ChatGPT Project 自己进行不必要的工具编排，例如 capabilities 探测、STATE_* 读取、网页/GitHub 搜索、重复 Fast Wake、扫描历史 COMMANDS/RECEIPTS。
 
-重要语义：
+因此当前目标改为让 Harbor 的调用形态尽量接近未来 MCP：
 
 ```text
-Fast Wake HTTP 200 = transport 已完成
-RECEIPT ok=true      = 业务成功
-RECEIPT ok=false     = 业务已处理，但需追问或业务校验失败
+用户自然语言
+→ 直接 life_query / life_mutate
+→ COMMANDS 只追加 1 行
+→ Fast Wake 只调用 1 次
+→ 精确读取同 command_id RECEIPT
+→ 回复
 ```
 
-不能再把“业务失败”误报成“桥没唤醒”。
+默认禁止：
 
-## 4. Fast Wake Production 专项验收
+- 普通请求例行 `life_capabilities`；
+- 正常查询先读 STATE_*；
+- 为业务字段搜索网页/GitHub/仓库文档；
+- 重复 wake；
+- 创建多个试探 payload；
+- 扫描整张 RECEIPTS 或历史 COMMANDS。
 
-受控 Production deployment：`dpl_9R7gRSwpvTw7Lgpu3X8Ehpja7mo9`。
+`STATE_*` 已重新定义为 UI/read-model 与故障 fallback，不是正常 Harbor query 的入口。
 
-专项回归 1：成功 query。
+### Lock contention 优化
 
-- RECEIPT：ok=TRUE；
-- Apps Script 返回并发锁场景；
-- Fast Wake：HTTP 200；
-- `reconciledFromLedger=true`；
-- `commandStatus=succeeded`；
-- `skipped=locked`。
-
-专项回归 2：故意缺少体重的 mutation。
-
-- RECEIPT：ok=FALSE；
-- 自然错误：`需要向用户确认：要记录多少公斤？`；
-- Fast Wake：HTTP 200；
-- `reconciledFromLedger=true`；
-- `commandStatus=failed`；
-- `skipped=locked`。
-
-这证明 transport 与业务结果已经正确解耦。
-
-专项回归后：
-
-- 正式域名首页 HTTP 200；
-- Vercel 最近 30 分钟 Runtime Errors：无；
-- 本轮仅产生 1 次 Production deployment；
-- `vercel.json` 已恢复 `git.deploymentEnabled=false`；
-- 恢复关闭自动部署的提交未触发第二次 Production deployment。
-
-Fast Wake 详细记录：
-
-- `docs/31-harbor-fast-wake-ledger-reconciliation-2026-09-05.md`
-
-## 5. 当前开发边界
-
-现在如果新增生理期、更多药箱操作、其他生活模块或未来 MCP，应继续遵守：
+Fast Wake route 正在增加锁竞争优化：
 
 ```text
-先定义 canonical business contract
-→ 再定义 natural input normalization / clarification
-→ 注册 life_query / life_mutate
-→ Harbor 只做 Adapter 转发
-→ MCP 未来直接复用 Core
+Apps Script skipped=locked
+→ 不再立刻发第二次 wake
+→ Vercel 短轮询 authoritative ledger
+→ finalized：返回 receiptReady=true
+→ 暂未 finalized：返回 accepted + commandStatus=processing + receiptReady=false
+→ Project 只读取同 command_id RECEIPT，不再 wake
 ```
 
-不得把新的业务 schema、枚举解释、权限判断长期塞入 ChatGPT Project prompt、Google Sheet 或 Apps Script。
+目的：避免多个 trigger/wake 围绕同一个 Apps Script script lock 排队，降低最坏时延和无效请求。
 
-## 6. 当前部署规则
+## 5. Bridge Sheet 当前提示
+
+Harbor Cat Sheet README / META 已加入 fast-path 运行提示：
+
+- `ai_interaction_mode=command_receipt_fastpath`
+- `capabilities_probe=disabled_for_normal_requests`
+- `state_read_policy=fallback_only`
+- `wake_retry_policy=single_wake_then_receipt`
+
+这些是 Adapter 运行提示，不是业务 contract，也不写入 secret。
+
+## 6. 未来 MCP 替换边界
+
+MCP 不继承：Sheet COMMANDS/RECEIPTS、Apps Script、Fast Wake、STATE_* AI 读取策略。
+
+MCP 继续复用：AI Access Core、natural input normalization、clarification、canonical services、权限、幂等、业务语义和媒体规则。
+
+因此 R10.3 的交互目标是“让 Harbor 看起来像一个慢一点的 MCP Adapter”，而不是继续往 Harbor 内添加业务逻辑。
+
+## 7. 当前部署规则
 
 Production 自动部署默认关闭：
 
