@@ -1,5 +1,6 @@
 import type { LifeMonthMoodRecord } from "../life/calendar-service";
 import type { LifeMonthBundle } from "../life/month-bundle";
+import { withMoodLabel } from "../life/mood-labels";
 import type {
   ActivityRecord,
   ActivityWritePayload,
@@ -92,19 +93,30 @@ async function callRpc<T>(
 }
 
 export async function getLifeDay(recordDate: string) {
-  return callRpc<LifeDayRecord>(
+  const day = await callRpc<LifeDayRecord>(
     "get_life_day",
     { p_record_date: recordDate, p_space_slug: coupleSpaceSlug() },
     "read",
   );
+  return {
+    ...day,
+    moods: day.moods.map(withMoodLabel),
+  };
 }
 
 export async function getLifeMonthMoods(monthStart: string) {
-  return callRpc<LifeMonthMoodRecord>(
+  const month = await callRpc<LifeMonthMoodRecord>(
     "get_life_month_moods",
     { p_month_start: monthStart, p_space_slug: coupleSpaceSlug() },
     "read",
   );
+  return {
+    ...month,
+    days: month.days.map((day) => ({
+      ...day,
+      moods: day.moods.map(withMoodLabel),
+    })),
+  };
 }
 
 export async function getLifeMonthBundle(monthStart: string) {
@@ -116,11 +128,12 @@ export async function getLifeMonthBundle(monthStart: string) {
 }
 
 export async function upsertMood(payload: MoodWritePayload) {
-  return callRpc<MoodRecord>(
+  const mood = await callRpc<MoodRecord>(
     "upsert_mood_record",
     { p_payload: payload, p_space_slug: coupleSpaceSlug() },
     "write",
   );
+  return withMoodLabel(mood);
 }
 
 export async function upsertSleep(payload: SleepWritePayload) {
