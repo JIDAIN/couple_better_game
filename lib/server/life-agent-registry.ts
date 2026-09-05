@@ -1,6 +1,10 @@
 import type { FixedLifeIdentity } from "./fixed-life-auth";
 import { buildChatgptWriteIdempotencyKey } from "../ai/record-write-protocol";
 import {
+  normalizeLifeMutationArgs,
+  normalizeLifeQueryArgs,
+} from "../ai/life-input-normalizer";
+import {
   parseActivityWritePayload,
   parseMoodWritePayload,
   parseSleepWritePayload,
@@ -151,7 +155,7 @@ export const LIFE_AGENT_TOOLS = [
     type: "function",
     function: {
       name: "life_capabilities",
-      description: "查看岛屿生活 AI 当前可查询和可修改的资源、字段边界与安全规则。",
+      description: "查看岛屿生活 AI 当前可查询和可修改的资源、字段边界与安全规则。普通读写不要例行调用。",
       parameters: { type: "object", properties: {}, additionalProperties: false },
     },
   },
@@ -159,22 +163,22 @@ export const LIFE_AGENT_TOOLS = [
     type: "function",
     function: {
       name: "life_query",
-      description: "查询岛屿生活真实数据。涉及事实时先查询，不要凭聊天记忆猜测。",
+      description: "查询岛屿生活真实数据。可使用自然常见别名；day/meal 未给日期时按 Asia/Shanghai 的今天处理。",
       parameters: {
         type: "object",
         properties: {
           resource: {
             type: "string",
-            enum: ["day", "month", "meal", "weight", "medicine", "mailbox", "settings", "life_export", "legacy_home"],
+            description: "day/month/meal/weight/medicine/mailbox/settings/life_export/legacy_home；也接受心情、睡眠、活动、三餐、体重、药箱、信箱、设置等常用中文别名。",
           },
-          date: { type: "string", description: "YYYY-MM-DD，day/meal 使用" },
-          monthStart: { type: "string", description: "YYYY-MM-01，month 使用" },
-          person: { type: "string", enum: ["me", "ta", "all", "cat", "fish"] },
+          date: { type: "string", description: "可选 YYYY-MM-DD；day/meal 默认今天" },
+          monthStart: { type: "string", description: "可选 YYYY-MM-01；month 默认本月" },
+          person: { type: "string", description: "me/ta/all/cat/fish，也接受我、对象、双方等表达" },
           limit: { type: "integer", minimum: 1, maximum: 1000 },
-          name: { type: "string", description: "medicine 名称模糊过滤" },
+          name: { type: "string", description: "medicine 名称模糊过滤，也可使用 query/keyword/medicineName" },
         },
         required: ["resource"],
-        additionalProperties: false,
+        additionalProperties: true,
       },
     },
   },
@@ -182,21 +186,25 @@ export const LIFE_AGENT_TOOLS = [
     type: "function",
     function: {
       name: "life_mutate",
-      description: "像当前登录用户一样新增、修改或删除岛屿生活记录。个人记录会在服务端强制绑定当前账号，不能冒充 Ta。",
+      description: "新增、修改或删除生活记录。优先传用户自然抽取出的字段，AI Access Core 会把常见别名规范化为 canonical contract；关键事实缺失时会返回需要向用户确认的问题。",
       parameters: {
         type: "object",
         properties: {
           resource: {
             type: "string",
-            enum: ["mood", "sleep", "activity", "meal", "weight", "medicine", "mailbox", "settings", "legacy_home"],
+            description: "mood/sleep/activity/meal/weight/medicine/mailbox/settings/legacy_home；也接受心情、睡眠、活动、三餐、体重、药品、信箱、设置等中文别名。",
           },
-          action: { type: "string", enum: ["create", "update", "delete", "upsert", "replace"] },
-          id: { type: "string", description: "update/delete 时的记录 UUID" },
-          attachPhoto: { type: "boolean", description: "meal create/update 是否把本轮用户上传图片绑定为餐食照片" },
-          data: { type: "object", additionalProperties: true },
+          action: { type: "string", description: "可选。记录/新增=create，修改=update，删除=delete；mood/sleep 默认 upsert，settings 默认 update。" },
+          id: { type: "string", description: "update/delete 的记录 UUID；禁止猜测，不知道时先查询" },
+          attachPhoto: { type: "boolean", description: "meal 是否绑定本轮图片" },
+          data: {
+            type: "object",
+            description: "自然抽取出的业务字段。允许常见别名，例如 meal item 可用 name/foodName/rawName，weight 可用 weight/weightKg，medicine 可用 medicineName/name。",
+            additionalProperties: true,
+          },
         },
-        required: ["resource", "action", "data"],
-        additionalProperties: false,
+        required: ["resource", "data"],
+        additionalProperties: true,
       },
     },
   },
@@ -209,32 +217,43 @@ function capabilities(identity: FixedLifeIdentity) {
       ta: otherPartnerKey(identity.partnerKey),
       displayName: identity.displayName,
     },
+    naturalInput: {
+      principle: "模型负责理解用户意图和抽取实体；AI Access Core 负责别名、默认值、日期/数量格式归一化；canonical service 继续严格校验。",
+      clarification: "缺少真正不可安全推断的信息时，服务端返回“需要向用户确认：...”的问题；不要让用户排查内部字段名。",
+      defaults: [
+        "day/meal/mood/sleep/activity/weight 未给日期时默认 Asia/Shanghai 今天",
+        "medicine 新增未给数量时默认 1",
+        "meal 的 name/foodName/rawName 都会归一为 rawName",
+        "meal 的 quantity 或 amount+unit 会归一为 portionDescription",
+      ],
+    },
     query: {
-      day: "某日心情、睡眠、活动",
-      month: "某月双人心情",
-      meal: "按日期与 me/ta/all 查询餐食",
+      day: "某日心情、睡眠、活动；日期默认今天",
+      month: "某月双人心情；默认本月",
+      meal: "按日期与 me/ta/all 查询餐食；日期默认今天",
       weight: "按 me/ta 查询体重历史",
-      medicine: "家庭药箱，可按名称过滤",
+      medicine: "家庭药箱，可按药名/关键词过滤",
       mailbox: "小信箱全部信件",
       settings: "周年日、当前两人的目标体重",
-      life_export: "V2 生活数据完整导出：心情、睡眠、活动、餐食及明细、药箱、体重、信箱、伴侣资料",
+      life_export: "V2 生活数据完整导出",
       legacy_home: "旧 /game 完整同步快照",
     },
     mutate: {
-      mood: "upsert；partnerKey 强制为当前账号；data: moodDate,moodKey",
-      sleep: "upsert；partnerKey 强制为当前账号；data: sleepDate,fellAsleepAt,wokeAt",
-      activity: "create/update/delete；data: activityDate,text,participantScope,occurredAt?,activityType?,durationMinutes?",
-      meal: "create/update/delete；partnerKey 强制为当前账号；data 使用 MealWritePayload 字段，source/status/idempotencyKey 由服务端覆盖；可 attachPhoto",
-      weight: "create/update/delete；partnerKey 强制为当前账号；data: measurementDate,measuredAt?,weightKg,note?",
-      medicine: "create/update/delete；共享药箱；data: name,productionDate?,shelfLifeMonths?,packageExpiryDate?,openedDate?,openedShelfLifeDays?,quantity,note?",
-      mailbox: "create/update/delete；sender 强制当前账号、recipient 强制 Ta；不能修改/删除 Ta 发出的信",
-      settings: "update；anniversaryDate 为共享设置，targetWeightKg 只修改当前账号",
-      legacy_home: "replace；仅当用户当前消息明确包含“确认覆盖游戏数据”时允许覆盖完整旧游戏快照",
+      mood: "upsert；自然字段 mood/moodKey/label + date 可归一；身份强制当前账号",
+      sleep: "upsert；支持 bedtime/sleepTime 与 wakeTime 等别名；缺时间时向用户确认",
+      activity: "create/update/delete；支持 name/text/description、duration/分钟/小时等常见输入",
+      meal: "create/update/delete；items[].name/foodName/rawName 均可；quantity 或 amount+unit 可表示份量；可 attachPhoto",
+      weight: "create/update/delete；weight/weightKg/kg/value 均可；缺体重数值时向用户确认",
+      medicine: "create/update/delete；medicineName/drugName/name 均可；数量缺省为 1",
+      mailbox: "create/update/delete；body/content/text/message 均可；发件人/收件人由服务端固定",
+      settings: "update；支持 anniversary/anniversaryDate、targetWeight/targetWeightKg",
+      legacy_home: "replace；仍要求用户当前消息明确包含“确认覆盖游戏数据”",
     },
     safety: [
       "没有任意 SQL 或任意 URL 工具",
       "删除只在用户当前消息明确要求删除时执行",
       "个人数据写入不能指定为 Ta",
+      "update/delete 的记录 ID 不允许自动猜测",
       "旧游戏全量覆盖需要用户说出：确认覆盖游戏数据",
     ],
   };
@@ -428,7 +447,21 @@ export async function executeLifeAgentTool(
 ) {
   const record = asRecord(args);
   if (name === "life_capabilities") return capabilities(context.identity);
-  if (name === "life_query") return queryLife(record, context);
-  if (name === "life_mutate") return mutateLife(record, context);
+  if (name === "life_query") {
+    const normalized = normalizeLifeQueryArgs(record, {
+      latestUserText: context.latestUserText,
+      actor: context.identity.partnerKey,
+      hasAttachment: Boolean(context.attachment),
+    });
+    return queryLife(normalized, context);
+  }
+  if (name === "life_mutate") {
+    const normalized = normalizeLifeMutationArgs(record, {
+      latestUserText: context.latestUserText,
+      actor: context.identity.partnerKey,
+      hasAttachment: Boolean(context.attachment),
+    });
+    return mutateLife(normalized, context);
+  }
   throw new Error(`未知 AI 工具：${name}`);
 }

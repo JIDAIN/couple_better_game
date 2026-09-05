@@ -1,5 +1,7 @@
 import type { MoodKey } from "./life-service";
 
+export type { MoodKey } from "./life-service";
+
 export const MOOD_LABELS: Record<MoodKey, string> = {
   happy: "开心",
   calm: "平静",
