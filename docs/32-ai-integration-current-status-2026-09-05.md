@@ -1,6 +1,6 @@
 # AI 接入当前状态总览（2026-09-05）
 
-> 用途：作为当前 AI 接入开发的“现在事实”入口。历史问题与过程记录保留在 26～31 文档中；发生冲突时，以本页和更晚的专项验收记录为准。
+> 用途：作为当前 AI 接入开发的“现在事实”入口。历史问题与过程记录保留在 26～35 文档中；发生冲突时，以本页和更晚的专项验收记录为准。
 
 ## 1. 当前架构基线
 
@@ -38,50 +38,67 @@ Partial update Production 实测：新增临时药品数量 1 → update 仅提�
 
 PR #69 已解决“命令已完成但 transport 返回 502”的假阴性。
 
-Production 专项验收：`dpl_9R7gRSwpvTw7Lgpu3X8Ehpja7mo9`。
-
-已验证：Apps Script `locked` 时，authoritative ledger 可正确把 `succeeded` 和业务 `failed` 都识别为 transport 已完成，Fast Wake 返回 200，业务结果继续由 RECEIPT 表达。
-
-## 4. Harbor R10.3 交互 Fast Path（当前开发中）
-
-进一步分析发现，剩余体感延迟主要不在 AI Access Core：backend 真正 query/mutate 常约 1 秒，较长等待来自 ChatGPT Project 自己进行不必要的工具编排，例如 capabilities 探测、STATE_* 读取、网页/GitHub 搜索、重复 Fast Wake、扫描历史 COMMANDS/RECEIPTS。
-
-因此当前目标改为让 Harbor 的调用形态尽量接近未来 MCP：
+R10.3 已把 Harbor 正常调用固定为：
 
 ```text
-用户自然语言
-→ 直接 life_query / life_mutate
+直接 life_query / life_mutate
 → COMMANDS 只追加 1 行
 → Fast Wake 只调用 1 次
 → 精确读取同 command_id RECEIPT
 → 回复
 ```
 
-默认禁止：
+默认禁止普通请求例行 `life_capabilities`、正常查询先读 STATE_*、网页/GitHub/仓库文档搜索、重复 wake、多个试探 payload、扫描整张 RECEIPTS / 历史 COMMANDS。
 
-- 普通请求例行 `life_capabilities`；
-- 正常查询先读 STATE_*；
-- 为业务字段搜索网页/GitHub/仓库文档；
-- 重复 wake；
-- 创建多个试探 payload；
-- 扫描整张 RECEIPTS 或历史 COMMANDS。
+`STATE_*` 只作为 UI/read-model 与故障 fallback。
 
-`STATE_*` 已重新定义为 UI/read-model 与故障 fallback，不是正常 Harbor query 的入口。
+## 4. Harbor R10.3.1 Ledger-first（Production 已验收）
 
-### Lock contention 优化
+R10.3 Production 速度测试发现：authoritative RECEIPT 已 finalized 后，Vercel 仍可能继续等待 Apps Script snapshot / 后处理，导致 Fast Wake 从约 5～6 秒可用事实拖到约 16 秒才 HTTP 返回。
 
-Fast Wake route 正在增加锁竞争优化：
+R10.3.1 改为：
 
 ```text
-Apps Script skipped=locked
-→ 不再立刻发第二次 wake
-→ Vercel 短轮询 authoritative ledger
-→ finalized：返回 receiptReady=true
-→ 暂未 finalized：返回 accepted + commandStatus=processing + receiptReady=false
-→ Project 只读取同 command_id RECEIPT，不再 wake
+Fast Wake
+├─ Apps Script HTTP wake
+└─ authoritative ledger polling
+
+ledger 先 finalized + receipt
+→ 立即 Fast Wake 200
+→ ledgerFirst=true
+→ receiptReady=true
+→ 停止等待当前 Apps Script HTTP client
 ```
 
-目的：避免多个 trigger/wake 围绕同一个 Apps Script script lock 排队，降低最坏时延和无效请求。
+Production deployment：
+
+```text
+dpl_E7LxGVH2KjASMwXzsEPoZo62Qd4i
+```
+
+真实第二次速度复测：
+
+```text
+Fast Wake server start ≈ 15:34:31.966Z
+ledger received_at      = 15:34:36.615Z
+receipt finished_at     = 15:34:37.882Z
+Fast Wake HTTP response ≈ 15:34:38Z
+```
+
+结果：
+
+```text
+backend business execution   ≈ 1.27 s
+Fast Wake start → receipt    ≈ 5.92 s
+receipt 后额外等待           ≈ 0.1 s 量级
+Fast Wake 总服务端等待       ≈ 6 s
+ledgerFirst                  true
+receiptReady                 true
+```
+
+与 R10.3 约 16 秒的 Fast Wake HTTP 等待相比，R10.3.1 已基本消除 RECEIPT 完成后的 transport 尾部等待。
+
+详细记录：`docs/35-harbor-r10-3-1-ledger-first-race.md`。
 
 ## 5. Bridge Sheet 当前提示
 
@@ -94,15 +111,25 @@ Harbor Cat Sheet README / META 已加入 fast-path 运行提示：
 
 这些是 Adapter 运行提示，不是业务 contract，也不写入 secret。
 
-## 6. 未来 MCP 替换边界
+## 6. 当前剩余体感延迟来源
+
+现在主要延迟已不在 canonical business service，也不在 Apps Script 完整后处理等待：
+
+- backend query/mutate 常约 1～1.5 秒；
+- Fast Wake 可在 authoritative receipt finalized 后立即结束；
+- 剩余主要来自 COMMAND 写入、Apps Script/Drive worker 启动、Google/ChatGPT 工具调用往返，以及 ChatGPT Project 是否严格遵守单 COMMAND / 单 Wake / 精确 RECEIPT fast path。
+
+因此后续性能优化应优先围绕 Adapter 启动与工具编排，而不是往 AI Access Core 添加特殊逻辑。
+
+## 7. 未来 MCP 替换边界
 
 MCP 不继承：Sheet COMMANDS/RECEIPTS、Apps Script、Fast Wake、STATE_* AI 读取策略。
 
 MCP 继续复用：AI Access Core、natural input normalization、clarification、canonical services、权限、幂等、业务语义和媒体规则。
 
-因此 R10.3 的交互目标是“让 Harbor 看起来像一个慢一点的 MCP Adapter”，而不是继续往 Harbor 内添加业务逻辑。
+Harbor 的目标始终是“一个可替换、逐步逼近 MCP 体验的临时 Adapter”。
 
-## 7. 当前部署规则
+## 8. 当前部署规则
 
 Production 自动部署默认关闭：
 
