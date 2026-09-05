@@ -33,6 +33,10 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isMealResource(value: unknown) {
+  return ["meal", "三餐", "餐食", "饮食", "吃饭"].includes(stringValue(value).toLowerCase());
+}
+
 function parseCommand(value: unknown): DriveBridgeCommand {
   const row = asRecord(value);
   const commandId = stringValue(row.commandId).slice(0, 120);
@@ -51,9 +55,8 @@ function parseCommand(value: unknown): DriveBridgeCommand {
 async function buildAttachment(identity: FixedLifeIdentity, command: DriveBridgeCommand) {
   if (!command.originalDriveFileId) return null;
   if (command.tool !== "life_mutate") throw new Error("只有 life_mutate 可以绑定原图");
-  const resource = stringValue(command.args.resource);
-  if (resource !== "meal" || command.args.attachPhoto !== true) {
-    throw new Error("Drive 原图只能用于 attachPhoto=true 的 meal 写入");
+  if (!isMealResource(command.args.resource) || command.args.attachPhoto !== true) {
+    throw new Error("Drive 原图只能用于 attachPhoto=true 的 meal/三餐写入");
   }
   if (!command.stagedOriginalPath) throw new Error("DRIVE_ORIGINAL_NOT_STAGED");
 
@@ -193,7 +196,7 @@ export async function getDriveBridgeSnapshot(identity: FixedLifeIdentity, includ
     includeLegacy ? loadHomeSyncSnapshot() : Promise.resolve(null),
   ]);
   return {
-    schemaVersion: "r10-v4",
+    schemaVersion: "r10-v3",
     generatedAt: new Date().toISOString(),
     identity: { me: identity.partnerKey, displayName: identity.displayName },
     lifeExport,
