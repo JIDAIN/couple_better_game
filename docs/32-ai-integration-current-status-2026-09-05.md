@@ -100,7 +100,7 @@ receiptReady                 true
 
 详细记录：`docs/35-harbor-r10-3-1-ledger-first-race.md`。
 
-## 5. Harbor R10.4 Targeted Command Wake（开发完成，待 live Apps Script 验收）
+## 5. Harbor R10.4 Targeted Command Wake（live Apps Script 已更新，待最终速度验收）
 
 R10.3.1 后剩余的主要服务端等待位于 Fast Wake 开始到 `/api/drive-bridge/execute` 真正收到 command 之间。代码核验发现，显式 Fast Wake 虽然已经携带唯一 `commandId`，Apps Script 仍走通用 `processPendingCommands()`：最长等 Script Lock 5 秒、读取整张 COMMANDS、扫描批量 pending，并在同一 lock 下刷新全部 STATE snapshot。
 
@@ -119,7 +119,9 @@ Fast Wake(commandId)
 
 该优化只属于 Harbor Adapter，不修改 AI Access Core 或 canonical service。
 
-**重要部署边界**：R10.4 的关键代码位于 Google Apps Script。仅 Vercel Production deployment 不能让它生效；必须先将仓库的 `Code.gs` 与 `FastKick.gs` 同步到 Cat Apps Script project 并更新 Web App deployment，再做真实速度验收。
+2026-09-06，用户已完成 Cat Apps Script 的人工同步并重新部署 Web App：`Code.gs` 使用 main 最新版，新增 `FastKick.gs`。因此 R10.4 live Apps Script 代码已具备 targeted processor。
+
+当前还缺一条由 Harbor Cat 正常路径触发的真实 Fast Wake 速度样本。维护会话可以读写 Harbor Sheet，但没有可安全发起带 wake-only token 的任意 HTTP GET 工具，所以不能把仅通过 Sheet fallback/Drive Watch 执行的命令误当成 targeted Fast Wake 验收。
 
 详细记录：`docs/36-harbor-r10-4-targeted-command-wake.md`。
 
@@ -140,7 +142,7 @@ Harbor Cat Sheet README / META 已加入 fast-path 运行提示：
 
 - canonical backend query/mutate 常约 1～1.5 秒；
 - RECEIPT 后 Fast Wake 尾部等待已由 R10.3.1 消除；
-- R10.4 正在消除 Apps Script 显式 wake 的整表扫描、5 秒 lock queue 和 snapshot-under-lock；
+- R10.4 live Apps Script 已更新，目标是消除显式 wake 的整表扫描、5 秒 lock queue 和 snapshot-under-lock；
 - 其余体感时间还包括 Google / ChatGPT 工具调用往返和 Project 是否严格遵守单 COMMAND / 单 Wake / 精确 RECEIPT fast path。
 
 后续性能优化继续只围绕 Adapter/transport，不往 AI Access Core 塞特殊逻辑。
