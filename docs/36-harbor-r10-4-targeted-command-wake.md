@@ -1,6 +1,6 @@
 # Harbor R10.4 — Targeted Command Wake
 
-> 状态：代码与测试已实现，等待 CI 与 Apps Script / Production 实际部署验收。
+> 状态：代码、测试、CI 已完成；2026-09-06 用户已将 `Code.gs` + `FastKick.gs` 手动同步到 Cat Apps Script 并重新部署 Web App。当前等待一次真实 Harbor Cat Fast Wake 速度验收，不提前标记为通过。
 
 ## 1. 问题
 
@@ -87,26 +87,45 @@ AI Access Core / Canonical Service
 - Script Lock 必须在 snapshot refresh 前释放；
 - locked / command_not_visible 不能伪装成成功执行。
 
-## 8. 部署边界
+PR #72 的 CI：Test / Lint / Build 全部通过。
 
-这次与 R10.3.1 不同：关键修改位于 Google Apps Script 源码。
+## 8. 部署边界与当前 live 状态
 
-因此仅部署 Vercel **不能**激活 R10.4。必须同时把仓库中的 `Code.gs` 与新增 `FastKick.gs` 同步到 Cat Apps Script 项目，并更新 Web App deployment 后，才可以进行真实启动速度验收。
+这次与 R10.3.1 不同：关键修改位于 Google Apps Script 源码。因此仅部署 Vercel不能激活 R10.4。
 
-当前 ChatGPT 已连接的 Google Drive 工具不能直接编辑 Apps Script project source；仓库代码、测试和文档可以自动完成，但 Apps Script live source 的同步必须通过支持 Apps Script 的部署方式或一次人工同步完成。
+2026-09-06，用户已确认完成以下人工步骤：
+
+```text
+Cat Apps Script
+- Code.gs 已替换为 main 最新版
+- 新增 FastKick.gs
+- Web App 已以新版本重新部署
+```
+
+因此 live Apps Script 代码现在应具备 R10.4 targeted processor，但仍需真实 Harbor Cat 命令命中 Fast Wake 后，用 COMMAND / RECEIPT / ledger 时间线验证，才能将状态改为“Production 验收通过”。
+
+当前这个维护会话可读写 Harbor Sheet，但没有可安全调用带 wake-only token 的任意 HTTP GET 工具；因此不能用维护会话自己伪造 Fast Wake 验收。真实验收必须由 Harbor Cat 正常调用路径触发。
 
 ## 9. 验收指标
 
-上线后记录：
+真实 Harbor Cat 请求后记录：
 
 ```text
-Fast Wake request start
-Apps Script targeted processor start（如可观测）
+COMMAND created_at
+Fast Wake request（若日志可观测）
 ledger received_at
 receipt finished_at
-Fast Wake HTTP response
+COMMAND processed_at
 ledgerFirst
 skipped / targeted
 ```
+
+验收重点：
+
+1. 新命令不再依赖通用整表扫描；
+2. 显式 wake 不再最多排队 5 秒等待 Script Lock；
+3. 正式 receipt 写完后 snapshot 不再占住 Script Lock；
+4. 不创建重复 command / 重复 mutation；
+5. 与 R10.3.1 的约 4～5 秒 pre-worker 启动段比较是否明显缩短。
 
 目标不是承诺固定毫秒数，而是确认显式 wake 不再因整表扫描、5 秒 lock queue 或 snapshot-under-lock 产生可避免的启动延迟。
