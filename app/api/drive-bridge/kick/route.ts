@@ -5,6 +5,7 @@ import {
   parseAllowedGoogleWebAppRedirect,
 } from "@/lib/server/drive-bridge-google-webapp";
 import { getDriveBridgeCommandLedger } from "@/lib/server/drive-bridge-ledger";
+import { shouldAvoidSecondHarborWake } from "@/lib/server/drive-bridge-kick-policy";
 import {
   isDriveProjectKickCommandId,
   verifyDriveProjectKickToken,
@@ -260,13 +261,10 @@ export async function GET(request: Request) {
     let retried = false;
 
     if (firstAttempt.worker.ok === false) {
-      const skipped = typeof firstAttempt.worker.skipped === "string" ? firstAttempt.worker.skipped : "";
-
       // A script lock means another trigger/wake already owns command processing.
-      // Do not send a second wake and make it wait on the same lock. Instead, give
-      // the authoritative ledger a short window to finalize; if it is still busy,
-      // return an accepted/processing response and let the caller read RECEIPTS.
-      if (skipped === "locked") {
+      // Do not send a second wake and make it queue on the same lock. Give the
+      // authoritative ledger a short window to finish instead.
+      if (shouldAvoidSecondHarborWake(firstAttempt.worker)) {
         const ledger = await waitForFinalizedLedger(bridgeId, commandId);
         if (ledger) {
           return reconciledSuccess({
