@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 const DEFAULT_SUPABASE_URL = "https://bfhntnzngozdqsmgfvjk.supabase.co";
 
-type LedgerRow = {
+export type DriveBridgeLedgerRow = {
   command_id: string;
   actor: "cat" | "fish";
   tool: string;
@@ -33,14 +33,27 @@ export function driveBridgeRequestHash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
-async function readLedger(actor: "cat" | "fish", commandId: string): Promise<LedgerRow | null> {
+export function isFinalizedDriveBridgeLedger(
+  row: DriveBridgeLedgerRow | null,
+): row is DriveBridgeLedgerRow & { status: "succeeded" | "failed" } {
+  return Boolean(row && row.status !== "processing" && row.receipt != null);
+}
+
+async function readLedger(actor: "cat" | "fish", commandId: string): Promise<DriveBridgeLedgerRow | null> {
   const response = await fetch(
     `${supabaseUrl()}/rest/v1/life_drive_bridge_commands?actor=eq.${actor}&command_id=eq.${encodeURIComponent(commandId)}&select=command_id,actor,tool,request_hash,status,receipt&limit=1`,
     { headers: headers(), cache: "no-store" },
   );
   if (!response.ok) throw new Error("DRIVE_BRIDGE_LEDGER_READ_FAILED");
-  const rows = (await response.json()) as LedgerRow[];
+  const rows = (await response.json()) as DriveBridgeLedgerRow[];
   return rows[0] ?? null;
+}
+
+export async function getDriveBridgeCommandLedger(
+  actor: "cat" | "fish",
+  commandId: string,
+): Promise<DriveBridgeLedgerRow | null> {
+  return readLedger(actor, commandId);
 }
 
 export async function claimDriveBridgeCommand(input: {
@@ -65,7 +78,7 @@ export async function claimDriveBridgeCommand(input: {
     cache: "no-store",
   });
   if (!response.ok) throw new Error("DRIVE_BRIDGE_LEDGER_CLAIM_FAILED");
-  const inserted = (await response.json()) as LedgerRow[];
+  const inserted = (await response.json()) as DriveBridgeLedgerRow[];
   if (inserted.length > 0) return { claimed: true as const, row: inserted[0] };
 
   const existing = await readLedger(input.actor, input.commandId);

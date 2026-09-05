@@ -4,6 +4,7 @@ import {
   googleWebAppHop,
   parseAllowedGoogleWebAppRedirect,
 } from "@/lib/server/drive-bridge-google-webapp";
+import { getDriveBridgeCommandLedger } from "@/lib/server/drive-bridge-ledger";
 import {
   isDriveProjectKickCommandId,
   verifyDriveProjectKickToken,
@@ -106,6 +107,45 @@ async function invokeWorker(options: {
   };
 }
 
+async function finalizedLedgerState(bridgeId: "cat" | "fish", commandId: string) {
+  try {
+    const row = await getDriveBridgeCommandLedger(bridgeId, commandId);
+    if (!row || row.status === "processing" || row.receipt == null) return null;
+    return { status: row.status, receipt: row.receipt } as const;
+  } catch (error) {
+    console.warn("[harbor-kick] ledger reconciliation unavailable", {
+      bridgeId,
+      commandId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return null;
+  }
+}
+
+function reconciledSuccess(options: {
+  bridgeId: "cat" | "fish";
+  commandId: string;
+  retried: boolean;
+  ledgerStatus: "succeeded" | "failed";
+  attempt: WakeAttempt;
+}) {
+  const { bridgeId, commandId, retried, ledgerStatus, attempt } = options;
+  return json({
+    ok: true,
+    bridgeId,
+    commandId,
+    retried,
+    reconciledFromLedger: true,
+    commandStatus: ledgerStatus,
+    processed: typeof attempt.worker.processed === "number" ? attempt.worker.processed : 0,
+    skipped: typeof attempt.worker.skipped === "string" ? attempt.worker.skipped : null,
+    diagnostics: {
+      firstHop: attempt.firstHop,
+      finalHop: attempt.finalHop,
+    },
+  });
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const bridgeId = parseDriveBridgeId(url.searchParams.get("bridgeId")?.trim() ?? "");
@@ -139,6 +179,17 @@ export async function GET(request: Request) {
     });
 
     if (!firstAttempt.workerResponse.ok) {
+      const ledger = await finalizedLedgerState(bridgeId, commandId);
+      if (ledger) {
+        return reconciledSuccess({
+          bridgeId,
+          commandId,
+          retried: false,
+          ledgerStatus: ledger.status,
+          attempt: firstAttempt,
+        });
+      }
+
       console.warn("[harbor-kick] Apps Script HTTP wake failed", {
         bridgeId,
         commandId,
@@ -164,11 +215,21 @@ export async function GET(request: Request) {
     let finalAttempt = firstAttempt;
     let retried = false;
 
-    // The worker can finish COMMANDS/RECEIPTS successfully and then fail while
-    // refreshing its non-authoritative STATE_* mirror. A second wake is safe:
-    // the command is idempotently no longer pending, so the worker immediately
-    // returns ok=true without duplicating the mutation.
+    // Apps Script can report ok=false after the authoritative command ledger has
+    // already finalized. Reconcile against Supabase before retrying so a finished
+    // command is never surfaced as a Fast Wake failure and no needless wake is sent.
     if (firstAttempt.worker.ok === false) {
+      const ledger = await finalizedLedgerState(bridgeId, commandId);
+      if (ledger) {
+        return reconciledSuccess({
+          bridgeId,
+          commandId,
+          retried: false,
+          ledgerStatus: ledger.status,
+          attempt: firstAttempt,
+        });
+      }
+
       retried = true;
       finalAttempt = await invokeWorker({
         scriptUrl,
@@ -180,6 +241,17 @@ export async function GET(request: Request) {
     }
 
     if (!finalAttempt.workerResponse.ok || finalAttempt.worker.ok !== true) {
+      const ledger = await finalizedLedgerState(bridgeId, commandId);
+      if (ledger) {
+        return reconciledSuccess({
+          bridgeId,
+          commandId,
+          retried,
+          ledgerStatus: ledger.status,
+          attempt: finalAttempt,
+        });
+      }
+
       console.warn("[harbor-kick] Apps Script wake failed", {
         bridgeId,
         commandId,
@@ -209,6 +281,7 @@ export async function GET(request: Request) {
       bridgeId,
       commandId,
       retried,
+      reconciledFromLedger: false,
       processed:
         typeof firstAttempt.worker.processed === "number"
           ? firstAttempt.worker.processed
@@ -245,6 +318,20 @@ export async function GET(request: Request) {
         },
         502,
       );
+    }
+
+    const ledger = await finalizedLedgerState(bridgeId, commandId);
+    if (ledger) {
+      return json({
+        ok: true,
+        bridgeId,
+        commandId,
+        retried: false,
+        reconciledFromLedger: true,
+        commandStatus: ledger.status,
+        processed: 0,
+        skipped: null,
+      });
     }
 
     console.warn("[harbor-kick] wake unavailable", {
