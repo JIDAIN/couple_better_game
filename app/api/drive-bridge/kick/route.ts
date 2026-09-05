@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { parseDriveBridgeId } from "@/lib/server/drive-bridge-auth";
 import {
+  googleWebAppHop,
+  parseAllowedGoogleWebAppRedirect,
+} from "@/lib/server/drive-bridge-google-webapp";
+import {
   isDriveProjectKickCommandId,
   verifyDriveProjectKickToken,
 } from "@/lib/server/drive-bridge-project-kick";
@@ -17,6 +21,10 @@ const NO_STORE_HEADERS = {
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
+}
+
+function isRedirect(status: number) {
+  return status >= 300 && status < 400;
 }
 
 export async function GET(request: Request) {
@@ -43,9 +51,12 @@ export async function GET(request: Request) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45_000);
   try {
-    const workerResponse = await fetch(scriptUrl, {
+    const firstResponse = await fetch(scriptUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "CoupleBetterGame-HarborWake/1.0",
+      },
       body: JSON.stringify({
         type: "project-kick",
         bridgeId,
@@ -53,9 +64,46 @@ export async function GET(request: Request) {
         secret: wakeSecret,
       }),
       cache: "no-store",
+      redirect: "manual",
       signal: controller.signal,
     });
 
+    const firstHop = googleWebAppHop(firstResponse);
+    let workerResponse = firstResponse;
+
+    if (isRedirect(firstResponse.status)) {
+      const redirectUrl = parseAllowedGoogleWebAppRedirect(
+        firstResponse.headers.get("location"),
+        scriptUrl,
+      );
+      if (!redirectUrl) {
+        console.warn("[harbor-kick] rejected Google redirect", {
+          bridgeId,
+          commandId,
+          firstHop,
+        });
+        return json(
+          {
+            ok: false,
+            error: "worker redirect rejected",
+            bridgeId,
+            commandId,
+            diagnostics: { firstHop },
+          },
+          502,
+        );
+      }
+
+      workerResponse = await fetch(redirectUrl, {
+        method: "GET",
+        cache: "no-store",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: { "User-Agent": "CoupleBetterGame-HarborWake/1.0" },
+      });
+    }
+
+    const finalHop = googleWebAppHop(workerResponse);
     const text = await workerResponse.text();
     let worker: Record<string, unknown> = {};
     try {
@@ -67,13 +115,21 @@ export async function GET(request: Request) {
       worker = {};
     }
 
-    if (!workerResponse.ok || worker.ok === false) {
+    if (!workerResponse.ok || worker.ok === false || worker.ok !== true) {
+      console.warn("[harbor-kick] Apps Script wake failed", {
+        bridgeId,
+        commandId,
+        firstHop,
+        finalHop,
+        bodyKind: text.trim().startsWith("{") ? "json-like" : text.trim().startsWith("<") ? "html-like" : "other",
+      });
       return json(
         {
           ok: false,
           error: "worker wake failed",
           bridgeId,
           commandId,
+          diagnostics: { firstHop, finalHop },
         },
         502,
       );
@@ -85,8 +141,14 @@ export async function GET(request: Request) {
       commandId,
       processed: typeof worker.processed === "number" ? worker.processed : null,
       skipped: typeof worker.skipped === "string" ? worker.skipped : null,
+      diagnostics: { firstHop, finalHop },
     });
   } catch (error) {
+    console.warn("[harbor-kick] wake unavailable", {
+      bridgeId,
+      commandId,
+      error: error instanceof Error ? error.name : "unknown",
+    });
     return json(
       {
         ok: false,
