@@ -1,14 +1,15 @@
 import type { MoodKey, SleepRecord } from "@/lib/life/life-service";
+import { moodLabel } from "@/lib/life/mood-labels";
 
 export const MOODS: Array<{ key: MoodKey; label: string; softTone: string }> = [
-  { key: "tired", label: "心累", softTone: "#eee5df" },
-  { key: "angry", label: "生气", softTone: "#ffe1db" },
-  { key: "excited", label: "兴奋", softTone: "#fff3c9" },
-  { key: "anxious", label: "烦躁", softTone: "#e7edf7" },
-  { key: "neutral", label: "心动", softTone: "#ffe5ec" },
-  { key: "calm", label: "平静", softTone: "#e5f5df" },
-  { key: "sad", label: "伤心", softTone: "#e5f2ff" },
-  { key: "happy", label: "开心", softTone: "#fff0df" },
+  { key: "tired", label: moodLabel("tired"), softTone: "#eee5df" },
+  { key: "angry", label: moodLabel("angry"), softTone: "#ffe1db" },
+  { key: "excited", label: moodLabel("excited"), softTone: "#fff3c9" },
+  { key: "anxious", label: moodLabel("anxious"), softTone: "#e7edf7" },
+  { key: "neutral", label: moodLabel("neutral"), softTone: "#ffe5ec" },
+  { key: "calm", label: moodLabel("calm"), softTone: "#e5f5df" },
+  { key: "sad", label: moodLabel("sad"), softTone: "#e5f2ff" },
+  { key: "happy", label: moodLabel("happy"), softTone: "#fff0df" },
 ];
 
 export function localIsoDate(date = new Date()) {
