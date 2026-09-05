@@ -172,18 +172,11 @@ Project prompt 中所有 mood key → 中文映射说明。
 
 ---
 
-## 2026-09-05 — meal 输入不得要求 AI 猜 rawName
+## 2026-09-05 — 自然语言输入统一进入 AI Access Core normalizer
 
 ### 问题
 
-用户要求记录“牛肉面一碗、鸡蛋一个”。AI 先后尝试：
-
-```text
-items[].name
-items[].foodName
-```
-
-服务端内部实际要求 `items[].rawName`，造成多次 failed。
+meal 暴露出 `name / foodName / rawName` 猜测失败，但同一问题会出现在体重、药箱、睡眠、活动、信箱、设置等所有 AI 写入资源。如果逐个把内部字段写进 Project prompt，会导致模型入口绑定业务实现，未来 MCP 迁移困难，而且用户缺少信息时容易看到内部 schema 错误而不是自然追问。
 
 ### 根因层
 
@@ -191,49 +184,68 @@ AI Access Core / Input contract。
 
 ### 决定
 
-餐食输入必须增加 normalization 层，AI 不需要知道数据库 / 内部 DTO 的唯一字段名。
-
-目标至少兼容：
+所有 AI 入口统一采用：
 
 ```text
-name
-foodName
-rawName
+自然语言
+→ 模型只负责意图理解与事实抽取
+→ Natural Input Normalizer
+→ canonical contract
+→ canonical parser / authorization / idempotency
+→ Supabase
 ```
 
-数量表达同时兼容业务友好的形式，并统一转换到 canonical meal payload。
+信息分三类：
+
+1. 可以安全默认：由程序补，例如 today、本月、medicine create quantity=1；
+2. 可以确定映射：由程序归一，例如中文 resource/action、person、meal item aliases、单位、时间、UI label；
+3. 不可安全推断：返回 `LIFE_CLARIFICATION_REQUIRED` 和一个用户可直接回答的问题。
+
+Canonical parser 保持严格，normalizer 只存在于 AI Access Core boundary，不改变网页/数据库正式 DTO。
 
 ### 为什么
 
-`rawName` 属于内部实现细节；如果未来 MCP 仍要求模型记住它，则说明 contract 设计失败。
+AI 应学习“用户意图”，不应学习内部数据库字段。未来无论 Harbor、内置 AI 还是 MCP，都应共享同一自然语言 contract，而不是各自维护提示词字典。
 
 ### 修改位置
 
-meal mutation normalization / validation（待完成）。
+- `lib/ai/life-input-normalizer.ts`
+- `lib/server/life-agent-registry.ts`
+- `lib/server/drive-bridge-service.ts`
+- `lib/server/life-ai-gateway.ts`
+- `docs/28-ai-natural-language-contract.md`
+- `tests/ai/life-input-normalizer.test.ts`
+- `tests/server/life-agent-registry.test.ts`
 
 ### Harbor 影响
 
-团子可以直接用业务友好字段，不必读取 schema 后反复试错。
+Harbor 可以继续提交 `life_query / life_mutate`，但常见字段别名会由 Core 自动归一。缺少关键信息时 receipt 的 error 为自然追问，并同时支持结构化 `errorCode/clarification`；Harbor 不应让用户排查 `rawName` 等内部字段。
+
+餐食照片在 Adapter 预处理边界也接受 `meal / 三餐 / 餐食 / 饮食 / 吃饭`，避免“文字能写、照片因 resource alias 被提前拒绝”。
 
 ### MCP / 未来入口复用
 
-完整复用同一 normalization。
+Natural Input Normalizer 是长期 Core 能力。当前旧 R8 MCP 工具实现仍有独立 domain/write 代码，后续迁移时应保留 MCP OAuth、scope、file handling 和外部 idempotency 语义，但把自然输入和业务执行逐步转到同一 Core，不复制新 schema。
 
 ### 安全影响
 
-不改变 owner / authorization；只改善输入兼容。
+- 不放宽 cat/fish ownership；
+- delete 仍先检查当前消息明确删除意图；
+- update/delete 不猜 UUID；
+- legacy_home 仍要求精确确认短语；
+- canonical parser 继续最终严格校验。
 
 ### 兼容性
 
-必须继续支持现有 canonical `rawName` payload。
+现有 canonical payload 继续支持；新增 common alias/default 是向后兼容扩展。
 
 ### 测试 / Production 验收
 
-待代码修复后覆盖：name / foodName / rawName、quantity、amount+unit，以及重复请求幂等。
+自动测试覆盖 query 默认日期/person、mood label、meal aliases/份量、weight string、medicine aliases/default quantity、mailbox、activity duration、settings、clarification 与 delete safety。CI Test/Lint/Build 已通过分支版本；Production 尚未部署，等待用户统一验收阶段前授权。
 
 ### 未来可删除内容
 
-Project prompt 里 meal 内部字段说明和 AI schema 猜测流程。
+Project prompt 中业务字段表、meal `rawName` 说明、mood 枚举表、绝大多数 schema troubleshooting 指令。
 
 ---
 
