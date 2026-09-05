@@ -1,5 +1,5 @@
 import type { FixedLifeIdentity } from "./fixed-life-auth";
-import { executeLifeAgentTool } from "./life-agent-registry";
+import { executeLifeAgentTool } from "./life-agent-executor";
 import { LifeClarificationError } from "../ai/life-input-normalizer";
 import { compressMealPhoto, DRIVE_MEAL_PHOTO_MAX_INPUT_BYTES } from "./image-compression";
 import {
