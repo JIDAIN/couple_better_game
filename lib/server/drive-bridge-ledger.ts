@@ -33,6 +33,12 @@ export function driveBridgeRequestHash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+export function isFinalizedDriveBridgeLedger(
+  row: DriveBridgeLedgerRow | null,
+): row is DriveBridgeLedgerRow & { status: "succeeded" | "failed" } {
+  return Boolean(row && row.status !== "processing" && row.receipt != null);
+}
+
 async function readLedger(actor: "cat" | "fish", commandId: string): Promise<DriveBridgeLedgerRow | null> {
   const response = await fetch(
     `${supabaseUrl()}/rest/v1/life_drive_bridge_commands?actor=eq.${actor}&command_id=eq.${encodeURIComponent(commandId)}&select=command_id,actor,tool,request_hash,status,receipt&limit=1`,
