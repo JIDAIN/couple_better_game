@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   listWeights: vi.fn(),
   updateWeight: vi.fn(),
   deleteWeight: vi.fn(),
+  createMeal: vi.fn(),
   deleteMedicine: vi.fn(),
   getMailboxSender: vi.fn(),
   updateMailboxLetter: vi.fn(),
@@ -20,6 +21,11 @@ vi.mock("../../lib/server/supabase-weight", async () => {
     updateWeight: mocks.updateWeight,
     deleteWeight: mocks.deleteWeight,
   };
+});
+
+vi.mock("../../lib/server/supabase-nutrition", async () => {
+  const actual = await vi.importActual<typeof import("../../lib/server/supabase-nutrition")>("../../lib/server/supabase-nutrition");
+  return { ...actual, createMeal: mocks.createMeal };
 });
 
 vi.mock("../../lib/server/supabase-medicine", async () => {
@@ -71,6 +77,36 @@ describe("life internal AI registry guards", () => {
 
     expect(result).toMatchObject({ partnerKey: "cat", weightKg: 52.4 });
     expect(mocks.createWeight).toHaveBeenCalledWith(expect.objectContaining({ partnerKey: "cat" }));
+  });
+
+  it("normalizes natural meal item fields before the canonical parser", async () => {
+    mocks.createMeal.mockImplementation(async (payload) => ({ id: "meal-1", ...payload }));
+
+    const result = await executeLifeAgentTool(
+      "life_mutate",
+      {
+        resource: "三餐",
+        data: {
+          mealType: "午饭",
+          mealDate: "2026-09-05",
+          items: [
+            { name: "牛肉面", quantity: "1碗" },
+            { foodName: "鸡蛋", amount: 1, unit: "个" },
+          ],
+        },
+      },
+      { identity: CAT, latestUserText: "帮我记录今天午饭：牛肉面一碗，鸡蛋一个", toolCallId: "meal-natural-test" },
+    );
+
+    expect(result).toMatchObject({
+      partnerKey: "cat",
+      mealDate: "2026-09-05",
+      mealType: "lunch",
+      items: [
+        { rawName: "牛肉面", portionDescription: "1碗" },
+        { rawName: "鸡蛋", portionDescription: "1个" },
+      ],
+    });
   });
 
   it("rejects delete calls when the latest user message did not ask to delete", async () => {
