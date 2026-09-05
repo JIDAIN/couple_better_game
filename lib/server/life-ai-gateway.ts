@@ -3,7 +3,7 @@ import {
   executeLifeAgentTool,
   LIFE_AGENT_TOOLS,
   type LifeAgentAttachment,
-} from "./life-agent-registry";
+} from "./life-agent-executor";
 
 const AI_GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/chat/completions";
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
