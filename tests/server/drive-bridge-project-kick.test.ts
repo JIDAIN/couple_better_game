@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  parseAllowedGoogleWebAppRedirect,
+} from "../../lib/server/drive-bridge-google-webapp";
+import {
   buildDriveProjectKickToken,
   isDriveProjectKickCommandId,
   verifyDriveProjectKickToken,
@@ -61,5 +64,18 @@ describe("R10 Harbor project fast wake", () => {
       },
     });
     await expect(verifyDriveProjectKickToken("cat", "wrong-token")).resolves.toEqual({ ok: false });
+  });
+
+  it("follows only HTTPS redirects on Google Apps Script content hosts", () => {
+    const base = "https://script.google.com/macros/s/example/exec";
+    expect(
+      parseAllowedGoogleWebAppRedirect(
+        "https://script.googleusercontent.com/macros/echo?user_content_key=abc",
+        base,
+      )?.hostname,
+    ).toBe("script.googleusercontent.com");
+    expect(parseAllowedGoogleWebAppRedirect("https://accounts.google.com/signin", base)).toBeNull();
+    expect(parseAllowedGoogleWebAppRedirect("https://evil.example/steal", base)).toBeNull();
+    expect(parseAllowedGoogleWebAppRedirect("http://script.google.com/macros/echo", base)).toBeNull();
   });
 });
