@@ -1,4 +1,5 @@
 import type {
+  MealPhotoDisplay,
   MealQuery,
   MealRecord,
   MealWritePayload,
@@ -180,12 +181,31 @@ export async function getMealPhotoPath(mealId: string) {
   );
 }
 
-export async function replaceMealPhotoPath(mealId: string, photoPath: string | null) {
+export async function replaceMealPhotoState(
+  mealId: string,
+  photoPath: string | null,
+  display: MealPhotoDisplay,
+) {
   return callRpc<MealPhotoReplacement>(
-    "replace_meal_photo_path",
+    "replace_meal_photo_state",
     {
       p_meal_id: mealId,
       p_photo_path: photoPath,
+      p_rotation_degrees: display.rotationDegrees,
+      p_scale: display.scale,
+      p_space_slug: coupleSpaceSlug(),
+    },
+    "write",
+  );
+}
+
+export async function updateMealPhotoDisplay(mealId: string, display: MealPhotoDisplay) {
+  return callRpc<MealRecord>(
+    "update_meal_photo_display",
+    {
+      p_meal_id: mealId,
+      p_rotation_degrees: display.rotationDegrees,
+      p_scale: display.scale,
       p_space_slug: coupleSpaceSlug(),
     },
     "write",
