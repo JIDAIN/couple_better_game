@@ -20,13 +20,13 @@ life_mutate
 
 ## 2. 当前 AI 入口
 
-### Harbor Cat / ChatGPT Project
+### Harbor Cat / ChatGPT Project（正式主入口）
 
 ```text
 Harbor Cat / 团子
-→ Google Drive / Bridge COMMAND
-→ Fast Wake / Worker
-→ /api/drive-bridge/*
+→ Harbor-Cat MCP
+→ OAuth = cat
+→ /mcp
 → life_query / life_mutate
 → AI Access Core
 → Supabase
@@ -42,7 +42,29 @@ Ta / 对象 = fish
 
 “团子”只是 AI 昵称，不是身份凭证。
 
-### MCP
+### Harbor Fish / ChatGPT Project（正式主入口）
+
+```text
+Harbor Fish
+→ Harbor-Fish MCP
+→ OAuth = fish
+→ /mcp
+→ life_query / life_mutate
+→ AI Access Core
+→ Supabase
+```
+
+固定语义：
+
+```text
+Harbor Fish authoritative actor = fish
+我 = fish
+Ta / 对象 = cat
+```
+
+Cat / Fish 身份由 OAuth token 与服务端授权上下文绑定，不能由聊天文本切换。
+
+### 其他 MCP client
 
 ```text
 MCP client
@@ -64,7 +86,21 @@ MCP client
 → AI Access Core
 ```
 
-三条入口共享同一套业务权限、校验和数据事实源，不复制 CRUD。
+### Google Drive / Sheet Bridge（兼容回滚）
+
+```text
+legacy Harbor transport
+→ Google Drive / Bridge COMMAND
+→ Fast Wake / Worker
+→ /api/drive-bridge/*
+→ life_query / life_mutate
+→ AI Access Core
+→ Supabase
+```
+
+Bridge 不再是 Harbor 正常读写路径，仅作为短期兼容 / 回滚入口保留。
+
+以上入口共享同一套业务权限、校验和数据事实源，不复制 CRUD。
 
 ## 3. Tool Registry
 
@@ -102,7 +138,7 @@ legacy_home replace
 
 身份由服务端授权上下文决定，不从模型猜测。
 
-Harbor Bridge 请求使用 HMAC 身份；MCP 使用其授权身份；程序内置 AI 使用当前登录身份。
+Harbor Cat 使用 Harbor-Cat OAuth 身份；Harbor Fish 使用 Harbor-Fish OAuth 身份；程序内置 AI 使用当前登录身份。Bridge 兼容通道继续使用 HMAC 固定身份。
 
 核心权限：
 
@@ -131,9 +167,9 @@ AI 对事实的理解和数据库写权限是两回事。
 → read-back / receipt
 ```
 
-Harbor 使用 `(actor, command_id)` ledger 防止重复执行；MCP 和各 domain 继续使用各自稳定幂等种子/写入键。
+MCP 和各 domain 使用稳定幂等种子/写入键；Bridge 兼容路径继续使用 `(actor, command_id)` ledger。
 
-如果执行结果不确定，应读回相同 operation/receipt，而不是换新 id 盲目重放。
+如果执行结果不确定，应读回相同 operation/record，而不是换新 id 盲目重放。
 
 ## 6. 饮食草稿确认：对话层软约束
 
@@ -154,7 +190,7 @@ Harbor 使用 `(actor, command_id)` ledger 防止重复执行；MCP 和各 domai
 - 持久化 draft token/state；
 - 通过当前一句 `userText` 是否包含“确认/可以/好的”来硬拦截 meal create。
 
-草稿状态由团子 / AI 的聊天上下文承接。
+草稿状态由 AI 的聊天上下文承接。
 
 因此用户已经确认后，如果正式写入临时失败，再说“再试一次”，AI 可以继续重试已确认的正式操作；AI Access Core 不会因为“再试一次”不包含确认关键词而拒绝。
 
@@ -229,7 +265,7 @@ photo_scale            = 0.60 .. 1.00
 
 竖图上传后默认 `90°` 横向显示；用户之后可以在 UI 无损调整方向和大小。
 
-若 MCP 客户端没有透传图片字节：
+ChatGPT Custom MCP 当前可直接接收 OpenAI 临时文件 URL。若某个 MCP 客户端没有透传图片字节：
 
 ```text
 life_mutate attachPhoto=true
@@ -241,37 +277,53 @@ life_mutate attachPhoto=true
 
 收到恢复链接后不重复 create/update。
 
-## 10. Harbor Fast Path
+## 10. Harbor MCP 正常路径
 
-普通 Harbor 业务优先：
+普通 Harbor 业务：
 
 ```text
-1 COMMAND
-→ 1 Fast Wake
-→ 同 command_id RECEIPT
-→ 回复用户
+Harbor-Cat / Harbor-Fish
+→ life_query / life_mutate
+→ /mcp
+→ AI Access Core
+→ Supabase
 ```
 
-不要在普通 query/mutate 前先 `life_capabilities`，不要扫描整张 RECEIPTS，也不要把 Fast Wake HTTP 200 当成业务成功。
+普通已知 query/mutate 不先 `life_capabilities`。
 
-`locked / processing / receiptReady=false` 时不重复 Wake、不创建新 command，只等待同一 receipt。
+正常 Harbor 请求不创建 `COMMAND`、不扫描 `RECEIPTS`、不触发 `Fast Wake`、不读取 `STATE_*` 作为事实源。
 
 ## 11. Drive Bridge 与 Supabase 边界
 
-Google Sheets / Drive Bridge 是传输和兼容层，不是事实源。
+Google Sheets / Drive Bridge 已降级为兼容 / 回滚传输层，不是事实源，也不是 Harbor 默认入口。
 
 ```text
-COMMANDS   命令日志
-RECEIPTS   执行结果
+COMMANDS   旧命令日志
+RECEIPTS   旧执行结果
 STATE_*    只读镜像 / fallback
 META       Bridge 元数据
 ```
 
 Supabase 始终是正式生活数据 Source of Truth。
 
-普通业务不应优先读取 `STATE_*`；只在 UI read model / snapshot / fallback 时使用。
+只有 MCP 明确不可用且用户要求走兼容通道时，才考虑 Bridge。
 
-## 12. 新 Domain 接入规范
+## 12. Harbor Project 指令
+
+当前有效模板见：
+
+`docs/46-harbor-mcp-project-instructions.md`
+
+原则：
+
+```text
+Harbor Cat  → 只使用 Harbor-Cat → OAuth cat
+Harbor Fish → 只使用 Harbor-Fish → OAuth fish
+```
+
+旧 Google Bridge Project Instructions 不再作为正常工作流。
+
+## 13. 新 Domain 接入规范
 
 新增例如 `cycle`：
 
@@ -284,7 +336,7 @@ Supabase 始终是正式生活数据 Source of Truth。
 7. 需要备份时扩展 `life_export`；
 8. Harbor/MCP 协议保持稳定。
 
-## 13. Production 部署纪律
+## 14. Production 部署纪律
 
 Production Git 自动部署默认关闭：
 
