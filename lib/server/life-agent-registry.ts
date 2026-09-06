@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { FixedLifeIdentity } from "./fixed-life-auth";
 import { buildChatgptWriteIdempotencyKey } from "../ai/record-write-protocol";
 import {
@@ -69,6 +70,7 @@ export type LifeAgentExecutionContext = {
   latestUserText: string;
   attachment?: LifeAgentAttachment | null;
   toolCallId?: string;
+  requestTimeMs?: number;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -119,13 +121,55 @@ function requireExplicitDelete(context: LifeAgentExecutionContext) {
   }
 }
 
-function idempotencyKey(domain: "meal" | "mood" | "sleep" | "activity", context: LifeAgentExecutionContext, date: string) {
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value as JsonRecord)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function idempotencyKey(
+  domain: "meal" | "mood" | "sleep" | "activity",
+  context: LifeAgentExecutionContext,
+  date: string,
+  semanticPayload?: unknown,
+  retrySafe = false,
+) {
+  let confirmationNonce = context.toolCallId || crypto.randomUUID();
+  if (retrySafe && semanticPayload) {
+    const nowMs = context.requestTimeMs ?? Date.now();
+    const tenMinuteWindow = Math.floor(nowMs / 600_000);
+    const fingerprint = createHash("sha256")
+      .update(`${domain}:${context.identity.partnerKey}:${date}:${stableJson(semanticPayload)}`)
+      .digest("hex")
+      .slice(0, 32);
+    confirmationNonce = `semantic-${tenMinuteWindow}-${fingerprint}`;
+  }
   return buildChatgptWriteIdempotencyKey({
     domain,
     scope: `internal-${context.identity.partnerKey}`,
     recordDate: date,
-    confirmationNonce: context.toolCallId || crypto.randomUUID(),
+    confirmationNonce,
   });
+}
+
+function explicitMutationTarget(args: JsonRecord, data: JsonRecord) {
+  const candidate = data.person ?? data.owner ?? data.who ?? data.partnerKey ?? args.person ?? args.owner ?? args.who;
+  return typeof candidate === "string" ? candidate.trim().toLowerCase() : "";
+}
+
+function requireOwnMutationTarget(args: JsonRecord, data: JsonRecord, context: LifeAgentExecutionContext) {
+  const target = explicitMutationTarget(args, data);
+  if (!target || ["me", "我", "自己", "本人", context.identity.partnerKey].includes(target)) return;
+  if (["ta", "她", "他", "对象", "伴侣", otherPartnerKey(context.identity.partnerKey)].includes(target)) {
+    throw new Error("个人数据只能写入当前 OAuth 账号，不能指定 Ta");
+  }
+  throw new Error("个人数据写入目标无效；只能写入 me/当前账号");
 }
 
 async function bindAttachmentToMeal(mealId: string, attachment: LifeAgentAttachment) {
@@ -150,6 +194,16 @@ async function bindAttachmentToMeal(mealId: string, attachment: LifeAgentAttachm
   }
 }
 
+function filterDayForPerson<T extends Awaited<ReturnType<typeof getLifeDay>>>(day: T, partnerKey: "cat" | "fish" | null) {
+  if (!partnerKey) return day;
+  return {
+    ...day,
+    moods: day.moods.filter((item) => item.partnerKey === partnerKey),
+    sleeps: day.sleeps.filter((item) => item.partnerKey === partnerKey),
+    activities: day.activities.filter((item) => item.participantScope === "both" || item.participantScope === partnerKey),
+  };
+}
+
 export const LIFE_AGENT_TOOLS = [
   {
     type: "function",
@@ -163,17 +217,19 @@ export const LIFE_AGENT_TOOLS = [
     type: "function",
     function: {
       name: "life_query",
-      description: "查询岛屿生活真实数据。可使用自然常见别名；day/meal 未给日期时按 Asia/Shanghai 的今天处理。",
+      description: "查询岛屿生活真实数据。day 是单日完整汇总（心情、睡眠、活动、饮食）；mood/sleep/activity 可单独查询。日期按 Asia/Shanghai 处理。",
       parameters: {
         type: "object",
         properties: {
           resource: {
             type: "string",
-            description: "day/month/meal/weight/medicine/mailbox/settings/life_export/legacy_home；也接受心情、睡眠、活动、三餐、体重、药箱、信箱、设置等常用中文别名。",
+            description: "day/mood/sleep/activity/month/meal/weight/medicine/mailbox/settings/life_export/legacy_home；也接受对应中文别名。",
           },
-          date: { type: "string", description: "可选 YYYY-MM-DD；day/meal 默认今天" },
+          date: { type: "string", description: "可选 YYYY-MM-DD；day/mood/sleep/activity/meal 默认今天；weight 有 date 时只返回该日" },
+          dateFrom: { type: "string", description: "weight 可选起始日期 YYYY-MM-DD" },
+          dateTo: { type: "string", description: "weight 可选结束日期 YYYY-MM-DD" },
           monthStart: { type: "string", description: "可选 YYYY-MM-01；month 默认本月" },
-          person: { type: "string", description: "me/ta/all/cat/fish，也接受我、对象、双方等表达" },
+          person: { type: "string", description: "me/ta/all/cat/fish。day/mood/sleep/activity/meal 支持 all；weight 仅 me/ta/cat/fish" },
           limit: { type: "integer", minimum: 1, maximum: 1000 },
           name: { type: "string", description: "medicine 名称模糊过滤，也可使用 query/keyword/medicineName" },
         },
@@ -186,20 +242,20 @@ export const LIFE_AGENT_TOOLS = [
     type: "function",
     function: {
       name: "life_mutate",
-      description: "新增、修改或删除生活记录。优先传用户自然抽取出的字段，AI Access Core 会把常见别名规范化为 canonical contract；关键事实缺失时会返回需要向用户确认的问题。",
+      description: "新增、修改或删除生活记录。个人资源只能写当前 OAuth 账号；共同活动使用 participantScope=both。AI Access Core 会归一化常见别名并对短时间网络重试做幂等保护。",
       parameters: {
         type: "object",
         properties: {
           resource: {
             type: "string",
-            description: "mood/sleep/activity/meal/weight/medicine/mailbox/settings/legacy_home；也接受心情、睡眠、活动、三餐、体重、药品、信箱、设置等中文别名。",
+            description: "mood/sleep/activity/meal/weight/medicine/mailbox/settings/legacy_home；也接受对应中文别名。",
           },
           action: { type: "string", description: "可选。记录/新增=create，修改=update，删除=delete；mood/sleep 默认 upsert，settings 默认 update。" },
           id: { type: "string", description: "update/delete 的记录 UUID；禁止猜测，不知道时先查询" },
           attachPhoto: { type: "boolean", description: "meal 是否绑定本轮图片" },
           data: {
             type: "object",
-            description: "自然抽取出的业务字段。允许常见别名，例如 meal item 可用 name/foodName/rawName，weight 可用 weight/weightKg，medicine 可用 medicineName/name。",
+            description: "自然业务字段。活动：participantScope=me 表示本人，both 表示双方共同活动；不要用 ta 创建个人活动。",
             additionalProperties: true,
           },
         },
@@ -221,29 +277,32 @@ function capabilities(identity: FixedLifeIdentity) {
       principle: "模型负责理解用户意图和抽取实体；AI Access Core 负责别名、默认值、日期/数量格式归一化；canonical service 继续严格校验。",
       clarification: "缺少真正不可安全推断的信息时，服务端返回“需要向用户确认：...”的问题；不要让用户排查内部字段名。",
       defaults: [
-        "day/meal/mood/sleep/activity/weight 未给日期时默认 Asia/Shanghai 今天",
+        "day/mood/sleep/activity/meal 未给日期时默认 Asia/Shanghai 今天",
+        "未给 person 时默认 me；day/mood/sleep/activity/meal 可显式 all",
         "medicine 新增未给数量时默认 1",
         "meal 的 name/foodName/rawName 都会归一为 rawName",
-        "meal 的 quantity 或 amount+unit 会归一为 portionDescription",
       ],
     },
     query: {
-      day: "某日心情、睡眠、活动；日期默认今天",
+      day: "某日完整生活汇总：心情、睡眠、活动、饮食；支持 me/ta/all",
+      mood: "按日期与 me/ta/all 查询心情",
+      sleep: "按日期与 me/ta/all 查询睡眠",
+      activity: "按日期与 me/ta/all 查询活动；both 活动对双方均可见",
       month: "某月双人心情；默认本月",
       meal: "按日期与 me/ta/all 查询餐食；日期默认今天",
-      weight: "按 me/ta 查询体重历史",
+      weight: "按 me/ta 查询体重；支持 date/dateFrom/dateTo/limit",
       medicine: "家庭药箱，可按药名/关键词过滤",
-      mailbox: "小信箱全部信件",
+      mailbox: "小信箱，可用 limit 取最近 N 封",
       settings: "周年日、当前两人的目标体重",
       life_export: "V2 生活数据完整导出",
       legacy_home: "旧 /game 完整同步快照",
     },
     mutate: {
-      mood: "upsert；自然字段 mood/moodKey/label + date 可归一；身份强制当前账号",
-      sleep: "upsert；支持 bedtime/sleepTime 与 wakeTime 等别名；缺时间时向用户确认",
-      activity: "create/update/delete；支持 name/text/description、duration/分钟/小时等常见输入",
-      meal: "create/update/delete；items[].name/foodName/rawName 均可；quantity 或 amount+unit 可表示份量；可 attachPhoto",
-      weight: "create/update/delete；weight/weightKg/kg/value 均可；缺体重数值时向用户确认",
+      mood: "upsert；只写当前 OAuth 账号",
+      sleep: "upsert；只写当前 OAuth 账号；支持 bedtime/sleepTime 与 wakeTime 等别名",
+      activity: "create/update/delete；participantScope=me/both；both 创建一条双方共享活动",
+      meal: "create/update/delete；只写当前 OAuth 账号；可 attachPhoto",
+      weight: "create/update/delete；只写当前 OAuth 账号；缺体重数值时向用户确认",
       medicine: "create/update/delete；medicineName/drugName/name 均可；数量缺省为 1",
       mailbox: "create/update/delete；body/content/text/message 均可；发件人/收件人由服务端固定",
       settings: "update；支持 anniversary/anniversaryDate、targetWeight/targetWeightKg",
@@ -252,9 +311,9 @@ function capabilities(identity: FixedLifeIdentity) {
     safety: [
       "没有任意 SQL 或任意 URL 工具",
       "删除只在用户当前消息明确要求删除时执行",
-      "个人数据写入不能指定为 Ta",
+      "个人数据写入显式指定 Ta 会被服务端拒绝",
+      "短时间内相同 activity/meal create 的网络重试使用语义幂等键去重",
       "update/delete 的记录 ID 不允许自动猜测",
-      "旧游戏全量覆盖需要用户说出：确认覆盖游戏数据",
     ],
   };
 }
@@ -262,10 +321,19 @@ function capabilities(identity: FixedLifeIdentity) {
 async function queryLife(args: JsonRecord, context: LifeAgentExecutionContext) {
   const resource = stringValue(args.resource);
   switch (resource) {
-    case "day": {
+    case "day":
+    case "mood":
+    case "sleep":
+    case "activity": {
       const date = stringValue(args.date);
-      if (!date) throw new Error("day 查询需要 date");
-      return getLifeDay(date);
+      if (!date) throw new Error(`${resource} 查询需要 date`);
+      const person = resolvePerson(args.person, context.identity, true);
+      const day = filterDayForPerson(await getLifeDay(date), person);
+      if (resource === "mood") return day.moods;
+      if (resource === "sleep") return day.sleeps;
+      if (resource === "activity") return day.activities;
+      const meals = await listMeals({ mealDate: date, partnerKey: person });
+      return { ...day, meals };
     }
     case "month": {
       const monthStart = stringValue(args.monthStart);
@@ -281,15 +349,26 @@ async function queryLife(args: JsonRecord, context: LifeAgentExecutionContext) {
       const partnerKey = resolvePerson(args.person, context.identity, false);
       if (!partnerKey) throw new Error("weight 不能使用 all");
       const limit = Math.max(1, Math.min(1000, Number(args.limit ?? 365) || 365));
-      return listWeights(partnerKey, limit);
+      const date = stringValue(args.date);
+      const dateFrom = stringValue(args.dateFrom);
+      const dateTo = stringValue(args.dateTo);
+      const rows = await listWeights(partnerKey, date || dateFrom || dateTo ? 1000 : limit);
+      return rows
+        .filter((row) => !date || row.measurementDate === date)
+        .filter((row) => !dateFrom || row.measurementDate >= dateFrom)
+        .filter((row) => !dateTo || row.measurementDate <= dateTo)
+        .slice(0, limit);
     }
     case "medicine": {
       const medicines = await listMedicines();
       const name = stringValue(args.name).toLowerCase();
       return name ? medicines.filter((item) => item.name.toLowerCase().includes(name)) : medicines;
     }
-    case "mailbox":
-      return listMailboxLetters();
+    case "mailbox": {
+      const rows = await listMailboxLetters();
+      const limit = Math.max(1, Math.min(1000, Number(args.limit ?? rows.length) || rows.length));
+      return rows.slice(0, limit);
+    }
     case "settings":
       return getLifeSettings();
     case "life_export":
@@ -312,25 +391,27 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
 
   switch (resource) {
     case "mood": {
+      requireOwnMutationTarget(args, data, context);
       if (action !== "upsert") throw new Error("mood 只支持 upsert");
       const date = stringValue(data.moodDate);
       const parsed = parseMoodWritePayload({
         ...data,
         partnerKey: actor,
         source: "chatgpt",
-        idempotencyKey: idempotencyKey("mood", context, date),
+        idempotencyKey: idempotencyKey("mood", context, date, data, true),
       });
       if (!parsed.ok) throw new Error(parsed.reason);
       return upsertMood(parsed.value);
     }
     case "sleep": {
+      requireOwnMutationTarget(args, data, context);
       if (action !== "upsert") throw new Error("sleep 只支持 upsert");
       const date = stringValue(data.sleepDate);
       const parsed = parseSleepWritePayload({
         ...data,
         partnerKey: actor,
         source: "chatgpt",
-        idempotencyKey: idempotencyKey("sleep", context, date),
+        idempotencyKey: idempotencyKey("sleep", context, date, data, true),
       });
       if (!parsed.ok) throw new Error(parsed.reason);
       return upsertSleep(parsed.value);
@@ -342,12 +423,13 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
       const parsed = parseActivityWritePayload({
         ...data,
         source: "chatgpt",
-        idempotencyKey: idempotencyKey("activity", context, date),
+        idempotencyKey: idempotencyKey("activity", context, date, data, action === "create"),
       });
       if (!parsed.ok) throw new Error(parsed.reason);
       return action === "create" ? createActivity(parsed.value) : updateActivity(requireId(args), parsed.value);
     }
     case "meal": {
+      requireOwnMutationTarget(args, data, context);
       if (action === "delete") {
         const id = requireId(args);
         const owner = await getMealOwner(id);
@@ -361,7 +443,7 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
         partnerKey: actor,
         status: "confirmed",
         source: "chatgpt",
-        idempotencyKey: idempotencyKey("meal", context, date),
+        idempotencyKey: idempotencyKey("meal", context, date, data, action === "create"),
       });
       if (!parsed.ok) throw new Error(parsed.reason);
       let meal;
@@ -380,6 +462,7 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
       return meal;
     }
     case "weight": {
+      requireOwnMutationTarget(args, data, context);
       if (action === "delete") {
         const id = requireId(args);
         const ownRows = await listWeights(actor, 1000);

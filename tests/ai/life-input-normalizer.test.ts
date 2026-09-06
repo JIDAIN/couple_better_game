@@ -14,10 +14,19 @@ const context = (text: string, hasAttachment = false) => ({
 });
 
 describe("life natural input query normalization", () => {
-  it("defaults day queries to today and accepts Chinese resource aliases", () => {
+  it("exposes mood as a first-class query resource and defaults date/person", () => {
     expect(normalizeLifeQueryArgs({ resource: "心情" }, context("看看我今天心情怎么样"))).toMatchObject({
+      resource: "mood",
+      date: "2026-09-05",
+      person: "me",
+    });
+  });
+
+  it("normalizes day person aliases", () => {
+    expect(normalizeLifeQueryArgs({ resource: "day", person: "对象" }, context("看看对象今天的生活记录"))).toMatchObject({
       resource: "day",
       date: "2026-09-05",
+      person: "ta",
     });
   });
 
@@ -26,6 +35,22 @@ describe("life natural input query normalization", () => {
       resource: "meal",
       date: "2026-09-05",
       person: "ta",
+    });
+  });
+
+  it("preserves weight history by default but supports explicit day/range filters", () => {
+    expect(normalizeLifeQueryArgs({ resource: "体重", person: "我" }, context("查询我最近3条体重"))).toMatchObject({
+      resource: "weight",
+      person: "me",
+    });
+    expect(normalizeLifeQueryArgs({ resource: "体重", person: "我", date: "2026-09-05" }, context("查询我今天体重"))).toMatchObject({
+      resource: "weight",
+      person: "me",
+      date: "2026-09-05",
+    });
+    expect(normalizeLifeQueryArgs({ resource: "weight", dateFrom: "2026-09-01", dateTo: "2026-09-05" }, context("查这几天体重"))).toMatchObject({
+      dateFrom: "2026-09-01",
+      dateTo: "2026-09-05",
     });
   });
 
@@ -101,12 +126,19 @@ describe("life natural input mutation normalization", () => {
     });
   });
 
-  it("normalizes activity duration and participant scope", () => {
+  it("normalizes shared activity duration and defaults unspecified activity to me", () => {
     expect(normalizeLifeMutationArgs({ resource: "活动", data: { name: "散步", person: "我们", duration: "1小时30分钟" } }, context("我们散步了一个半小时，记一下"))).toMatchObject({
       resource: "activity",
       action: "create",
       data: { activityDate: "2026-09-05", text: "散步", participantScope: "both", durationMinutes: 90 },
     });
+    expect(normalizeLifeMutationArgs({ resource: "activity", data: { name: "跑步", duration: "30分钟" } }, context("记录我跑步30分钟"))).toMatchObject({
+      data: { participantScope: "cat", durationMinutes: 30 },
+    });
+  });
+
+  it("rejects activity writes targeting only Ta", () => {
+    expect(() => normalizeLifeMutationArgs({ resource: "activity", data: { name: "跑步", person: "对象" } }, context("记录对象跑步"))).toThrow("个人活动不能以当前账号替 Ta 写入");
   });
 
   it("normalizes settings aliases", () => {
