@@ -7,29 +7,66 @@ type RegistrationRequest = {
   redirect_uris?: unknown;
   client_name?: unknown;
   token_endpoint_auth_method?: unknown;
+  grant_types?: unknown;
+  response_types?: unknown;
+  scope?: unknown;
 };
+
+function noStoreJson(body: unknown, status: number) {
+  return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+function registrationFailure(error: unknown) {
+  const code = error instanceof Error ? error.message : "UNKNOWN_REGISTRATION_ERROR";
+  console.error("MCP_CLIENT_REGISTRATION_FAILED", { code });
+
+  if (code === "LIFE_MCP_SIGNING_SECRET_MISSING") {
+    return noStoreJson(
+      {
+        error: "server_error",
+        error_description: "OAuth signing configuration is unavailable",
+      },
+      503,
+    );
+  }
+
+  if (code === "INVALID_REDIRECT_URIS") {
+    return noStoreJson(
+      {
+        error: "invalid_redirect_uri",
+        error_description: "Only HTTPS or loopback HTTP redirect URIs are supported",
+      },
+      400,
+    );
+  }
+
+  return noStoreJson({ error: "invalid_client_metadata" }, 400);
+}
 
 export async function POST(request: Request) {
   let body: RegistrationRequest;
   try {
     body = (await request.json()) as RegistrationRequest;
   } catch {
-    return Response.json({ error: "invalid_client_metadata" }, { status: 400 });
+    return noStoreJson({ error: "invalid_client_metadata" }, 400);
   }
+
   if (!Array.isArray(body.redirect_uris) || !body.redirect_uris.every((value) => typeof value === "string")) {
-    return Response.json({ error: "invalid_redirect_uri" }, { status: 400 });
+    return noStoreJson({ error: "invalid_redirect_uri" }, 400);
   }
+
   if (body.token_endpoint_auth_method != null && body.token_endpoint_auth_method !== "none") {
-    return Response.json(
+    return noStoreJson(
       { error: "invalid_client_metadata", error_description: "Only public PKCE clients are supported" },
-      { status: 400 },
+      400,
     );
   }
+
   try {
     const redirectUris = body.redirect_uris as string[];
     const clientName = typeof body.client_name === "string" ? body.client_name : null;
     const clientId = createRegisteredClient({ redirectUris, clientName });
-    return Response.json(
+    return noStoreJson(
       {
         client_id: clientId,
         client_id_issued_at: Math.floor(Date.now() / 1000),
@@ -39,9 +76,9 @@ export async function POST(request: Request) {
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
       },
-      { status: 201, headers: { "Cache-Control": "no-store" } },
+      201,
     );
-  } catch {
-    return Response.json({ error: "invalid_client_metadata" }, { status: 400 });
+  } catch (error) {
+    return registrationFailure(error);
   }
 }
