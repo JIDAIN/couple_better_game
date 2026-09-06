@@ -1,129 +1,232 @@
 # 当前状态与 Roadmap
 
-**状态日期：2026-09-04**
+**状态日期：2026-09-06**
 
-详细视觉规范见 `docs/12-island-life-design-system.md`；R8.1 见 `docs/30-r8-ui-closeout.md`；R8.2 见 `docs/31-r8-2-ui-calibration.md`；R8.3 见 `docs/32-r8-3-visual-polish.md`；R8.4 见 `docs/33-r8-4-resilient-navigation-and-readiness.md`；R10 Drive Bridge 见 `docs/25-*` 至 `docs/29-*`。
+R11.5 详细说明见：
 
-## 1. 主功能状态
+`docs/45-r11-5-meal-nutrition-photo-display.md`
 
-```text
-V2-P0  新旧系统边界 /game                    ✅
-V2-P1  心情 / 睡眠 / 活动 facts + API         ✅
-V2-UI  岛屿生活视觉语言 + App* 基础            ✅
-V2-P2  今日首页                               ✅
-V2-P3  饮食 + 编辑 + 照片                     ✅
-V2-P4  月历 + 日期详情                         ✅
-V2-P5  小窝 + 体重                             ✅
-V2-P6  家庭药箱                                ✅
-V2-P7  小信箱                                  ✅
-V2-P8  游戏机列表 -> /game                     ✅
-R1-R7  重构与移动端校准                         ✅
-R8     数据管理 + MCP                          ✅
-R8.1   第一轮视觉/交互收口                       ✅ Production
-R8.2   Production 实机视觉二次校准               ✅ Production
-R8.3   信息减法 + UI hotfix                     ✅ Production
-R8.4   弱网缓存 + 持久导航 + App Shell            ✅ Production
-R8.7   无阻塞启动 + 图片缓存 + 日历即时同步          ✅ Production
-R8.8   缓存竞态收口 + 首页/饮食/日历无闪烁           ✅ Production
-R9     程序内置 AI Agent                        ✅ 备用能力，不展示在“我的”
-R10    双 Harbor + Worker Pairing 后端            ✅ Production
-R10.1  Supabase -> PushPlus 微信调度后端           ✅ Production DB
-R10.1  微信绑定/测试网页                         ⏳ 等待一次授权 Production 部署
-R10.1  Cat/Fish Apps Script AI Workers           ⏳ 尚未激活
-```
-
-## 2. 固定身份与 Harbor
+## 1. 当前主功能状态
 
 ```text
-cat 登录  -> 我=cat,  Ta=fish
-fish 登录 -> 我=fish, Ta=cat
-
-Harbor Cat  / 团子 -> authoritative actor = cat
-Harbor Fish / 仔仔 -> authoritative actor = fish
+今日 / 心情 / 睡眠 / 活动                ✅ Production
+饮食 + Meal CRUD + 私有照片              ✅ Production
+日历 + 双人心情                           ✅ Production
+小窝 / 体重 / 家庭药箱 / 小信箱 / 游戏机   ✅ Production
+Legacy Game                              ✅ 保留
+MCP / AI Access Core                     ✅ Production
+Harbor ChatGPT Bridge                    ✅ 可用兼容入口
+R8.7-R8.8 无感加载 / 缓存竞态收口          ✅ Production
+R11.4 MCP 图片恢复链路                     ✅ Production
+R11.5 AI 饮食草稿软确认                    ✅ Production
+R11.5 营养字段完整化                       ✅ Production
+R11.5 照片旋转 / 大小 / 无裁切显示          ✅ Production
 ```
 
-AI 昵称只用于会话识别；服务端权限始终绑定 `cat / fish`。
+## 2. 固定身份
 
-## 3. R8.4 弱网与页面切换
-
-Production 实机确认原 stale-while-revalidate 仍只有内存缓存，而且 `/api/auth/session` 临时失败会被误判为退出登录；底部导航也在每个页面 Shell 内重复挂载。
-
-R8.4 已完成并上线：
-
-- `stale-query` 增加 cat/fish 身份隔离的 `localStorage` 持久读缓存；
-- `localStorage` 保存最近确认的 cat/fish 非授权 scope hint，使安装后的应用重新打开时能立刻恢复对应的本地读缓存；真实权限仍由服务端签名 Cookie 确认；
-- 网络/5xx 失败不再自动变成“退出登录”，服务器明确 unauthenticated 才清身份；
-- 网络恢复后自动重新确认 session 并后台刷新；
-- 今日、月历、饮食、体重、药箱、信箱、设置均可在已有缓存时继续显示旧数据；
-- 底部导航上移至 Root `PersistentLifeChrome`，主 tab 切换时不再反复卸载重建；
-- Root 主动 prefetch 今日 / 饮食 / 日历 / 小窝 / 我的；
-- 新增 `/life-sw.js`，缓存主要页面壳与静态资源；
-- 页面弱网超过约 2.5 秒可回落已缓存 App Shell；
-- Service Worker 明确不缓存 `/api/*`、MCP、OAuth 数据，Supabase 始终是事实源；
-- 写操作仍要求真实网络和服务端权限，不伪装成离线写入。
-
-PR #52：
+Harbor Cat：
 
 ```text
-merge commit: 3232f834941431706d70a03deda4077978fe8b62
-CI #274:
-Test   ✅ 207/207
-Lint   ✅
-Build  ✅
+我 = cat
+Ta / 对象 = fish
+团子 = AI 昵称
 ```
 
-## 4. R8.7-R8.8 无感加载与缓存一致性（已上线）
+Harbor Fish 按其固定 actor 规则执行。
 
-R8.4-R8.6 已有持久读缓存与月度 bundle，但 Production 实机仍能看到启动进度、餐食默认图切换到实拍图、心情写入后月历短暂显示旧值。R8.7 先移除人为启动 gate、统一 canonical 预热和图片版本缓存；Production 复查后又确认存在一个更深层竞态：早于写入启动的旧请求可能在更晚返回后把新缓存覆盖回旧数据。R8.8 针对这个竞态和剩余首屏闪烁完成最后收口。
+AI 昵称不参与服务端身份判断；身份来自登录 / Bridge / MCP 授权上下文。
 
-当前已上线能力：
+## 3. 当前 AI 入口
 
-- 删除全屏启动 gate 及其 CSS，页面壳不再被 620ms/2.4s 人为阻塞；
-- 最近确认身份的 scope hint 跨应用重开保留，浏览器绘制前恢复身份提示和持久读缓存；真实权限仍由签名 Cookie 决定；
-- 启动首批预热只使用 Today/Food 的 canonical keys，月历、体重、药箱、信箱延后，降低首屏 RPC 争抢；
-- 月度 bundle 直接生成 `life-month:*` 月历缓存；
-- 心情/睡眠/活动写入 read-back 后同步更新 day、month、bundle 三层缓存；
-- stale-query 增加 request revision barrier：旧 in-flight 响应不能覆盖 mutation 后的新缓存；invalidate 发生在飞行请求途中时会从 mutation 之后重新读取；
-- 月度 bundle 尚在请求途中时发生 day/mood 写入，会显式使旧 bundle 快照失效，避免月历回滚；
-- 餐食照片 URL 带 `updatedAt` 版本，响应为 `private, max-age=31536000, immutable`；
-- 餐食编辑/删除直接更新当日列表缓存；
-- 今日页首帧使用固定尺寸静态壳，不显示“第一次读取今天的记录”；
-- 饮食页身份/数据恢复期间不显示“正在确认当前账号”，餐食记录未恢复时使用中性图片位，避免默认餐图再切实拍图；
-- 日历直接首屏渲染月份网格，身份和心情只增量补齐，不再整页从加载态切换。
-
-PR #58 最终 CI：
+三个入口共享同一个 AI Access Core：
 
 ```text
-Test   ✅ 221/221
-Lint   ✅
-Build  ✅ Next.js production build
+Harbor ChatGPT Project
+MCP /mcp
+程序内置 AI /api/ai/chat
+        ↓
+life_query / life_mutate
+        ↓
+canonical domain services
+        ↓
+Supabase
 ```
 
-Production 验收：
+Supabase 是正式生活数据事实源。
+
+Google Sheet / Drive Bridge 的 COMMANDS、RECEIPTS、STATE_* 只是兼容传输与镜像层。
+
+## 4. Harbor Fast Path
+
+普通 query / mutate：
 
 ```text
-/             200
-/food         200
-/calendar     200
-首页首屏       无“第一次读取今天的记录”文字
-饮食首屏       无“正在确认当前账号”文字
-日历首屏       直接渲染 2026 年 9 月网格
-runtime       部署后最近 30 分钟 error/fatal = 0
+1 COMMAND
+→ 1 Fast Wake
+→ 同 command_id RECEIPT
+→ 回复用户
 ```
 
-## 5. 当前 Vercel Production
+当前原则：
+
+- 普通业务不先 `life_capabilities`；
+- 不扫描整张 RECEIPTS；
+- `locked / processing / receiptReady=false` 不重复 Wake；
+- Fast Wake 200 不等于业务成功；
+- 正式结果只认同 command_id RECEIPT。
+
+## 5. R11.5 饮食交互
+
+新的 meal：
 
 ```text
-primary domain: https://couple-better-game.vercel.app
-deployment: dpl_2WsHTaUJZYLht9J8mRZZQ4vjKLSf
-status: READY
-source commit: 0cffc3bf906a7a2bfdb8d878af3b9d544bed2eb1
-release: R8.8
+图片 / 文字
+→ AI 分析实际摄入
+→ 聊天中展示待确认草稿
+→ 用户修改 / 确认
+→ 正式 life_mutate
 ```
 
-本轮 R10.1 尚未获得新的 Vercel Production 授权，因此网页/API 变更不会擅自上线。
+草稿状态属于聊天上下文：
 
-`vercel.json` 当前保持：
+- 无 `meal_drafts` 后台表；
+- 无 server-side draft state；
+- 服务端不再匹配“确认 / 可以 / 好的”等关键词决定 meal create；
+- 用户已经确认后，如果写入临时失败，再说“再试一次”应继续重试已确认操作。
+
+身份、权限、删除、高风险覆盖、幂等等真正安全边界继续由服务端保证。
+
+## 6. R11.5 实际摄入与营养
+
+默认优先级：
+
+```text
+用户明确文字
+>
+餐前 / 餐后差分
+>
+单图估算
+```
+
+确认后的正式 meal 在能合理判断时尽量一次填写：
+
+```text
+portion
+estimated weight
+calories
+protein
+carbs
+fat
+total calories
+```
+
+未知字段允许 `null`；不使用虚假精度。
+
+UI 手动编辑已有 AI meal 时，现有重量、宏量营养、calorie range 等必须 round-trip 保留，除非用户真正修改相关字段。
+
+## 7. R11.5 餐食照片
+
+当前正式 meal 仍绑定 1 张展示照片。
+
+多图聊天：
+
+```text
+餐前图 + 餐后图都可用于 AI 差分
+→ 未特别指定时正式保存餐前图
+→ 餐后图默认只用于估算
+```
+
+图片上传：
+
+```text
+EXIF normalize
+→ 600px WebP
+→ Storage
+→ photo_path
+```
+
+新增显示元数据：
+
+```text
+photo_rotation_degrees = 0 / 90 / 180 / 270
+photo_scale            = 0.60 .. 1.00
+```
+
+竖图默认 90° 横向显示。
+
+饮食编辑页支持：
+
+- 左 / 右旋转 90°；
+- 60%–100% 大小；
+- 更换 / 移除照片。
+
+真实照片统一 `object-contain + 留白`，用户设成竖向时不强裁切内容。
+
+## 8. 数据库状态
+
+R11.5 migration：
+
+`supabase/migrations/20260906160000_add_meal_photo_display_transform.sql`
+
+已在 Production Supabase 执行成功。
+
+主要新增：
+
+```text
+meals.photo_rotation_degrees
+meals.photo_scale
+replace_meal_photo_state(...)
+update_meal_photo_display(...)
+```
+
+Meal kcal / macros 当前允许 nullable：
+
+```text
+NULL = 未估算
+0    = 确实为 0
+```
+
+## 9. 测试状态
+
+PR #84 最终合并：
+
+```text
+merge commit: 1aa0dcad94674061f10d4735192383d01209d8c8
+CI #452:
+Test  ✅
+Lint  ✅
+Build ✅
+```
+
+覆盖包括：
+
+- AI 软确认 contract；
+- MCP 营养字段 guidance；
+- EXIF / portrait 默认旋转；
+- photo rotation / scale 解析；
+- `MealPhotoFrame` contain + 留白；
+- 编辑器照片控件；
+- 手动编辑不吞掉 AI 营养数据。
+
+## 10. 当前 Production
+
+Primary domain：
+
+`https://couple-better-game.vercel.app`
+
+本次文档同步与 R11.5 当前代码重新受控部署：
+
+```text
+deployment: dpl_C4BzUmM5AkV2PmNz5AgT31TPQaxb
+state: READY
+target: production
+source commit: c2b2c2ecd0499eeb3e2a7202ea906df7bec446d0
+```
+
+部署完成后自动部署已恢复关闭。
+
+当前 `vercel.json`：
 
 ```json
 {
@@ -133,103 +236,34 @@ release: R8.8
 }
 ```
 
-## 6. R10 AI 当前真实状态
+## 11. 已知边界
 
-代码/协议已经具备：
+当前仍存在的明确边界：
 
-- Production `/mcp` 与 canonical `life_query / life_mutate`；
-- Cat/Fish 独立 HMAC 固定身份；
-- 个人数据写权限隔离；
-- 共享药箱 / 设置；
-- `(actor, command_id)` 幂等 ledger；
-- Drive 原图身份目录隔离；
-- 原图 -> 600px WebP -> Supabase Storage；
-- Drive watch + 一分钟 fallback；
-- Cat 单一家庭备份 leader。
+- 一个 meal 只能正式绑定 1 张展示照片；
+- 餐前 / 餐后可以一起用于 AI 分析，但还没有多图持久化模型；
+- Server-side vision recognizer 没有配置付费 key 时会安全跳过识别，不影响照片保存；
+- RikkaHub / 某些 MCP 客户端不透传图片字节时需要 browser recovery；
+- 内置网页 AI 当前单次附件能力与 ChatGPT Project 多图会话能力不完全相同；
+- Production 自动部署长期保持关闭。
 
-截至 2026-09-04，OpenAI 对个人 Plus 仍未开放自定义 MCP 的完整写入能力，因此当前 Plus 的可执行兼容路径仍是 Harbor Drive Bridge。R10.1 已把微信提醒从该 Worker 移除，使 AI Worker 只承担 AI/Drive 工作。
+## 12. 下一步候选
 
-Production 数据库实况仍为：
+优先级按真实使用需求决定，不自动开发：
 
 ```text
-cat  apps_script_url = empty / paired_at = null
-fish apps_script_url = empty / paired_at = null
-life_drive_bridge_commands = 0 条真实命令
+1. 实机验证照片默认方向 / 旋转 / 大小持久化
+2. 实机验证“确认后失败 → 再试一次”不重复确认
+3. 实机验证餐前 / 餐后差分草稿与完整营养写入
+4. 如确实需要，再设计 meal 多图持久化模型
+5. 调研可长期使用的免费 / 免费额度视觉识别 provider
+6. 后续新增 cycle 等生活 domain 时复用 AI Access Core
 ```
 
-因此 Harbor AI **后端已经准备好，但还不能称为真实可用**。下一步只剩两个 bound Apps Script Web App 的一次性人工激活，然后由系统自动 pairing，再做真实读写、照片、watch、fallback 和 backup 验收。
+## 13. 部署纪律
 
-## 7. 微信提醒当前真实状态
+任何新的 Production deployment 都必须获得用户当次明确授权。
 
-Production DB 已完成 R10.1：
+一次“允许部署”只授权当前一次部署。部署完成后必须恢复：
 
-```text
-daily reminder       21:15  enabled
-anniversary reminder 09:15  enabled
-offsets              [7,1,0]
-cron                  */5 * * * * active
-provider              Supabase http -> PushPlus -> WeChat
-cat token             未配置
-fish token            未配置
-```
-
-已验证：
-
-- Supabase Vault 可用；
-- `http` extension 可用；
-- `pg_cron` 可用；
-- `life-pushplus-reminders-v1` active；
-- cron 已至少真实执行一次且状态 `succeeded`；
-- 未配置 token 时 Cat/Fish 都安全 no-op；
-- 不会因为没有 token 就生成假的 delivery reservation。
-
-网页已经加入“我的 -> 微信提醒”卡片，可保存 / 替换 token、测试发送和解绑。token 只进入服务端并加密保存到 Vault，网页只能获取布尔状态。
-
-目前唯一未完成的是：网页代码尚未获得本轮 Vercel Production 授权，因此还不能在生产站绑定 token；也就尚未做 Cat/Fish 两条真实微信测试。
-
-## 8. 达到“日常实用”的最后验收
-
-AI：
-
-```text
-1. 创建并发布 Cat / Fish Apps Script Web App
-2. 分别完成 setupR10Pairing()（内部调用 setupR10Triggers()）
-3. Harbor Cat / Fish 自动回填 apps_script_url
-4. 两边真实 query / mutate
-5. 跨身份写入拒绝
-6. 餐食原图完整链路
-7. Drive watch 延迟实测
-8. 1 分钟 fallback 实测
-9. Cat Daily backup 实际生成
-10. 至少一次恢复演练
-```
-
-微信：
-
-```text
-1. 获得一次明确 Vercel Production 授权并上线“我的 -> 微信提醒”
-2. Cat 登录后绑定 cat PushPlus token，发送真实测试微信
-3. Fish 登录后绑定 fish PushPlus token，发送真实测试微信
-4. 已有当天记录时不发送 daily reminder
-5. 同 dedupe key 不重复发送
-6. 模拟一次失败后重试成功
-```
-
-这些验收通过后，当前架构对两个人的私人日常使用已经足够，不需要再增加数据库、消息队列或额外付费基础设施。长期最可能的容量瓶颈仍是 Google Drive 原始照片空间。
-
-## 9. 当前执行顺序
-
-```text
-1. R8.7 / R8.8 无感加载与缓存竞态修复       ✅ Production
-2. R10.1 Supabase 微信调度                   ✅ Production DB
-3. R10.1 网页绑定/测试代码 + CI              ⏳ PR #59
-4. 获得授权后做一次受控 Vercel Production      ⏳
-5. Cat / Fish 分别绑定 PushPlus + 真微信测试    ⏳
-6. 激活 Harbor Cat / Fish Apps Script Workers ⏳
-7. Harbor 读写 / 照片 / watch / fallback 验收  ⏳
-8. Cat backup / restore 验收                  ⏳
-```
-
-## 10. 部署纪律
-
-**任何后续 Vercel Preview 或 Production deployment 都必须逐次获得用户明确许可。**
+`git.deploymentEnabled = false`
