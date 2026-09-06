@@ -1,4 +1,5 @@
 import type {
+  MealPhotoDisplay,
   MealQuery,
   MealRecord,
   MealWritePayload,
@@ -116,6 +117,18 @@ export async function uploadMealPhoto(mealId: string, file: File) {
     credentials: "same-origin",
     cache: "no-store",
     body: form,
+  });
+  const body = await readJson<MealWriteResponse>(response);
+  return body.meal;
+}
+
+export async function updateMealPhotoDisplay(mealId: string, display: MealPhotoDisplay) {
+  const response = await fetch(`/api/meals/${encodeURIComponent(mealId)}/photo`, {
+    method: "PATCH",
+    credentials: "same-origin",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(display),
   });
   const body = await readJson<MealWriteResponse>(response);
   return body.meal;
