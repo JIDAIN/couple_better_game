@@ -347,14 +347,26 @@ export function useStaleQuery<T>({
     const cached = peekStaleQuery<T>(key);
     setData(cached);
     setLoading(cached === undefined);
-    void refresh(false).catch(() => undefined);
+    // Always verify persisted/in-memory data after a screen mounts. Cached content
+    // stays visible while this forced read runs, preserving the no-flash UX.
+    void refresh(true).catch(() => undefined);
   }, [key, refresh]);
 
   useEffect(() => {
     if (!browserReady()) return;
-    const handleOnline = () => { void refresh(true).catch(() => undefined); };
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
+    const revalidate = () => { void refresh(true).catch(() => undefined); };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") revalidate();
+    };
+
+    window.addEventListener("online", revalidate);
+    window.addEventListener("focus", revalidate);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("online", revalidate);
+      window.removeEventListener("focus", revalidate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [refresh]);
 
   const update = useCallback((next: T | ((current: T | undefined) => T)) => {

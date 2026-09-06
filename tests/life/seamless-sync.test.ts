@@ -78,6 +78,14 @@ describe("life seamless synchronization", () => {
     expect(cache).toContain("useBrowserLayoutEffect");
   });
 
+  it("revalidates cached data on mount and whenever the app returns to foreground", () => {
+    const cache = source("lib/client/use-stale-query.ts");
+    expect(cache).toContain("void refresh(true)");
+    expect(cache).toContain('window.addEventListener("focus", revalidate)');
+    expect(cache).toContain('document.addEventListener("visibilitychange", handleVisibilityChange)');
+    expect(cache).toContain('document.visibilityState === "visible"');
+  });
+
   it("updates the visible month cache immediately after a mood write", () => {
     const date = "2098-11-03";
     const monthKey = "life-month:2098-11";
