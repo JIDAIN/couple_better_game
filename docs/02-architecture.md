@@ -28,22 +28,33 @@ Browser
 → Supabase
 ```
 
-### Harbor ChatGPT Project
+### Harbor ChatGPT Project（当前正式主入口）
 
 ```text
-Harbor Cat / Harbor Fish
-→ Google Drive / Sheet Bridge
-→ COMMAND + Fast Wake
-→ /api/drive-bridge/*
+Harbor Cat
+→ Harbor-Cat MCP
+→ OAuth = cat
+→ /mcp
+→ life_query / life_mutate
+→ AI Access Core
+→ Supabase
+
+Harbor Fish
+→ Harbor-Fish MCP
+→ OAuth = fish
+→ /mcp
 → life_query / life_mutate
 → AI Access Core
 → Supabase
 ```
 
-### MCP
+Cat / Fish 身份由 OAuth token 绑定，不能由聊天中的昵称、自称或 `person` 文本切换。
+
+### 其他 MCP client
 
 ```text
 MCP client
+→ OAuth / fixed access identity
 → /mcp
 → life_query / life_mutate
 → AI Access Core
@@ -60,6 +71,20 @@ MCP client
 → AI Access Core
 ```
 
+### Google Drive / Sheet Bridge（兼容回滚）
+
+```text
+Harbor legacy transport
+→ Google Drive / Sheet Bridge
+→ COMMAND + Fast Wake
+→ /api/drive-bridge/*
+→ life_query / life_mutate
+→ AI Access Core
+→ Supabase
+```
+
+Bridge 不再是 Harbor 的默认读写入口，仅保留为短期兼容 / 回滚能力。
+
 ## 3. Source of Truth
 
 正式生活数据事实源始终是 Supabase。
@@ -73,7 +98,7 @@ STATE_*
 META
 ```
 
-只是 AI 兼容传输 / 镜像层，不是数据库。
+只是历史兼容传输 / 镜像层，不是数据库，也不再用于 Harbor 正常读写。
 
 浏览器 stale cache、Service Worker cache、STATE_* 都属于可重建读模型。
 
@@ -200,20 +225,21 @@ AI Access Core 负责：
 
 模型负责对话语义和草稿交互，但不能替代服务端权限。
 
-## 9. Harbor Fast Path
+## 9. Harbor MCP Fast Path
 
 普通 Harbor 请求：
 
 ```text
-1 COMMAND
-→ 1 Fast Wake
-→ 同 command_id RECEIPT
-→ 回复
+Harbor-Cat / Harbor-Fish
+→ life_query / life_mutate
+→ /mcp
+→ AI Access Core
+→ Supabase
 ```
 
-真正业务结果只认 RECEIPT，不认 Wake HTTP 200。
+不再创建 `COMMAND`、等待 `RECEIPT` 或触发 `Fast Wake`。
 
-同一个正式动作不能因为 processing / timeout 就生成多个 command id。
+Bridge Fast Wake 只属于兼容回滚路径，不进入正常请求链路。
 
 ## 10. 图片恢复路径
 
@@ -226,6 +252,8 @@ life_mutate attachPhoto=true
 → browser upload
 → 服务端完成原操作
 ```
+
+ChatGPT Custom MCP 已支持 OpenAI 临时文件地址直传；能直接取得附件时不进入 recovery。
 
 恢复后仍进入相同 canonical meal/storage 路径。
 
@@ -268,7 +296,15 @@ image-compression.ts
 
 保存生产 schema / RPC / grant 的不可回写历史。
 
-## 12. Migration 与 Production
+## 12. Harbor Project 指令
+
+当前有效模板：
+
+`docs/46-harbor-mcp-project-instructions.md`
+
+其中 Harbor Cat 只使用 `Harbor-Cat`，Harbor Fish 只使用 `Harbor-Fish`。旧 Google Bridge Project 指令不再作为正常工作流。
+
+## 13. Migration 与 Production
 
 数据库结构变化必须新增 migration，已执行 migration 不回改。
 
