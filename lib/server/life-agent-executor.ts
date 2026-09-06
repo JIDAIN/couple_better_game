@@ -13,11 +13,6 @@ import {
   pickMedicineUpdateBase,
   pickWeightUpdateBase,
 } from "../ai/life-update-merge";
-import {
-  isMealCreateMutation,
-  isMealDraftConfirmationText,
-  MEAL_DRAFT_CONFIRMATION_QUESTION,
-} from "../ai/meal-draft-contract";
 import { getLifeExport } from "./life-data-management";
 import { listMedicines } from "./supabase-medicine";
 import { listWeights } from "./supabase-weight";
@@ -74,12 +69,6 @@ function wantsHydratedUpdate(row: JsonRecord) {
   if (isDeleteAction(row.action)) return false;
   if (isUpdateAction(row.action)) return true;
   return !stringValue(row.action) && Boolean(stringValue(row.id ?? row.recordId));
-}
-
-function assertMealDraftConfirmed(args: unknown, context: LifeAgentExecutionContext) {
-  if (!isMealCreateMutation(args)) return;
-  if (isMealDraftConfirmationText(context.latestUserText)) return;
-  throw new Error(MEAL_DRAFT_CONFIRMATION_QUESTION);
 }
 
 async function loadExportUser() {
@@ -169,7 +158,6 @@ export async function executeLifeAgentTool(
   args: unknown,
   context: LifeAgentExecutionContext,
 ) {
-  if (name === "life_mutate") assertMealDraftConfirmed(args, context);
   const prepared = name === "life_mutate"
     ? await hydratePartialUpdateArgs(args, context)
     : args;
