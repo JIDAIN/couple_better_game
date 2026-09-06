@@ -1,13 +1,13 @@
-# AI 接入当前状态总览（2026-09-05）
+# AI 接入当前状态总览（更新至 2026-09-06）
 
-> 用途：作为当前 AI 接入开发的“现在事实”入口。历史问题与过程记录保留在 26～36 文档中；发生冲突时，以本页和更晚的专项验收记录为准。
+> 用途：作为当前 AI 接入开发的“现在事实”入口。历史问题与过程记录保留在专项文档中；发生冲突时，以本页和更晚的专项验收记录为准。
 
 ## 1. 当前架构基线
 
 ```text
 AI Entry / Adapter
-  当前：ChatGPT Project → Harbor Sheet / Apps Script / Fast Wake
-  未来：MCP / 其他 AI API
+  当前 Production：ChatGPT Project → Harbor Sheet / Apps Script / Drive Watch
+  已完成代码准备：MCP Adapter → AI Access Core
         ↓
 AI Access Core
         ↓
@@ -34,11 +34,11 @@ Partial update Production 实测：新增临时药品数量 1 → update 仅提�
 - `docs/29-ai-access-core-unified-acceptance-2026-09-05.md`
 - `docs/30-ai-access-core-partial-update-hardening-2026-09-05.md`
 
-## 3. Harbor Fast Wake 当前状态
+## 3. Harbor Fast Wake 基线
 
 PR #69 已解决“命令已完成但 transport 返回 502”的假阴性。
 
-R10.3 已把 Harbor 正常调用固定为：
+R10.3 将 Harbor 理想 fast path 定义为：
 
 ```text
 直接 life_query / life_mutate
@@ -48,27 +48,13 @@ R10.3 已把 Harbor 正常调用固定为：
 → 回复
 ```
 
-默认禁止普通请求例行 `life_capabilities`、正常查询先读 STATE_*、网页/GitHub/仓库文档搜索、重复 wake、多个试探 payload、扫描整张 RECEIPTS / 历史 COMMANDS。
-
 `STATE_*` 只作为 UI/read-model 与故障 fallback。
 
 ## 4. Harbor R10.3.1 Ledger-first（Production 已验收）
 
 R10.3 Production 速度测试发现：authoritative RECEIPT 已 finalized 后，Vercel 仍可能继续等待 Apps Script snapshot / 后处理，导致 Fast Wake 从约 5～6 秒可用事实拖到约 16 秒才 HTTP 返回。
 
-R10.3.1 改为：
-
-```text
-Fast Wake
-├─ Apps Script HTTP wake
-└─ authoritative ledger polling
-
-ledger 先 finalized + receipt
-→ 立即 Fast Wake 200
-→ ledgerFirst=true
-→ receiptReady=true
-→ 停止等待当前 Apps Script HTTP client
-```
+R10.3.1 改为 Fast Wake HTTP 与 authoritative ledger polling 并行；ledger 先 finalized 时立即返回。
 
 Production deployment：
 
@@ -85,45 +71,31 @@ receipt finished_at     = 15:34:37.882Z
 Fast Wake HTTP response ≈ 15:34:38Z
 ```
 
-结果：
-
-```text
-backend business execution   ≈ 1.27 s
-Fast Wake start → receipt    ≈ 5.92 s
-receipt 后额外等待           ≈ 0.1 s 量级
-Fast Wake 总服务端等待       ≈ 6 s
-ledgerFirst                  true
-receiptReady                 true
-```
-
-与 R10.3 约 16 秒的 Fast Wake HTTP 等待相比，R10.3.1 已基本消除 RECEIPT 完成后的 transport 尾部等待。
+结果：backend business execution ≈1.27s；Fast Wake start → receipt ≈5.92s；receipt 后额外等待约 0.1s。
 
 详细记录：`docs/35-harbor-r10-3-1-ledger-first-race.md`。
 
-## 5. Harbor R10.4 Targeted Command Wake（live Apps Script 已更新，待最终速度验收）
+## 5. Harbor R10.4 Targeted Command Wake（Apps Script live 已更新，但 ChatGPT Project 未命中）
 
-R10.3.1 后剩余的主要服务端等待位于 Fast Wake 开始到 `/api/drive-bridge/execute` 真正收到 command 之间。代码核验发现，显式 Fast Wake 虽然已经携带唯一 `commandId`，Apps Script 仍走通用 `processPendingCommands()`：最长等 Script Lock 5 秒、读取整张 COMMANDS、扫描批量 pending，并在同一 lock 下刷新全部 STATE snapshot。
+R10.4 在 Apps Script 增加 targeted processor：显式 Fast Wake 携带 `commandId` 时，只定位并执行目标 COMMAND，短 lock wait，receipt/status 后先释放 lock，再 best-effort snapshot。
 
-R10.4 在 Apps Script 增加 targeted processor：
+用户已于 2026-09-06 人工同步并重新部署 Cat Apps Script Web App。
+
+但随后两次 Harbor Cat 正常业务请求均没有真正调用 Fast Wake，而是落入 Drive Watch / 约 1 分钟 fallback：
 
 ```text
-Fast Wake(commandId)
-→ 精确定位该 COMMAND
-→ 只 execute 这一条
-→ 写 receipt/status
-→ 释放 Script Lock
-→ best-effort refreshSnapshot
+样本 1：COMMAND → Worker ≈ 59.6s，业务执行 ≈ 1.2s
+样本 2：COMMAND → Worker ≈ 69.5s，业务执行 ≈ 1.41s
 ```
 
-显式路径的 lock wait 降为 250ms；优先扫描末尾 64 行，必要时 exact TextFinder fallback；Sheet 可见性短轮询最长 1.2 秒。Drive Watch / 1 分钟 fallback 仍保留原批处理器。
+这确认了当前主要问题不是 AI Access Core，也不是 R10.4 targeted processor 本身，而是 ChatGPT Project 当前工具集合里没有一个可直接调用 `/api/drive-bridge/kick` 的一等 Fast Wake 工具。Project Instructions 只能约束模型行为，不能凭空增加 HTTP 工具。
 
-该优化只属于 Harbor Adapter，不修改 AI Access Core 或 canonical service。
+因此不再继续通过 prompt 调优来解决这类 transport 延迟。
 
-2026-09-06，用户已完成 Cat Apps Script 的人工同步并重新部署 Web App：`Code.gs` 使用 main 最新版，新增 `FastKick.gs`。因此 R10.4 live Apps Script 代码已具备 targeted processor。
+详细记录：
 
-当前还缺一条由 Harbor Cat 正常路径触发的真实 Fast Wake 速度样本。维护会话可以读写 Harbor Sheet，但没有可安全发起带 wake-only token 的任意 HTTP GET 工具，所以不能把仅通过 Sheet fallback/Drive Watch 执行的命令误当成 targeted Fast Wake 验收。
-
-详细记录：`docs/36-harbor-r10-4-targeted-command-wake.md`。
+- `docs/36-harbor-r10-4-targeted-command-wake.md`
+- `docs/37-harbor-r10-4-first-live-sample-2026-09-06.md`
 
 ## 6. Bridge Sheet 当前提示
 
@@ -134,28 +106,72 @@ Harbor Cat Sheet README / META 已加入 fast-path 运行提示：
 - `state_read_policy=fallback_only`
 - `wake_retry_policy=single_wake_then_receipt`
 
-这些是 Adapter 运行提示，不是业务 contract，也不写入 secret。
+这些只是 Adapter 运行提示，不是业务 contract。
 
-## 7. 当前剩余体感延迟来源
+## 7. 当前体感延迟结论
 
 目前已经明确分层：
 
 - canonical backend query/mutate 常约 1～1.5 秒；
-- RECEIPT 后 Fast Wake 尾部等待已由 R10.3.1 消除；
-- R10.4 live Apps Script 已更新，目标是消除显式 wake 的整表扫描、5 秒 lock queue 和 snapshot-under-lock；
-- 其余体感时间还包括 Google / ChatGPT 工具调用往返和 Project 是否严格遵守单 COMMAND / 单 Wake / 精确 RECEIPT fast path。
+- RECEIPT 后 Fast Wake 尾部等待已由 R10.3.1 基本消除；
+- 当前 Harbor Cat 正常使用的主要慢点是 Google Drive Watch / fallback 唤醒，而不是正式业务执行；
+- 仅继续修改 Project Instructions 不能补出一个不存在的 Fast Wake 调用工具。
 
-后续性能优化继续只围绕 Adapter/transport，不往 AI Access Core 塞特殊逻辑。
+因此长期性能方向从“继续打磨 Harbor transport”切换为“让支持 MCP 的客户端直接进入 AI Access Core”。
 
-## 8. 未来 MCP 替换边界
+## 8. R11 MCP → AI Access Core（代码已合并 main，未部署 Production）
+
+PR #73 已将旧 R8 MCP 独立业务实现替换为 AI Access Core Adapter。
+
+合并 commit：
+
+```text
+96cee880a523e5186fc924ffc6b56a7cb376bfde
+```
+
+MCP 公开 contract 统一为：
+
+```text
+life_capabilities
+life_query
+life_mutate
+```
+
+旧 `life_write` 不再作为新 MCP 主 contract。
+
+MCP Adapter 当前只负责：
+
+- OAuth scope；
+- Cat/Fish 固定身份；
+- MCP schema；
+- file reference → 既有 media boundary；
+- JSON-RPC id → Core toolCallId；
+- `userText` → Core delete/high-risk safety；
+- Core clarification → MCP ToolResult。
+
+真正业务逻辑统一复用：
+
+```text
+life-agent-executor
+→ life-agent-registry
+→ canonical services
+```
+
+CI run #395：Test ✅ / Lint ✅ / Build ✅。
+
+详细记录：`docs/38-r11-mcp-core-adapter.md`。
+
+当前只是代码 ready；由于本轮没有新的 Production deployment 授权，Production `/mcp` 仍然运行旧版本，尚未做 R11 live smoke test。
+
+## 9. MCP 替换边界
 
 MCP 不继承：Sheet COMMANDS/RECEIPTS、Apps Script、Fast Wake、STATE_* AI 读取策略。
 
 MCP 继续复用：AI Access Core、natural input normalization、clarification、canonical services、权限、幂等、业务语义和媒体规则。
 
-Harbor 的目标始终是“一个可替换、逐步逼近 MCP 体验的临时 Adapter”。
+Harbor 当前继续作为 Plus 环境下的兼容入口；未来支持完整 MCP 的客户端可直接使用 `/mcp`。
 
-## 9. 当前部署规则
+## 10. 当前部署规则
 
 Production 自动部署默认关闭：
 
