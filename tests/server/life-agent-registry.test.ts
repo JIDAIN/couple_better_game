@@ -56,8 +56,25 @@ beforeEach(() => {
 });
 
 describe("life internal AI registry guards", () => {
-  it("forces personal weight writes to the authenticated account", async () => {
+  it("rejects explicit Ta personal weight writes and permits current-account writes", async () => {
     mocks.createWeight.mockImplementation(async (payload) => payload);
+
+    await expect(
+      executeLifeAgentTool(
+        "life_mutate",
+        {
+          resource: "weight",
+          action: "create",
+          data: {
+            partnerKey: "fish",
+            measurementDate: "2026-09-03",
+            weightKg: 52.4,
+          },
+        },
+        { identity: CAT, latestUserText: "帮我把对象体重记成52.4kg" },
+      ),
+    ).rejects.toThrow("不能指定 Ta");
+    expect(mocks.createWeight).not.toHaveBeenCalled();
 
     const result = await executeLifeAgentTool(
       "life_mutate",
@@ -65,9 +82,7 @@ describe("life internal AI registry guards", () => {
         resource: "weight",
         action: "create",
         data: {
-          partnerKey: "fish",
           measurementDate: "2026-09-03",
-          measuredAt: null,
           weightKg: 52.4,
           note: "test",
         },
