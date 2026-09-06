@@ -8,6 +8,16 @@
 
 当前不是纯前端项目：Browser -> Next.js API -> server-only Supabase；localStorage 仍承担 Legacy Game 运行缓存/离线兜底；Supabase 是生产云端事实源。
 
+当前产品关系：
+
+```text
+Couple Better Game（当前主程序 / Island Life）
+└─ 游戏
+   └─ 变瘦变美大作战（Legacy Game 子项目）
+```
+
+旧版“变瘦变美大作战”已经被收纳为新程序「游戏」中的独立子项目，不再代表整个应用。
+
 ## 2. 开始任务前必读
 
 至少阅读：
@@ -24,6 +34,7 @@
 | 产品 / 页面流程 | `docs/01-product.md` |
 | 架构 / 重构 | `docs/02-architecture.md` |
 | 数据字段 / Supabase | `docs/03-data-model.md` |
+| 数据清理 / import / restore / Legacy Game 边界 | `docs/48-life-legacy-game-data-boundary.md` |
 | API / 同步 / 鉴权 | `docs/04-api-and-sync.md` |
 | 金币 / 宝石 / 旧游戏规则 | `docs/05-business-rules.md` |
 | **任何 V2 可见 UI** | **`docs/12-island-life-design-system.md` + `docs/06-ui-guidelines.md`** |
@@ -34,6 +45,7 @@
 
 ```text
 饮食摄入 ≠ deficit ≠ 体重 ≠ 运动/活动
+Island Life maintenance ≠ Legacy Game maintenance
 ```
 
 - intake：`meals / meal_items`
@@ -43,6 +55,37 @@
 - V2 Life activity：`activity_entries`
 
 关联展示不等于自动互相改值。
+
+### 数据维护硬规则
+
+Island Life 生活数据：
+
+```text
+meals / meal_items
+mood_entries
+sleep_records
+activity_entries
+weight_measurements
+medicine_items
+mailbox_letters
+```
+
+Legacy Game 游戏子项目：
+
+```text
+daily_records
+daily_record_sides
+exchange_categories
+exchange_records
+wallets
+wallet_ledger
+```
+
+任何“清理本周测试数据 / 清生活记录 / Life import / Life restore”等普通 Life 操作，默认只能作用于 Island Life allowlist。
+
+除非用户明确要求操作旧游戏，否则不得修改或删除任何 Legacy Game 表。禁止使用“所有最近创建的数据”这种跨域规则直接扫表。
+
+代码级表边界定义：`lib/server/life-data-domains.ts`。
 
 ## 4. V2 视觉语言是强制规范
 
@@ -146,6 +189,8 @@ meal / mood / sleep / activity / weight / medicine
 
 AI 不获得任意 SQL 权限。
 
+`legacy_home` 是 Legacy Game 兼容入口，不属于普通 Island Life resource；只有用户明确要求旧游戏操作时才进入该流程。
+
 ## 9. Supabase / 安全
 
 - Browser -> Next.js API -> server-only Supabase；
@@ -158,9 +203,11 @@ AI 不获得任意 SQL 权限。
 
 ## 10. Legacy Game
 
-旧游戏完整保留：deficit、运动分钟、游戏体重快照、金币/宝石、成长地图、兑换商店与历史、成长日志、同步/备份。
+旧游戏完整保留：deficit、运动分钟、游戏体重快照、金币/宝石、钱包、成长地图、兑换商店与历史、成长日志、同步/备份。
 
-V2 不顺手重写 Legacy Game，也不把 Life facts 自动转成全局排行榜。
+它现在的产品身份是：**新程序「游戏」里的独立子项目“变瘦变美大作战”**。
+
+V2 不顺手重写 Legacy Game，也不把 Life facts 自动转成全局排行榜；普通生活数据清理、导入和恢复也不得顺手修改 Legacy Game。
 
 ## 11. 开发验证
 
