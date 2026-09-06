@@ -1,123 +1,66 @@
 # API、云端同步与鉴权
 
+状态：2026-09-06。
+
 ## 1. API 总览
 
-### 当前 production 已上线
+### 生活与餐食
 
 | Method | Path | 作用 |
 |---|---|---|
-| POST | `/api/cloud-session` | 验证同步密码并建立 cloud session |
-| GET | `/api/home-data` | 从 Supabase 导出兼容游戏快照 |
-| POST | `/api/save-data` | 将兼容游戏快照写回规范化 Supabase |
 | GET | `/api/meals?date=...&person=...` | 查询某日餐食 |
 | POST | `/api/meals` | 新增餐食 |
-| PUT | `/api/meals/[id]` | 完整更新餐食 |
+| PUT | `/api/meals/[id]` | 更新餐食 |
 | DELETE | `/api/meals/[id]` | 软删除餐食 |
-
-### V2-P1 分支新增
-
-| Method | Path | 作用 |
-|---|---|---|
-| GET | `/api/life/day?date=YYYY-MM-DD` | 一次读取当天心情、睡眠、活动 |
-| PUT | `/api/life/mood` | 保存/修改当天某角色心情 |
-| PUT | `/api/life/sleep` | 保存/修改当天某角色睡眠 |
+| GET | `/api/meals/[id]/photo` | 读取私有餐食照片 |
+| PUT | `/api/meals/[id]/photo` | 上传 / 更换餐食照片 |
+| PATCH | `/api/meals/[id]/photo` | 修改照片显示旋转 / 大小 |
+| DELETE | `/api/meals/[id]/photo` | 移除餐食照片 |
+| GET | `/api/life/day?date=YYYY-MM-DD` | 读取当天心情、睡眠、活动 |
+| PUT | `/api/life/mood` | 保存 / 修改心情 |
+| PUT | `/api/life/sleep` | 保存 / 修改睡眠 |
 | POST | `/api/life/activities` | 新增活动 |
 | PUT | `/api/life/activities/[id]` | 修改活动 |
-| DELETE | `/api/life/activities/[id]` | 软删除活动 |
+| DELETE | `/api/life/activities/[id]` | 删除活动 |
 
-这些 Life API 在 migration 应用并合并前不视为 production 已上线。
+### AI 入口
+
+```text
+/mcp
+/api/drive-bridge/*
+/api/ai/chat
+```
+
+三条入口最终都进入 AI Access Core / canonical domain services。
 
 ## 2. 当前鉴权模型
 
-这是私人小范围应用的共享访问保护，不是完整用户账号系统。
-
-### Web
-
-服务器环境变量：
-
-```text
-DATA_EDIT_PASSWORD
-```
-
-验证成功后设置 HttpOnly：
-
-```text
-couple-cloud-session
-```
-
-浏览器业务路径统一保持：
+浏览器：
 
 ```text
 Browser
--> Next.js API
--> cloud request auth
--> lib/server domain service
--> service-role RPC
--> Supabase
+→ Next.js API
+→ 当前登录 / cloud session 鉴权
+→ server-side domain service
+→ service-role RPC
+→ Supabase
 ```
 
-Life API 复用现有 cloud session / `x-couple-password` 鉴权，不在浏览器暴露 Supabase secret。
+浏览器不持有 Supabase service secret。
 
-### ChatGPT
+AI：
 
-ChatGPT 不使用浏览器共享密码，也不新增匿名写接口。
+- Harbor Cat / Fish 通过固定 Bridge 身份 + HMAC；
+- MCP 使用对应 OAuth / fixed access identity；
+- 程序内置 AI 使用当前登录身份；
+- AI 昵称不参与权限判断。
 
-当前已上线餐食路径：
-
-```text
-ChatGPT explicit confirmation
--> 已授权 Supabase 能力
--> service-only ChatGPT meal RPC
--> meals / meal_items
-```
-
-未来 Life / Weight / Medicine 继续沿用同一原则：受授权连接 + 领域专属写接口，而不是通用 SQL 写权限。
-
-## 3. 新设备保护
-
-游戏兼容同步继续保留：
-
-```text
-新设备
--> 输入同步密码
--> POST /api/cloud-session
--> 建立 HttpOnly session
--> 先从云端下载
--> 再允许后续写回
-```
-
-没有 cloud session 就直接调用 `/api/save-data` 时仍受现有 guard 保护。
-
-## 4. 游戏云端读取 / 写入
-
-读取：
-
-```text
-GET /api/home-data
--> export_home_sync_snapshot
--> Supabase normalized tables
--> schemaVersion 1 compatible snapshot
-```
-
-写入：
-
-```text
-POST /api/save-data
--> auth / guard
--> importHomeBackupJson normalize
--> buildHomeSyncData
--> replace_home_sync_snapshot
--> Supabase
-```
-
-`reloadFromGitHub / syncToGitHub / /data/couple-data.json` 仍是 legacy 内部命名 / compatibility shim。
-
-## 5. Meal API
+## 3. Meal API
 
 ### 查询
 
 ```http
-GET /api/meals?date=2026-09-01&person=cat
+GET /api/meals?date=2026-09-06&person=cat
 ```
 
 ### 新增 / 更新 / 删除
@@ -134,200 +77,208 @@ DELETE /api/meals/<uuid>
 manual / chatgpt / import
 ```
 
-当前 meal kcal 仍为必填；V2-P3 再单独迁移到 nullable，保持：
+Meal 和 Meal Item 的 kcal / macros 允许 nullable：
 
 ```text
 NULL = 未估算
-0 = 确实为 0 kcal
+0    = 确实为 0
 ```
 
-## 6. Life API
+## 4. Meal Photo API
 
-### 当天读取
-
-```http
-GET /api/life/day?date=2026-09-02
-```
-
-返回 canonical shape：
-
-```json
-{
-  "date": "2026-09-02",
-  "moods": [],
-  "sleeps": [],
-  "activities": []
-}
-```
-
-首页未来只需要一次读取，不需要三个模块各发一次请求。
-
-### 心情
-
-```http
-PUT /api/life/mood
-```
-
-手动 Web payload 只需要：
-
-```json
-{
-  "partnerKey": "fish",
-  "moodDate": "2026-09-02",
-  "moodKey": "calm"
-}
-```
-
-Web route 强制 `source=manual`，不接受客户端伪造 ChatGPT source/idempotency。
-
-### 睡眠
-
-```http
-PUT /api/life/sleep
-```
-
-保存：
+### 上传 / 更换
 
 ```text
-partnerKey
-sleepDate
-fellAsleepAt
-wokeAt
+PUT /api/meals/<uuid>/photo
 ```
 
-`wokeAt` 必须晚于 `fellAsleepAt`。`sleepDate` 是这条睡眠记录在生活日历/首页归属的日期；时长从两个时间派生，不作为评价分数。
-
-### 活动
+服务端执行：
 
 ```text
-POST   /api/life/activities
-PUT    /api/life/activities/<uuid>
-DELETE /api/life/activities/<uuid>
+鉴权
+→ 图片校验
+→ EXIF 方向归一
+→ 最长边 600px WebP 压缩
+→ Storage 上传
+→ 根据最终宽高计算默认显示旋转
+→ replace_meal_photo_state
 ```
 
-手动 UI 核心只需要 `activityDate + text`，默认 `participantScope=both`。
-
-以下字段是可选结构化信息，不要求用户每次填写：
+竖图默认：
 
 ```text
-occurredAt
-activityType
-durationMinutes
+rotationDegrees = 90
+scale = 1.00
 ```
 
-未来 AI 可在事实明确时补充这些字段。
-
-## 7. Life RPC 映射
-
-| 调用方 | RPC |
-|---|---|
-| Life day read | `get_life_day` |
-| Mood write | `upsert_mood_record` |
-| Sleep write | `upsert_sleep_record` |
-| Activity create | `create_activity_record` |
-| Activity update | `update_activity_record` |
-| Activity delete | `delete_activity_record` |
-
-这些函数只授权 service-role 路径；`anon / authenticated` 不获得 execute 权限。
-
-## 8. AI 写入统一协议
-
-V2 不再把 AI 理解成“饮食专属功能”。
-
-代码基础：
+### 修改显示
 
 ```text
-lib/ai/record-write-protocol.ts
+PATCH /api/meals/<uuid>/photo
 ```
 
-当前预留 AI writable domains：
+Payload 只允许：
 
 ```text
-meal
-mood
-sleep
-activity
-weight
-medicine
+rotationDegrees: 0 | 90 | 180 | 270
+scale: 0.60 .. 1.00
 ```
 
-统一流程：
+PATCH 不重新压缩 / 上传图片。
+
+### 删除
 
 ```text
-自然语言 / 图片
--> 对话层解析草稿
--> 用户明确确认保存或修改
--> buildChatgptWriteIdempotencyKey(...)
--> domain-specific prepare / validation
--> domain-specific canonical write service / restricted RPC
--> read-back / receipt check
--> 成功后确认
+DELETE /api/meals/<uuid>/photo
 ```
 
-关键点：
+同时恢复显示元数据到 `0° / 100%`。
 
-- “理解了用户的话”不等于“获得写数据库权限”；
-- 不提供 `execute arbitrary SQL` 风格的统一 AI 工具；
-- 通用层只负责 domain/source/idempotency 等横切能力；
-- 具体字段和业务规则继续属于各领域；
-- 工具超时或结果不确定时必须查回执/读回，再用同一个 key 重试。
+## 5. AI 写入统一协议
 
-## 9. `record_write_receipts`
-
-V2-P1 新增跨领域外部写入回执表：
+稳定入口：
 
 ```text
-couple_space_id
-source          chatgpt / import
-domain          meal / mood / sleep / activity / weight / medicine
-idempotency_key
-entity_id
-created_at
+life_query
+life_mutate
 ```
 
-作用：
+普通查询不应先调用 `life_capabilities`；只有未知能力发现或开发排错时才需要。
 
-1. 外部写入重试不会因为实体后来被手动编辑而丢失幂等历史；
-2. AI/导入可以按稳定 key 查“这次确认是否已经执行”；
-3. 将来药箱、体重、心情不需要各自重新发明一套重试机制。
-
-现有 meal 自身已经有 `meals.idempotency_key`，当前不强行迁移；以后可以逐步桥接到统一 receipt 机制。
-
-## 10. ChatGPT 餐食“记上”现状
-
-当前已上线路径仍保持：
+正式写入统一原则：
 
 ```text
-明确保存意图
--> 构造最终 meal payload
--> chatgpt: idempotency key
--> create_chatgpt_meal_record
--> meals + meal_items
--> get_chatgpt_meal_record(same key)
--> 成功后回复“已记上”
+自然语言
+→ AI 提取语义
+→ canonical normalize / validate
+→ permission
+→ idempotency
+→ domain write
+→ read-back / receipt
 ```
 
-ChatGPT 餐食写入不得直接修改 deficit、exercise、weight、wallet、金币宝石或 heatmap。
+不提供任意 SQL 或任意表修改工具。
 
-## 11. P2.5 同日关联
+## 6. 新 Meal 的聊天层草稿流程
 
-P2.5 是只读关联，不新增数据库写行为。
-
-代码已在 V2-P0 拆成：
+新的饮食记录使用：
 
 ```text
-DailyMealsPanel        legacy game adapter
-└─ DailyMealsPanelCore provider-free nutrition UI
+用户文字 / 图片
+→ AI 分析实际摄入
+→ 聊天中展示待确认草稿
+→ 用户修改 / 确认
+→ life_mutate 正式写入
 ```
 
-因此未来独立饮食页不需要 `HomeResourcesProvider`。
+关键边界：
 
-## 12. 当前安全边界
+- 草稿不写数据库；
+- 没有 `meal_drafts` 后台表；
+- 服务端不通过当前 `userText` 是否包含“确认/可以/好的”来决定能不能 create meal；
+- 确认状态属于对话上下文；
+- 如果确认后的写入临时失败，用户说“再试一次”时，AI 可以重试已确认的正式操作。
 
-- 浏览器数据 API 验证共享 password/session；
-- Supabase secret 不进入浏览器或普通聊天；
-- API 响应使用 `no-store`；
-- server-only RPC 不授权 anon/authenticated；
-- ChatGPT 只在明确确认后调用受限领域写接口；
-- 外部写入使用稳定 idempotency key；
-- 当前仍是共享空间保护，不是成熟单用户授权模型。
+身份、删除、高风险覆盖等安全规则仍必须由服务端硬校验。
+
+## 7. 饮食实际摄入与营养字段
+
+AI 默认统计实际吃下去的量。
+
+优先级：
+
+```text
+用户明确文字
+>
+餐前/餐后图片差分
+>
+单图估算
+```
+
+能合理判断时，确认后的单次正式写入尽量包含：
+
+```text
+items[].rawName / displayName
+items[].portionDescription
+items[].estimatedWeightG
+items[].caloriesKcal
+items[].proteinG
+items[].carbsG
+items[].fatG
+totalCaloriesKcal
+```
+
+真正未知字段允许 `null`，不能编造精确值。
+
+## 8. 多图与单图持久化
+
+聊天里可以同时使用餐前 / 餐后多张图片做差分，但当前正式 meal 只绑定 1 张展示图。
+
+默认：
+
+```text
+餐前 + 餐后都参与分析
+→ 未指定时正式保存餐前图
+→ 餐后图只作为估算依据
+```
+
+用户明确指定“保存餐后图”时覆盖默认。
+
+当前系统不能声称同一 meal 永久保存两张照片，也不支持 `beforePhotoPath / afterPhotoPath`。
+
+## 9. MCP 图片恢复
+
+如果用户要求正式保存图片，但 MCP 客户端没有传真实图片字节：
+
+```text
+life_mutate attachPhoto=true
+→ MEDIA_ATTACHMENT_REQUIRED
+→ recovery.uploadUrl
+→ 用户浏览器补传
+→ 完成原正式操作
+```
+
+收到恢复链接后：
+
+- 不重新 create meal；
+- 不重复 life_mutate；
+- 不再生成第二套业务参数；
+- 未完成前不能声称照片已保存。
+
+## 10. Harbor Fast Path
+
+正常 Harbor query/mutate：
+
+```text
+1 COMMAND
+→ 1 Fast Wake
+→ 同 command_id RECEIPT
+→ 回复
+```
+
+`locked / processing / receiptReady=false` 时，只等待同一 receipt，不重复 Wake / command。
+
+业务成功只认 RECEIPT `ok=true`，不能把 Wake HTTP 200 当成成功。
+
+## 11. 游戏云端同步
+
+Legacy Game 兼容同步仍保持：
+
+```text
+GET  /api/home-data
+POST /api/save-data
+```
+
+内部 legacy GitHub 命名 / compatibility shim 不改变 Supabase 是事实源这一点。
+
+Meal calories 不自动生成 deficit，也不自动修改金币、宝石、钱包或 heatmap。
+
+## 12. 安全与部署边界
+
+- 浏览器不持有 Supabase secret；
+- server-only RPC 不开放给任意浏览器；
+- AI 入口绑定固定 actor；
+- 写入使用稳定幂等边界；
+- 图片 bucket 为 private；
+- Production 自动部署默认关闭；
+- 每一次新的 Production deployment 都必须获得用户当次明确授权。
