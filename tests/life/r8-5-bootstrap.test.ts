@@ -40,7 +40,9 @@ describe("R8.7 non-blocking startup and prewarm", () => {
     expect(mood).toContain("<Image unoptimized");
     expect(activity).toContain('<Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png"');
     expect(nest).toContain('<Image unoptimized loading="eager" src="/illustrations/life/activity-girls.png"');
-    expect(food).toContain("<Image unoptimized priority={Boolean(customPhoto)}");
+    expect(food).toContain("mealPhotoUrl(meal)");
+    expect(food).toContain("unoptimized");
+    expect(food).toContain("priority");
   });
 
   it("keeps heavier secondary screens warming after the app is interactive", () => {

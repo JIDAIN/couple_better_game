@@ -91,7 +91,37 @@ function MealPhotoSlot({ meal, label, mealType, pending = false }: { meal?: Meal
   }
   const customPhoto = Boolean(meal?.photoPath) && !photoFailed;
   const src = customPhoto && meal ? mealPhotoUrl(meal) : (DEFAULT_MEAL_ART[mealType] ?? DEFAULT_MEAL_ART.lunch);
-  return <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)]"><Image unoptimized priority={Boolean(customPhoto)} loading={customPhoto ? "eager" : undefined} src={src} alt={customPhoto && meal ? `${label}实物照片：${mealNames(meal)}` : `${label}默认卡通插图`} fill sizes="(max-width: 480px) 42vw, 190px" className="object-cover" onError={() => { if (customPhoto) setPhotoFailed(true); }} />{!customPhoto ? <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(transparent,rgba(74,65,57,0.5))] px-2.5 pb-2 pt-7 text-white"><p className="line-clamp-1 text-[10px] font-bold">{meal ? mealNames(meal) : `${label}还没有记录`}</p></div> : null}</div>;
+
+  if (customPhoto && meal) {
+    const alt = `${label}实物照片：${mealNames(meal)}`;
+    return (
+      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)]">
+        <Image
+          unoptimized
+          priority
+          src={src}
+          alt=""
+          aria-hidden
+          fill
+          sizes="(max-width: 480px) 42vw, 190px"
+          className="scale-110 object-cover opacity-30 blur-xl"
+        />
+        <div className="absolute inset-0 bg-white/15" aria-hidden />
+        <Image
+          unoptimized
+          priority
+          src={src}
+          alt={alt}
+          fill
+          sizes="(max-width: 480px) 42vw, 190px"
+          className="object-contain"
+          onError={() => setPhotoFailed(true)}
+        />
+      </div>
+    );
+  }
+
+  return <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)]"><Image unoptimized src={src} alt={`${label}默认卡通插图`} fill sizes="(max-width: 480px) 42vw, 190px" className="object-cover" /><div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(transparent,rgba(74,65,57,0.5))] px-2.5 pb-2 pt-7 text-white"><p className="line-clamp-1 text-[10px] font-bold">{meal ? mealNames(meal) : `${label}还没有记录`}</p></div></div>;
 }
 function MealNutrition({ meal }: { meal?: MealRecord }) {
   const totals = nutritionTotals(meal ? [meal] : []);
