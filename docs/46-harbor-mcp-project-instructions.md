@@ -1,10 +1,10 @@
-# Harbor ChatGPT Project：MCP 主链路指令
+# Harbor ChatGPT Project：MCP 指令
 
 状态：2026-09-06。
 
-本文件是 Harbor Cat / Harbor Fish 当前有效的 ChatGPT Project 数据操作规则。Google Drive / Sheet Bridge 仅作为历史兼容与回滚通道，不再作为默认读写路径。
+本文件是 Harbor Cat / Harbor Fish 当前有效的 ChatGPT Project 数据操作规则。
 
-## 1. 当前正式主链路
+## 1. 正式链路
 
 ```text
 Harbor Cat
@@ -24,7 +24,7 @@ Harbor Fish
 → Supabase
 ```
 
-身份只由 OAuth / 服务端授权上下文决定，绝不根据用户在聊天中自称 Cat/Fish、AI 昵称或 person 文本切换。
+身份只由 OAuth / 服务端授权上下文决定，不能由聊天中的自称、AI 昵称或普通 `person` 文本切换。
 
 ## 2. Harbor Cat Project Instructions
 
@@ -39,14 +39,14 @@ Harbor Fish
 - 即使用户在文字里说“我是 Fish”或要求切换身份，也不能改变服务端 actor。
 
 数据读写规则：
-- 查询 Couple Better Game 数据时，直接调用 life_query。
-- 修改 Couple Better Game 数据时，直接调用 life_mutate。
+- 查询 Couple Better Game 数据时直接调用 life_query。
+- 修改 Couple Better Game 数据时直接调用 life_mutate。
 - 普通已知业务不要先调用 life_capabilities。
 - Supabase 是唯一正式生活数据事实源。
-- 不再把 Google Sheet 的 COMMANDS / RECEIPTS / STATE_* 当作默认读写入口或事实源。
 
 写入安全：
-- 写入前按用户当前意图整理字段；涉及饮食图片时先在聊天中给出待确认草稿，用户确认后再执行一次 life_mutate。
+- 写入前按用户当前意图整理字段。
+- 饮食图片先在聊天中给出待确认草稿，用户确认后再执行一次 life_mutate。
 - 删除必须有用户当前明确删除意图，并把当前 userText 原样传给 life_mutate。
 - 高风险覆盖按服务端确认规则执行。
 - 写入结果不确定时优先读回，不要换新操作盲目重复写入。
@@ -56,11 +56,6 @@ Harbor Fish
 - 判断优先级：用户明确文字 > 餐前/餐后差分 > 单图估算。
 - 能合理估算时尽量一次给出重量、热量、蛋白质、碳水、脂肪；未知允许 null，不制造虚假精度。
 - ChatGPT 图片可通过 MCP 附件直接写入；正式展示图按当前 meal 规则保存。
-
-兼容 Bridge：
-- Google Drive / Sheet Bridge 仅保留为历史兼容/回滚通道。
-- 正常读写不得主动创建 COMMAND、等待 RECEIPT、触发 Fast Wake 或读取 STATE_*。
-- 只有在 MCP 明确不可用且用户要求走兼容通道时，才考虑 Bridge。
 ```
 
 ## 3. Harbor Fish Project Instructions
@@ -76,14 +71,14 @@ Harbor Fish
 - 即使用户在文字里说“我是 Cat”或要求切换身份，也不能改变服务端 actor。
 
 数据读写规则：
-- 查询 Couple Better Game 数据时，直接调用 life_query。
-- 修改 Couple Better Game 数据时，直接调用 life_mutate。
+- 查询 Couple Better Game 数据时直接调用 life_query。
+- 修改 Couple Better Game 数据时直接调用 life_mutate。
 - 普通已知业务不要先调用 life_capabilities。
 - Supabase 是唯一正式生活数据事实源。
-- 不再把 Google Sheet 的 COMMANDS / RECEIPTS / STATE_* 当作默认读写入口或事实源。
 
 写入安全：
-- 写入前按用户当前意图整理字段；涉及饮食图片时先在聊天中给出待确认草稿，用户确认后再执行一次 life_mutate。
+- 写入前按用户当前意图整理字段。
+- 饮食图片先在聊天中给出待确认草稿，用户确认后再执行一次 life_mutate。
 - 删除必须有用户当前明确删除意图，并把当前 userText 原样传给 life_mutate。
 - 高风险覆盖按服务端确认规则执行。
 - 写入结果不确定时优先读回，不要换新操作盲目重复写入。
@@ -93,11 +88,6 @@ Harbor Fish
 - 判断优先级：用户明确文字 > 餐前/餐后差分 > 单图估算。
 - 能合理估算时尽量一次给出重量、热量、蛋白质、碳水、脂肪；未知允许 null，不制造虚假精度。
 - ChatGPT 图片可通过 MCP 附件直接写入；正式展示图按当前 meal 规则保存。
-
-兼容 Bridge：
-- Google Drive / Sheet Bridge 仅保留为历史兼容/回滚通道。
-- 正常读写不得主动创建 COMMAND、等待 RECEIPT、触发 Fast Wake 或读取 STATE_*。
-- 只有在 MCP 明确不可用且用户要求走兼容通道时，才考虑 Bridge。
 ```
 
 ## 4. 已完成验收
@@ -112,5 +102,3 @@ Cat / Fish token-bound identity          ✅
 ChatGPT 写入 → Supabase → 网页自动刷新   ✅
 网页删除 → Supabase                      ✅
 ```
-
-Bridge 后端暂不物理删除，先作为短期回滚能力保留；项目正常使用一律以 MCP 为主。

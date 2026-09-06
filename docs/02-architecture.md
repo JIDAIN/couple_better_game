@@ -7,13 +7,13 @@
 Couple Better Game 是一个 Next.js 一体化 Web 应用：
 
 ```text
-浏览器 UI
+浏览器 UI / AI Client
 → Next.js / Vercel API
 → canonical domain services / AI Access Core
 → Supabase PostgreSQL + Private Storage
 ```
 
-AI 入口与 Web 入口共享同一个业务事实层，不维护第二套数据库。
+AI 与 Web 共享同一个业务事实层，不维护第二套数据库。
 
 ## 2. 主要运行入口
 
@@ -22,13 +22,13 @@ AI 入口与 Web 入口共享同一个业务事实层，不维护第二套数据
 ```text
 Browser
 → Next.js API
-→ fixed/session identity
+→ session identity
 → domain service
 → service-role RPC / Storage
 → Supabase
 ```
 
-### Harbor ChatGPT Project（当前正式主入口）
+### Harbor ChatGPT Project
 
 ```text
 Harbor Cat
@@ -64,43 +64,19 @@ MCP client
 ### 程序内置 AI
 
 ```text
-/life AI UI
+/ai
 → /api/ai/chat
 → Vercel AI Gateway
 → life-agent-registry
 → AI Access Core
-```
-
-### Google Drive / Sheet Bridge（兼容回滚）
-
-```text
-Harbor legacy transport
-→ Google Drive / Sheet Bridge
-→ COMMAND + Fast Wake
-→ /api/drive-bridge/*
-→ life_query / life_mutate
-→ AI Access Core
 → Supabase
 ```
-
-Bridge 不再是 Harbor 的默认读写入口，仅保留为短期兼容 / 回滚能力。
 
 ## 3. Source of Truth
 
 正式生活数据事实源始终是 Supabase。
 
-Google Sheet / Drive Bridge 的：
-
-```text
-COMMANDS
-RECEIPTS
-STATE_*
-META
-```
-
-只是历史兼容传输 / 镜像层，不是数据库，也不再用于 Harbor 正常读写。
-
-浏览器 stale cache、Service Worker cache、STATE_* 都属于可重建读模型。
+浏览器 stale cache、Service Worker cache 等只属于可重建读模型，不是第二数据库。
 
 ## 4. 领域边界
 
@@ -150,7 +126,7 @@ LifeFoodPage / LifeMealEditorPage
 
 ```text
 用户文字 / 图片
-→ AI 先分析并在聊天里给草稿
+→ AI 在聊天里给草稿
 → 用户修改 / 确认
 → life_mutate
 → meal adapter
@@ -170,15 +146,7 @@ AI 可以同时利用餐前、餐后多图分析：
 
 用户文字优先于视觉差分。
 
-当前正式 meal 仍只绑定一张 `photo_path`：
-
-```text
-多图参与分析
-→ 默认正式保存餐前图
-→ 餐后图默认只用于估算
-```
-
-用户明确指定时可以改存餐后图。当前不支持同一 meal 永久绑定两张图片。
+当前正式 meal 仍只绑定一张 `photo_path`。多图可参与分析；默认保存餐前图，用户明确指定时可改存餐后图。
 
 ## 7. 餐食照片架构
 
@@ -190,14 +158,12 @@ AI 可以同时利用餐前、餐后多图分析：
 → meals.photo_path
 ```
 
-R11.5 新增非破坏性显示元数据：
+显示元数据：
 
 ```text
 photo_rotation_degrees
 photo_scale
 ```
-
-竖图上传后默认显示旋转 90°；用户可在 UI 左右旋转并调 60%–100% 大小。
 
 真实照片使用 `MealPhotoFrame + object-contain`，留白优先于裁切。
 
@@ -213,37 +179,11 @@ life_mutate
 
 普通已知业务 query/mutate 不先调用 `life_capabilities`。
 
-AI Access Core 负责：
+AI Access Core 负责身份、权限、归一化、幂等、媒体边界与 canonical resource dispatch；模型负责对话语义和草稿交互，但不能替代服务端权限。
 
-- actor identity；
-- permission；
-- natural-language normalization；
-- canonical resource dispatch；
-- idempotency；
-- media recovery；
-- domain service 调用。
+## 9. 图片恢复路径
 
-模型负责对话语义和草稿交互，但不能替代服务端权限。
-
-## 9. Harbor MCP Fast Path
-
-普通 Harbor 请求：
-
-```text
-Harbor-Cat / Harbor-Fish
-→ life_query / life_mutate
-→ /mcp
-→ AI Access Core
-→ Supabase
-```
-
-不再创建 `COMMAND`、等待 `RECEIPT` 或触发 `Fast Wake`。
-
-Bridge Fast Wake 只属于兼容回滚路径，不进入正常请求链路。
-
-## 10. 图片恢复路径
-
-MCP / 客户端不能传真实图片字节时：
+MCP 客户端不能传真实图片字节时：
 
 ```text
 life_mutate attachPhoto=true
@@ -255,63 +195,33 @@ life_mutate attachPhoto=true
 
 ChatGPT Custom MCP 已支持 OpenAI 临时文件地址直传；能直接取得附件时不进入 recovery。
 
-恢复后仍进入相同 canonical meal/storage 路径。
-
-## 11. 目录职责
+## 10. 目录职责
 
 ### `components/life/`
-
-生活系统页面与 Pattern，包括：
-
-```text
-LifeFoodPage
-LifeMealEditorPage
-MealPhotoFrame
-```
+生活系统页面与交互组件。
 
 ### `lib/nutrition/`
-
-```text
-meal-service.ts
-meal-client.ts
-chatgpt-meal-protocol.ts
-```
+Meal service / client / protocol。
 
 ### `lib/server/`
-
-```text
-life-agent-registry.ts
-life-agent-executor.ts
-life-ai-gateway.ts
-life-mcp-tools.ts
-supabase-nutrition.ts
-image-compression.ts
-```
+AI Access Core、MCP、canonical server adapters、Supabase services、图片压缩。
 
 ### `lib/ai/`
-
-保存自然语言输入规范与 AI 行为 contract，例如 `meal-draft-contract.ts`。
+自然语言输入规范与 AI 行为 contract。
 
 ### `supabase/migrations/`
+Production schema / RPC / grant 的不可回写历史。
 
-保存生产 schema / RPC / grant 的不可回写历史。
-
-## 12. Harbor Project 指令
+## 11. Harbor Project 指令
 
 当前有效模板：
 
 `docs/46-harbor-mcp-project-instructions.md`
 
-其中 Harbor Cat 只使用 `Harbor-Cat`，Harbor Fish 只使用 `Harbor-Fish`。旧 Google Bridge Project 指令不再作为正常工作流。
+Harbor Cat 只使用 `Harbor-Cat`，Harbor Fish 只使用 `Harbor-Fish`。
 
-## 13. Migration 与 Production
+## 12. Migration 与 Production
 
 数据库结构变化必须新增 migration，已执行 migration 不回改。
-
-R11.5：
-
-`20260906160000_add_meal_photo_display_transform.sql`
-
-已在 Production Supabase 执行。
 
 Vercel Git 自动部署保持默认关闭。每次 Production deployment 都必须获得用户当次明确授权，完成后立即恢复 `deploymentEnabled=false`。
