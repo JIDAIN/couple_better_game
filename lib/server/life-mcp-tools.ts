@@ -175,7 +175,8 @@ async function prepareAttachment(file: FileReference): Promise<LifeAgentAttachme
 
 function mcpToolDefinition(tool: (typeof LIFE_AGENT_TOOLS)[number]): LifeMcpToolDefinition {
   const name = tool.function.name;
-  const baseProperties = record(tool.function.parameters.properties);
+  const parameters = record(tool.function.parameters);
+  const baseProperties = record(parameters.properties);
   const properties: Record<string, unknown> = {
     ...baseProperties,
     userText: {
@@ -191,8 +192,8 @@ function mcpToolDefinition(tool: (typeof LIFE_AGENT_TOOLS)[number]): LifeMcpTool
     properties.file = FILE_REFERENCE_SCHEMA;
   }
 
-  const required = Array.isArray(tool.function.parameters.required)
-    ? [...tool.function.parameters.required]
+  const required = Array.isArray(parameters.required)
+    ? parameters.required.filter((value): value is string => typeof value === "string")
     : [];
   if (name === "life_mutate" && !required.includes("userText")) required.push("userText");
 
@@ -206,7 +207,7 @@ function mcpToolDefinition(tool: (typeof LIFE_AGENT_TOOLS)[number]): LifeMcpTool
           : "查看生活记录能力",
     description: tool.function.description,
     inputSchema: {
-      ...tool.function.parameters,
+      ...parameters,
       properties,
       required,
     },
