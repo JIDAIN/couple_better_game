@@ -13,7 +13,7 @@ import {
 import { parseMailboxPayload } from "../life/mailbox-service";
 import { parseMedicinePayload } from "../life/medicine-service";
 import { parseWeightWritePayload } from "../life/weight-service";
-import { parseMealWritePayload } from "../nutrition/meal-service";
+import { defaultMealPhotoDisplay, parseMealWritePayload } from "../nutrition/meal-service";
 import {
   createActivity,
   deleteActivity,
@@ -30,7 +30,7 @@ import {
   deleteMealPhotoObject,
   getMealOwner,
   listMeals,
-  replaceMealPhotoPath,
+  replaceMealPhotoState,
   updateMeal,
   uploadMealPhotoObject,
 } from "./supabase-nutrition";
@@ -183,7 +183,8 @@ async function bindAttachmentToMeal(mealId: string, attachment: LifeAgentAttachm
     attachment.contentType,
   );
   try {
-    const replacement = await replaceMealPhotoPath(mealId, path);
+    const display = defaultMealPhotoDisplay(attachment.width, attachment.height);
+    const replacement = await replaceMealPhotoState(mealId, path, display);
     if (replacement.previousPhotoPath) {
       await deleteMealPhotoObject(replacement.previousPhotoPath).catch(() => undefined);
     }

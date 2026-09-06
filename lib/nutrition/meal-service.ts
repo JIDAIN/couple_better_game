@@ -3,6 +3,14 @@ export type MealType = "breakfast" | "lunch" | "dinner" | "snack" | "other";
 export type SnackPeriod = "morning" | "afternoon" | "evening" | "late_night";
 export type MealStatus = "draft" | "confirmed";
 export type MealSource = "manual" | "chatgpt" | "import";
+export type MealPhotoRotation = 0 | 90 | 180 | 270;
+export type MealPhotoDisplay = {
+  rotationDegrees: MealPhotoRotation;
+  scale: number;
+};
+
+export const MEAL_PHOTO_SCALE_MIN = 0.6;
+export const MEAL_PHOTO_SCALE_MAX = 1;
 
 export type MealItemWrite = {
   foodId: string | null;
@@ -44,6 +52,8 @@ export type MealItemRecord = MealItemWrite & {
 export type MealRecord = Omit<MealWritePayload, "items"> & {
   id: string;
   photoPath: string | null;
+  photoRotationDegrees: MealPhotoRotation;
+  photoScale: number;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -64,6 +74,7 @@ const SNACK_PERIODS: readonly SnackPeriod[] = ["morning", "afternoon", "evening"
 const MEAL_STATUSES: readonly MealStatus[] = ["draft", "confirmed"];
 const MEAL_SOURCES: readonly MealSource[] = ["manual", "chatgpt", "import"];
 const PARTNER_KEYS: readonly NutritionPartnerKey[] = ["fish", "cat"];
+const PHOTO_ROTATIONS: readonly MealPhotoRotation[] = [0, 90, 180, 270];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -88,6 +99,32 @@ function isIsoDate(value: string) {
 
 export function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export function defaultMealPhotoDisplay(width: number | null, height: number | null): MealPhotoDisplay {
+  return {
+    rotationDegrees: width != null && height != null && height > width ? 90 : 0,
+    scale: 1,
+  };
+}
+
+export function parseMealPhotoDisplayPayload(value: unknown): ParseResult<MealPhotoDisplay> {
+  if (!isRecord(value)) return { ok: false, reason: "照片显示设置格式不正确" };
+  const rotation = Number(value.rotationDegrees);
+  if (!PHOTO_ROTATIONS.includes(rotation as MealPhotoRotation)) {
+    return { ok: false, reason: "照片旋转角度只能是 0、90、180 或 270 度" };
+  }
+  const scale = Number(value.scale);
+  if (!Number.isFinite(scale) || scale < MEAL_PHOTO_SCALE_MIN || scale > MEAL_PHOTO_SCALE_MAX) {
+    return { ok: false, reason: "照片大小需要在 60% 到 100% 之间" };
+  }
+  return {
+    ok: true,
+    value: {
+      rotationDegrees: rotation as MealPhotoRotation,
+      scale: Math.round(scale * 100) / 100,
+    },
+  };
 }
 
 function optionalNonNegativeNumber(value: unknown): ParseResult<number | null> {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultMealPhotoDisplay,
+  parseMealPhotoDisplayPayload,
   parseMealQuery,
   parseMealWritePayload,
 } from "../../lib/nutrition/meal-service";
@@ -98,6 +100,27 @@ describe("nutrition meal service", () => {
         totalCaloriesKcal: 0,
         items: [{ caloriesKcal: 0 }],
       },
+    });
+  });
+
+  it("defaults portrait uploads to a quarter-turn landscape display", () => {
+    expect(defaultMealPhotoDisplay(450, 600)).toEqual({ rotationDegrees: 90, scale: 1 });
+    expect(defaultMealPhotoDisplay(600, 450)).toEqual({ rotationDegrees: 0, scale: 1 });
+    expect(defaultMealPhotoDisplay(null, null)).toEqual({ rotationDegrees: 0, scale: 1 });
+  });
+
+  it("accepts only safe non-cropping photo display values", () => {
+    expect(parseMealPhotoDisplayPayload({ rotationDegrees: 270, scale: 0.8 })).toEqual({
+      ok: true,
+      value: { rotationDegrees: 270, scale: 0.8 },
+    });
+    expect(parseMealPhotoDisplayPayload({ rotationDegrees: 45, scale: 1 })).toEqual({
+      ok: false,
+      reason: "照片旋转角度只能是 0、90、180 或 270 度",
+    });
+    expect(parseMealPhotoDisplayPayload({ rotationDegrees: 0, scale: 0.5 })).toEqual({
+      ok: false,
+      reason: "照片大小需要在 60% 到 100% 之间",
     });
   });
 

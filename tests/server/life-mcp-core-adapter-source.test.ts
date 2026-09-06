@@ -20,6 +20,19 @@ describe("R11 MCP -> AI Access Core adapter source contract", () => {
     expect(adapter).toContain('required.push("userText")');
   });
 
+  it("tells MCP models to complete meal nutrition by default without inventing unknown facts", () => {
+    expect(adapter).toContain("LIFE_MUTATE_MEAL_NUTRITION_ORCHESTRATION");
+    expect(adapter).toContain("默认目标不是只保存食物名称");
+    expect(adapter).toContain("estimatedWeightG");
+    expect(adapter).toContain("caloriesKcal");
+    expect(adapter).toContain("proteinG");
+    expect(adapter).toContain("carbsG");
+    expect(adapter).toContain("fatG");
+    expect(adapter).toContain("totalCaloriesKcal");
+    expect(adapter).toContain("实际吃下去的量");
+    expect(adapter).toContain("数据库仍允许真正无法判断的营养字段为 null");
+  });
+
   it("keeps destructive safety in the core by forwarding the latest user message", () => {
     expect(adapter).toContain("latestUserText");
     expect(adapter).toContain("USER_TEXT_REQUIRED");
