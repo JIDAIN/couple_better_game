@@ -3,6 +3,7 @@ import { compressMealPhoto, MEAL_PHOTO_MAX_INPUT_BYTES } from "@/lib/server/imag
 import type { FixedLifeIdentity } from "@/lib/server/fixed-life-auth";
 import type { LifeMcpAccessIdentity } from "@/lib/server/life-mcp-auth";
 import { createLifeMediaRecovery } from "@/lib/server/life-mcp-media-recovery";
+import { isAllowedOpenAiFileUrl } from "@/lib/server/openai-file-url";
 import {
   executeLifeAgentTool,
   LIFE_AGENT_TOOLS,
@@ -155,26 +156,8 @@ function isInlineImageReference(value: unknown): value is InlineImageReference {
   return typeof item.data_base64 === "string" && typeof item.mime_type === "string";
 }
 
-function allowedOpenAiFileUrl(value: string) {
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:") return false;
-    const host = url.hostname.toLowerCase();
-    return (
-      host === "oaiusercontent.com" ||
-      host.endsWith(".oaiusercontent.com") ||
-      host === "openai.com" ||
-      host.endsWith(".openai.com") ||
-      host === "chatgpt.com" ||
-      host.endsWith(".chatgpt.com")
-    );
-  } catch {
-    return false;
-  }
-}
-
 async function downloadProvidedFile(file: FileReference) {
-  if (!allowedOpenAiFileUrl(file.download_url)) throw new Error("UNTRUSTED_FILE_URL");
+  if (!isAllowedOpenAiFileUrl(file.download_url)) throw new Error("UNTRUSTED_FILE_URL");
   const response = await fetch(file.download_url, {
     method: "GET",
     redirect: "error",
