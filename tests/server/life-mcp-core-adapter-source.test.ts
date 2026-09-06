@@ -49,10 +49,13 @@ describe("R11 MCP -> AI Access Core adapter source contract", () => {
     expect(adapter).not.toContain("properties.fileUrl");
   });
 
-  it("fails explicitly when a client claims attachPhoto but did not actually bind image bytes", () => {
+  it("fails explicitly and offers a non-retryable recovery when image bytes are missing", () => {
     expect(adapter).toContain("MEDIA_ATTACHMENT_REQUIRED");
     expect(adapter).toContain("photoRequested(args) && !attachment");
-    expect(adapter).toContain("不要把本次操作报告为图片已保存");
+    expect(adapter).toContain("mutationExecuted: false");
+    expect(adapter).toContain("retryable: false");
+    expect(adapter).toContain('type: "browser_upload"');
+    expect(adapter).toContain("不要重复 create/update");
   });
 
   it("does not allow two competing media sources in one mutation", () => {
