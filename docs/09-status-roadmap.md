@@ -15,6 +15,7 @@ Legacy Game                              ✅ 保留
 MCP / AI Access Core                     ✅ Production
 Harbor-Cat direct MCP                    ✅ Production / 已验收
 Harbor-Fish direct MCP                   ✅ Production / 已验收
+Google Drive / Sheet Harbor Bridge       ✅ 已从 Production runtime 退役
 R8.7-R8.8 无感加载 / 缓存竞态收口          ✅ Production
 前台恢复 / focus 自动后台校验              ✅ Production
 ChatGPT MCP 临时文件直传                   ✅ Production / 已验收
@@ -62,6 +63,8 @@ Supabase
 ```
 
 Supabase 是正式生活数据事实源。
+
+旧 `/api/drive-bridge/*` 已从 Production 删除，不再属于可用 AI 入口。
 
 ## 4. Harbor MCP 已完成验收
 
@@ -129,13 +132,28 @@ ChatGPT Custom MCP 已验收可从 OpenAI 临时文件地址获取图片并写�
 Primary domain：`https://couple-better-game.vercel.app`
 
 ```text
-deployment: dpl_VNd6Emg1xe1GZGcv9QgjfNBAdLQA
+deployment: dpl_39mzvsqqqrEtE14nu5Li9tB6NmL3
 state: READY
 target: production
-source commit: 0a293a2e1994f82b256564326350f62396f10cb4
+source commit: 543da4fd9654c448bd33be3c099536de6efcd620
 ```
 
-当前仓库正在清理已废弃的旧传输实现；该代码清理在获得下一次明确 Production 部署授权之前不会改变线上运行版本。
+本次 Production 已包含旧 Harbor Google Drive / Sheet Bridge runtime 删除：
+
+```text
+/api/drive-bridge/*                      → 404
+/mcp（无 OAuth token）                   → 401 OAuth required
+```
+
+Supabase 已执行 `remove_drive_bridge_runtime` migration：
+
+```text
+life_drive_bridge_commands               → 已删除
+life_drive_bridge_configs                → 已删除
+pair_life_drive_bridge_worker(...)       → 已删除
+```
+
+`drive-bridge-staging` 当前为空，但 Supabase 禁止直接 SQL 删除 Storage bucket；它只剩一个空的历史 bucket，后续通过 Storage API / Dashboard 删除即可，不影响运行。
 
 当前 `vercel.json` 保持：
 
@@ -155,16 +173,19 @@ source commit: 0a293a2e1994f82b256564326350f62396f10cb4
 - Server-side vision recognizer 没有配置付费 key 时会安全跳过识别，不影响照片保存；
 - 某些 MCP 客户端不透传图片字节时需要 browser recovery；
 - 内置网页 AI 当前单次附件能力与 ChatGPT Project 多图会话能力不完全相同；
+- `drive-bridge-staging` 仍有一个空 bucket 待通过 Storage API / Dashboard 删除；
 - Production 自动部署长期保持关闭。
 
 ## 11. 下一步候选
 
 ```text
-1. 给 mood 增加正式 delete 能力
-2. 做一次 Cat / Fish “我 / Ta / both”完整权限回归
-3. 实机验证餐前 / 餐后差分草稿与完整营养写入
-4. 如确实需要，再设计 meal 多图持久化模型
-5. 后续新增 cycle 等生活 domain 时复用 AI Access Core
+1. 将 Harbor Cat / Harbor Fish ChatGPT Project Instructions 替换为纯 MCP 当前模板
+2. 删除空的 drive-bridge-staging Storage bucket
+3. 给 mood 增加正式 delete 能力
+4. 做一次 Cat / Fish “我 / Ta / both”完整权限回归
+5. 实机验证餐前 / 餐后差分草稿与完整营养写入
+6. 如确实需要，再设计 meal 多图持久化模型
+7. 后续新增 cycle 等生活 domain 时复用 AI Access Core
 ```
 
 ## 12. 部署纪律
