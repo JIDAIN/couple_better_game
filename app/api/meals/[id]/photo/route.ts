@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { isUuid } from "../../../../../lib/nutrition/meal-service";
+import {
+  defaultMealPhotoDisplay,
+  isUuid,
+  parseMealPhotoDisplayPayload,
+} from "../../../../../lib/nutrition/meal-service";
 import {
   MealPhotoCompressionError,
   compressMealPhoto,
@@ -12,7 +16,8 @@ import {
   getMealOwner,
   getMealPhotoPath,
   NutritionCloudError,
-  replaceMealPhotoPath,
+  replaceMealPhotoState,
+  updateMealPhotoDisplay,
   uploadMealPhotoObject,
 } from "../../../../../lib/server/supabase-nutrition";
 
@@ -31,7 +36,8 @@ async function mealId(context: RouteContext) {
 }
 
 function cloudError(error: NutritionCloudError) {
-  const status = error.errorCode === "SERVER_CONFIG" ? 500 : error.message.includes("Meal not found") ? 404 : 502;
+  const notFound = error.message.includes("Meal not found") || error.message.includes("Meal photo not found");
+  const status = error.errorCode === "SERVER_CONFIG" ? 500 : notFound ? 404 : 502;
   return jsonError(error.message, status, error.errorCode);
 }
 
@@ -59,8 +65,6 @@ export async function GET(request: Request, context: RouteContext) {
       status: 200,
       headers: {
         "Content-Type": storageResponse.headers.get("content-type") || "image/webp",
-        // mealPhotoUrl includes the meal updatedAt value. A changed/deleted photo
-        // therefore gets a new URL, so previously viewed versions are safe to keep.
         "Cache-Control": "private, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
       },
@@ -100,6 +104,7 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   const path = buildMealPhotoPath(id, compressed.extension);
+  const display = defaultMealPhotoDisplay(compressed.width, compressed.height);
   try {
     const bytes = compressed.bytes.buffer.slice(
       compressed.bytes.byteOffset,
@@ -108,7 +113,7 @@ export async function PUT(request: Request, context: RouteContext) {
     await uploadMealPhotoObject(path, bytes, compressed.contentType);
     let replacement;
     try {
-      replacement = await replaceMealPhotoPath(id, path);
+      replacement = await replaceMealPhotoState(id, path, display);
     } catch (error) {
       await deleteMealPhotoObject(path).catch(() => undefined);
       throw error;
@@ -127,6 +132,8 @@ export async function PUT(request: Request, context: RouteContext) {
           originalBytes: compressed.originalBytes,
           outputBytes: compressed.outputBytes,
           contentType: compressed.contentType,
+          rotationDegrees: display.rotationDegrees,
+          scale: display.scale,
         },
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -137,13 +144,42 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 }
 
+export async function PATCH(request: Request, context: RouteContext) {
+  const id = await mealId(context);
+  if (!id) return jsonError("餐食 ID 格式不正确", 400, "BAD_REQUEST");
+  try {
+    const authError = await authorizePhotoWrite(request, id);
+    if (authError) return authError;
+  } catch (error) {
+    if (error instanceof NutritionCloudError) return cloudError(error);
+    return jsonError("读取餐食归属失败", 502, "NUTRITION_READ_FAILED");
+  }
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return jsonError("照片显示设置格式不正确", 400, "BAD_REQUEST");
+  }
+  const parsed = parseMealPhotoDisplayPayload(raw);
+  if (!parsed.ok) return jsonError(parsed.reason, 400, "BAD_REQUEST");
+
+  try {
+    const meal = await updateMealPhotoDisplay(id, parsed.value);
+    return NextResponse.json({ ok: true, meal }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    if (error instanceof NutritionCloudError) return cloudError(error);
+    return jsonError("保存照片显示设置失败", 502, "PHOTO_WRITE_FAILED");
+  }
+}
+
 export async function DELETE(request: Request, context: RouteContext) {
   const id = await mealId(context);
   if (!id) return jsonError("餐食 ID 格式不正确", 400, "BAD_REQUEST");
   try {
     const authError = await authorizePhotoWrite(request, id);
     if (authError) return authError;
-    const replacement = await replaceMealPhotoPath(id, null);
+    const replacement = await replaceMealPhotoState(id, null, { rotationDegrees: 0, scale: 1 });
     if (replacement.previousPhotoPath) {
       await deleteMealPhotoObject(replacement.previousPhotoPath).catch(() => undefined);
     }
