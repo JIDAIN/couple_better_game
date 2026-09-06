@@ -32,10 +32,32 @@ describe("R11 MCP -> AI Access Core adapter source contract", () => {
     expect(adapter).toContain("identityOf(identity)");
   });
 
-  it("passes MCP meal files through the existing compression/media boundary", () => {
+  it("passes OpenAI MCP meal files through the existing compression/media boundary", () => {
     expect(adapter).toContain("compressMealPhoto");
     expect(adapter).toContain('"openai/fileParams": ["file"]');
+    expect(adapter).toContain("prepareFileAttachment");
     expect(adapter).toContain("forwarded.attachPhoto = true");
+  });
+
+  it("adds a client-neutral inline image path without opening arbitrary remote URL fetching", () => {
+    expect(adapter).toContain("INLINE_IMAGE_SCHEMA");
+    expect(adapter).toContain("data_base64");
+    expect(adapter).toContain("prepareInlineAttachment");
+    expect(adapter).toContain("INVALID_IMAGE_MIME_TYPE");
+    expect(adapter).toContain("PHOTO_TOO_LARGE");
+    expect(adapter).not.toContain("properties.imageUrl");
+    expect(adapter).not.toContain("properties.fileUrl");
+  });
+
+  it("fails explicitly when a client claims attachPhoto but did not actually bind image bytes", () => {
+    expect(adapter).toContain("MEDIA_ATTACHMENT_REQUIRED");
+    expect(adapter).toContain("photoRequested(args) && !attachment");
+    expect(adapter).toContain("不要把本次操作报告为图片已保存");
+  });
+
+  it("does not allow two competing media sources in one mutation", () => {
+    expect(adapter).toContain("MULTIPLE_MEDIA_INPUTS");
+    expect(adapter).toContain("args.file != null && args.media != null");
   });
 
   it("returns canonical clarification details without converting them to schema debugging", () => {
