@@ -1,75 +1,65 @@
 # 项目文档索引
 
-这里保存**当前有效**的长期项目文档。目标是让第一次接手的人不需要阅读历史对话或几十份迁移报告，也能回答：产品是什么、代码怎么工作、数据在哪里、规则是什么、目前做到哪一步、下一步做什么。
+`docs/` 顶层只保存**当前有效、需要持续维护**的项目文档。历史实现、阶段验收和迁移过程统一放入 [`archive/`](archive/README.md)，不再与当前事实文档混在一起。
 
-## 阅读顺序
+目标是让第一次接手的人不用翻历史对话，就能回答：产品是什么、代码怎么工作、数据在哪里、业务规则是什么、AI 如何接入、现在做到哪一步。
+
+## 建议阅读顺序
 
 | 文档 | 回答的问题 |
 |---|---|
-| [`01-product.md`](01-product.md) | 这个产品给谁用？有哪些功能和用户流程？ |
-| [`02-architecture.md`](02-architecture.md) | 浏览器、Provider、API、Supabase 如何连接？ |
-| [`03-data-model.md`](03-data-model.md) | 哪些是事实数据？当前各数据域如何隔离？ |
-| [`04-api-and-sync.md`](04-api-and-sync.md) | 当前真实 API、cloud session、同步保护怎么工作？ |
-| [`05-business-rules.md`](05-business-rules.md) | Legacy game 的金币、宝石、热力图、周规则是什么？ |
-| [`06-ui-guidelines.md`](06-ui-guidelines.md) | 当前 App* / animal-island-ui 维护约束是什么？ |
+| [`01-product.md`](01-product.md) | 产品给谁用、有哪些主要模块和用户流程？ |
+| [`02-architecture.md`](02-architecture.md) | 浏览器、MCP、AI Access Core、API 与 Supabase 如何连接？ |
+| [`03-data-model.md`](03-data-model.md) | 哪些是事实数据，各生活域如何建模和隔离？ |
+| [`04-api-and-sync.md`](04-api-and-sync.md) | 当前 API、session、缓存和同步保护如何工作？ |
+| [`05-business-rules.md`](05-business-rules.md) | Legacy Game 与生活系统的核心业务规则是什么？ |
+| [`06-ui-guidelines.md`](06-ui-guidelines.md) | 当前页面与组件维护约束是什么？ |
 | [`07-development-testing.md`](07-development-testing.md) | 新功能放哪里、怎么测试、怎么更新文档？ |
-| [`08-deployment-security.md`](08-deployment-security.md) | Vercel/Supabase 怎么部署，密钥和隐私如何保护？ |
-| [`09-status-roadmap.md`](09-status-roadmap.md) | 已完成、进行中、下一步、技术债是什么？ |
-| [`10-v2-life-redesign.md`](10-v2-life-redesign.md) | V2 为什么把生活系统设为主产品、旧游戏如何隐藏保留？ |
-| [`11-ai-write-architecture.md`](11-ai-write-architecture.md) | ChatGPT 如何跨饮食、生活、体重、药箱复用安全写入架构？ |
-| [`12-island-life-design-system.md`](12-island-life-design-system.md) | **V2 所有可见 UI 的唯一主视觉规范** |
-| [`24-r7-mobile-ui-calibration.md`](24-r7-mobile-ui-calibration.md) | R7 如何根据手机截图校准全站 UI？ |
+| [`08-deployment-security.md`](08-deployment-security.md) | Vercel / Supabase 如何部署，密钥和隐私如何保护？ |
+| [`09-status-roadmap.md`](09-status-roadmap.md) | Production 当前状态、已知边界和下一步是什么？ |
+| [`10-v2-life-redesign.md`](10-v2-life-redesign.md) | 为什么生活系统是主产品、旧游戏如何保留？ |
+| [`11-ai-write-architecture.md`](11-ai-write-architecture.md) | AI 如何统一、安全地查询和写入生活数据？ |
+| [`12-island-life-design-system.md`](12-island-life-design-system.md) | V2 可见 UI 的主视觉规范是什么？ |
 
-## V2 UI 当前代码基础
+## 当前专项文档
 
-视觉语言已经人工定稿，当前实现基础位于：
-
-```text
-app/island-life-tokens.css
-components/ui/AppPageShell.tsx
-components/ui/AppRoleSwitch.tsx
-components/ui/AppRecordRow.tsx
-components/ui/AppFeatureTile.tsx
-components/ui/AppNutritionBar.tsx
-app/ui-lab/page.tsx
-```
-
-`/ui-lab` 只用于假数据视觉回归，不能读写 Supabase / Life facts，也不能触发 Legacy Game settlement。
-
-以后新增任何 V2 可见页面，必须先阅读 `12-island-life-design-system.md`，不得在单个业务 PR 中自行改变色板、主导航或已经确认的页面结构。
-
-根目录另外有：
-
-- `README.md`：给人看的快速入口。
-- `AGENTS.md`：所有 AI / 自动化开发工具的工程规则。
-- `CLAUDE.md`：Claude Code 薄入口。
-- `CHANGELOG.md`：里程碑事实记录。
-- `.codex/skills/couple-better-game-maintainer/SKILL.md`：Codex 持续维护 Skill。
+| 文档 | 主题 |
+|---|---|
+| [`13-meal-photo-storage.md`](13-meal-photo-storage.md) | 餐食照片 Storage、压缩与绑定 |
+| [`14-wechat-reminders.md`](14-wechat-reminders.md) | Supabase → PushPlus 微信提醒 |
+| [`17-auth-and-pairing.md`](17-auth-and-pairing.md) | 固定 Cat / Fish 登录、session 与权限边界 |
+| [`26-ai-access-core-principles.md`](26-ai-access-core-principles.md) | AI Access Core 长期架构原则 |
+| [`28-ai-natural-language-contract.md`](28-ai-natural-language-contract.md) | 自然语言 normalization / clarification contract |
+| [`44-meal-draft-before-after-contract.md`](44-meal-draft-before-after-contract.md) | 新 meal 的草稿确认与餐前/餐后差分 |
+| [`45-r11-5-meal-nutrition-photo-display.md`](45-r11-5-meal-nutrition-photo-display.md) | 当前营养字段、照片展示与单图持久化细节 |
+| [`46-harbor-mcp-project-instructions.md`](46-harbor-mcp-project-instructions.md) | Harbor Cat / Fish 当前 MCP Project Instructions |
+| [`47-harbor-instructions-maintenance.md`](47-harbor-instructions-maintenance.md) | Project Instructions 的维护规则 |
 
 ## 文档事实优先级
 
-当资料冲突时，按以下顺序确认：
+资料冲突时按以下顺序确认：
 
-1. 已验证的生产行为 / Supabase 当前 schema；
+1. 已验证的 Production 行为 / Supabase 当前 schema；
 2. 当前 `main` 代码；
-3. 本目录主文档；
-4. Git 历史中的旧文档 / 旧聊天记录。
+3. `docs/` 顶层当前主文档；
+4. [`docs/archive/`](archive/README.md)；
+5. Git 历史和旧聊天记录。
 
-正在 PR 中、尚未合并/部署的 V2 内容必须明确写成“开发中”，不能冒充 production 已上线。
-
-发现主文档与真实实现不一致时，修代码或修文档，但不能保持“两个版本都算对”。
+尚未部署的代码或 migration 必须明确写成“待部署 / 待执行”，不能冒充 Production 已上线。
 
 ## 文档维护原则
 
-- **一个主题只保留一个主文档。**
-- 重构 / 迁移过程报告不作为长期事实源；稳定结论合并进主文档。
-- `CHANGELOG` 记录“发生了什么”，roadmap 记录“现在在哪、下一步是什么”。
-- API、schema、规则变化必须同步对应文档。
-- V2 的产品边界、AI 写入架构和岛屿生活 Design System 都属于长期设计约束，因此保留 `10` / `11` / `12` 三份专项主文档。
-- 临时 audit、调研和迁移 checklist 优先放 issue / PR / 对话，不继续堆在 `docs/`。
+- 一个主题只保留一个当前主文档；
+- `docs/` 顶层不放一次性部署记录、阶段验收报告、临时调研或已经完成的 migration checklist；
+- 稳定结论应合并回对应主文档；
+- `CHANGELOG.md` 记录“发生了什么”，`09-status-roadmap.md` 记录“现在在哪、下一步是什么”；
+- API、schema、权限、产品规则或 UI contract 改变时，同一批修改同步更新对应主文档；
+- 历史文档不得反向覆盖当前事实。
 
-## 历史文档
+根目录另外有：
 
-2026-09-01 前仓库曾同时存在 product brief、requirements、user flows、两套 architecture/testing/deployment 文档、GitHub JSON 同步说明以及多份 UI migration audit/report/rollback 文档。
-
-这些内容已合并到当前主文档并从主分支删除，以免继续误导。需要追溯迁移过程时，请查看 Git 历史。
+- `README.md`：项目快速入口；
+- `AGENTS.md`：AI / 自动化开发工具的工程规则；
+- `CLAUDE.md`：Claude Code 薄入口；
+- `CHANGELOG.md`：里程碑事实记录；
+- `.codex/skills/couple-better-game-maintainer/SKILL.md`：Codex 持续维护 Skill。
