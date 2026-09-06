@@ -81,6 +81,11 @@ function resolveProtocol(request: Request, params: Record<string, unknown>) {
   return SUPPORTED_PROTOCOLS[0];
 }
 
+function toolCallId(id: unknown) {
+  if (typeof id === "string" || typeof id === "number") return `mcp:${String(id)}`;
+  return `mcp:${crypto.randomUUID()}`;
+}
+
 export async function OPTIONS(request: Request) {
   if (!allowedOrigin(request)) return new Response(null, { status: 403 });
   const requestOrigin = request.headers.get("origin") ?? "";
@@ -135,11 +140,11 @@ export async function POST(request: Request) {
       serverInfo: {
         name: "couple-better-game-life",
         title: "🐟🐱生活记录",
-        version: "1.0.0",
-        description: "Private couple life records with OAuth, stable domain routing, and confirmed writes.",
+        version: "2.0.0",
+        description: "Private couple life records backed by the shared AI Access Core.",
       },
       instructions:
-        "Use life_query for fresh records. Before any write, confirm the user explicitly wants the change saved. Personal writes are always bound to the OAuth identity. Use the optional file parameter on life_write for a user-provided meal photo.",
+        "Use life_query for normal reads and life_mutate for writes. Do not probe life_capabilities before routine requests. For life_mutate, pass the current user message verbatim in userText so delete/high-risk safety checks remain server-side. Personal writes are bound to the OAuth identity. Meal photos may be passed with file.",
     });
   }
 
@@ -154,7 +159,7 @@ export async function POST(request: Request) {
     if (!name) return rpcError(message.id, -32602, "Tool name is required");
     const tool = LIFE_MCP_TOOLS.find((item) => item.name === name);
     if (!tool) return rpcError(message.id, -32602, `Unknown tool: ${name}`);
-    const result = await callLifeMcpTool(name, params.arguments, identity);
+    const result = await callLifeMcpTool(name, params.arguments, identity, { toolCallId: toolCallId(message.id) });
     return rpcResult(message.id, result);
   }
 
