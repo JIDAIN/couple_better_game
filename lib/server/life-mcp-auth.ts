@@ -111,11 +111,30 @@ function verifyPayload<T extends SignedBase>(token: string, kind: T["kind"]): T 
   }
 }
 
-function validHttpsOrLocalhostUrl(value: string) {
+function isIpv4Loopback(hostname: string) {
+  const parts = hostname.split(".");
+  if (parts.length !== 4 || parts[0] !== "127") return false;
+  return parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
+}
+
+function isLoopbackHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  return normalized === "localhost" || normalized === "::1" || normalized === "[::1]" || isIpv4Loopback(normalized);
+}
+
+function isPrivateUseRedirect(url: URL) {
+  if (url.protocol === "http:" || url.protocol === "https:") return false;
+  if (["file:", "data:", "javascript:", "ftp:", "ws:", "wss:"].includes(url.protocol)) return false;
+  if (url.username || url.password) return false;
+  return /^[a-z][a-z0-9+.-]*:$/.test(url.protocol);
+}
+
+function validOAuthRedirectUrl(value: string) {
   try {
     const url = new URL(value);
     if (url.protocol === "https:") return true;
-    return url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1");
+    if (url.protocol === "http:") return isLoopbackHostname(url.hostname);
+    return isPrivateUseRedirect(url);
   } catch {
     return false;
   }
@@ -134,7 +153,7 @@ export function createRegisteredClient(input: {
   redirectUris: string[];
   clientName?: string | null;
 }) {
-  const redirectUris = [...new Set(input.redirectUris.map((value) => value.trim()))].filter(validHttpsOrLocalhostUrl);
+  const redirectUris = [...new Set(input.redirectUris.map((value) => value.trim()))].filter(validOAuthRedirectUrl);
   if (redirectUris.length === 0 || redirectUris.length > 10) throw new Error("INVALID_REDIRECT_URIS");
   const now = nowSeconds();
   const payload: ClientPayload = {
