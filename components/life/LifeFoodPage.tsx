@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { MealPhotoFrame } from "@/components/life/MealPhotoFrame";
 import { AppPageShell } from "@/components/ui/AppPageShell";
 import { AppRoleSwitch, type AppRoleSwitchValue } from "@/components/ui/AppRoleSwitch";
 import { AppNutritionBar } from "@/components/ui/AppNutritionBar";
@@ -93,31 +94,15 @@ function MealPhotoSlot({ meal, label, mealType, pending = false }: { meal?: Meal
   const src = customPhoto && meal ? mealPhotoUrl(meal) : (DEFAULT_MEAL_ART[mealType] ?? DEFAULT_MEAL_ART.lunch);
 
   if (customPhoto && meal) {
-    const alt = `${label}实物照片：${mealNames(meal)}`;
     return (
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--life-radius-control)] bg-[var(--life-surface-warm)]">
-        <Image
-          unoptimized
-          priority
-          src={src}
-          alt=""
-          aria-hidden
-          fill
-          sizes="(max-width: 480px) 42vw, 190px"
-          className="scale-110 object-cover opacity-30 blur-xl"
-        />
-        <div className="absolute inset-0 bg-white/15" aria-hidden />
-        <Image
-          unoptimized
-          priority
-          src={src}
-          alt={alt}
-          fill
-          sizes="(max-width: 480px) 42vw, 190px"
-          className="object-contain"
-          onError={() => setPhotoFailed(true)}
-        />
-      </div>
+      <MealPhotoFrame
+        src={src}
+        alt={`${label}实物照片：${mealNames(meal)}`}
+        rotationDegrees={meal.photoRotationDegrees ?? 0}
+        scale={meal.photoScale ?? 1}
+        priority
+        onError={() => setPhotoFailed(true)}
+      />
     );
   }
 
