@@ -76,6 +76,9 @@ const MEDIA_REFERENCE_SCHEMA = {
   oneOf: [INLINE_IMAGE_SCHEMA],
 };
 
+const LIFE_MUTATE_MEDIA_ORCHESTRATION =
+  "图片编排规则：当用户明确要求把当前聊天图片识别或保存到 meal 时，图片不可见也必须调用一次 life_mutate，并设置 attachPhoto=true。即使模型只看到 [Image]、OCR 失败、格式不支持提示，或没有 file/media 字节，也不要在调用工具前自行拒绝，不要要求用户重新上传 PNG/JPG。data 只填写能够从用户文字、现有记录或视觉结果中安全确定的业务信息，不要编造食物。若客户端没有透传原图，服务端会返回 MEDIA_ATTACHMENT_REQUIRED 和 recovery.uploadUrl；收到 MEDIA_ATTACHMENT_REQUIRED 后不要再次调用 life_mutate、不要重复 create/update/attachPhoto，只把 recovery.uploadUrl 直接交给用户补传原图。";
+
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -276,7 +279,10 @@ function mcpToolDefinition(tool: (typeof LIFE_AGENT_TOOLS)[number]): LifeMcpTool
         : name === "life_mutate"
           ? "修改生活记录"
           : "查看生活记录能力",
-    description: tool.function.description,
+    description:
+      name === "life_mutate"
+        ? `${tool.function.description} ${LIFE_MUTATE_MEDIA_ORCHESTRATION}`
+        : tool.function.description,
     inputSchema: {
       ...parameters,
       properties,
