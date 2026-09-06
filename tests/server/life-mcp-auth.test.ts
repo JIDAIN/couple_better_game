@@ -37,12 +37,33 @@ describe("life MCP OAuth helpers", () => {
     expect(client?.clientName).toBe("ChatGPT");
   });
 
-  it("accepts RikkaHub's native loopback callback and rejects remote plaintext HTTP", () => {
+  it("accepts RikkaHub's native loopback callback", () => {
     const clientId = createRegisteredClient({ redirectUris: [RIKKAHUB_REDIRECT], clientName: "RikkaHub" });
     expect(resolveRegisteredClient(clientId)?.redirectUris).toEqual([RIKKAHUB_REDIRECT]);
-    expect(() =>
-      createRegisteredClient({ redirectUris: ["http://example.com/oauth/callback"], clientName: "unsafe" }),
-    ).toThrow("INVALID_REDIRECT_URIS");
+  });
+
+  it("accepts RFC8252 loopback variants and private-use app schemes", () => {
+    const redirects = [
+      "http://127.0.0.42:52134/oauth/callback",
+      "http://[::1]:52134/oauth/callback",
+      "rikkahub://oauth/callback",
+    ];
+    const clientId = createRegisteredClient({ redirectUris: redirects, clientName: "Native MCP client" });
+    expect(resolveRegisteredClient(clientId)?.redirectUris).toEqual(redirects);
+  });
+
+  it("rejects remote plaintext HTTP and unsafe schemes", () => {
+    for (const redirectUri of [
+      "http://example.com/oauth/callback",
+      "http://192.168.1.2/oauth/callback",
+      "file:///tmp/oauth",
+      "javascript:alert(1)",
+      "data:text/plain,oauth",
+    ]) {
+      expect(() => createRegisteredClient({ redirectUris: [redirectUri], clientName: "unsafe" })).toThrow(
+        "INVALID_REDIRECT_URIS",
+      );
+    }
   });
 
   it("rejects tampered client identifiers", () => {
