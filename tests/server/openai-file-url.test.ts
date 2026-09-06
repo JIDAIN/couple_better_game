@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedOpenAiFileUrl } from "@/lib/server/openai-file-url";
+import { isAllowedOpenAiFileUrl } from "../../lib/server/openai-file-url";
 
 describe("OpenAI MCP file URL allowlist", () => {
   it("keeps the existing OpenAI and ChatGPT download hosts trusted", () => {
