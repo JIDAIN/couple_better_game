@@ -6,6 +6,10 @@ R11.5 详细说明见：
 
 `docs/45-r11-5-meal-nutrition-photo-display.md`
 
+Harbor 当前 Project 指令模板见：
+
+`docs/46-harbor-mcp-project-instructions.md`
+
 ## 1. 当前主功能状态
 
 ```text
@@ -15,9 +19,13 @@ R11.5 详细说明见：
 小窝 / 体重 / 家庭药箱 / 小信箱 / 游戏机   ✅ Production
 Legacy Game                              ✅ 保留
 MCP / AI Access Core                     ✅ Production
-Harbor ChatGPT Bridge                    ✅ 可用兼容入口
+Harbor-Cat direct MCP                    ✅ Production / 已验收
+Harbor-Fish direct MCP                   ✅ Production / 已验收
+Google Drive / Sheet Bridge              ⚪ 兼容回滚入口，不再默认使用
 R8.7-R8.8 无感加载 / 缓存竞态收口          ✅ Production
+前台恢复 / focus 自动后台校验              ✅ Production
 R11.4 MCP 图片恢复链路                     ✅ Production
+ChatGPT MCP 临时文件直传                   ✅ Production / 已验收
 R11.5 AI 饮食草稿软确认                    ✅ Production
 R11.5 营养字段完整化                       ✅ Production
 R11.5 照片旋转 / 大小 / 无裁切显示          ✅ Production
@@ -28,25 +36,47 @@ R11.5 照片旋转 / 大小 / 无裁切显示          ✅ Production
 Harbor Cat：
 
 ```text
+Harbor-Cat OAuth actor = cat
 我 = cat
 Ta / 对象 = fish
 团子 = AI 昵称
 ```
 
-Harbor Fish 按其固定 actor 规则执行。
+Harbor Fish：
 
-AI 昵称不参与服务端身份判断；身份来自登录 / Bridge / MCP 授权上下文。
+```text
+Harbor-Fish OAuth actor = fish
+我 = fish
+Ta / 对象 = cat
+```
+
+AI 昵称、用户自称或普通文本 `person` 不参与服务端身份判断；身份来自 OAuth / 登录授权上下文。
 
 ## 3. 当前 AI 入口
 
-三个入口共享同一个 AI Access Core：
+正式主路径：
 
 ```text
-Harbor ChatGPT Project
-MCP /mcp
-程序内置 AI /api/ai/chat
+Harbor Cat Project
+→ Harbor-Cat MCP
+→ OAuth cat
+→ /mcp
+
+Harbor Fish Project
+→ Harbor-Fish MCP
+→ OAuth fish
+→ /mcp
+
+其他 MCP client
+→ /mcp
+
+程序内置 AI
+→ /api/ai/chat
+
         ↓
 life_query / life_mutate
+        ↓
+AI Access Core
         ↓
 canonical domain services
         ↓
@@ -55,28 +85,50 @@ Supabase
 
 Supabase 是正式生活数据事实源。
 
-Google Sheet / Drive Bridge 的 COMMANDS、RECEIPTS、STATE_* 只是兼容传输与镜像层。
+Google Sheet / Drive Bridge 的 COMMANDS、RECEIPTS、STATE_* 只保留作兼容 / 回滚层，不再进入 Harbor 正常读写路径。
 
-## 4. Harbor Fast Path
+## 4. Harbor MCP 已完成验收
 
-普通 query / mutate：
+2026-09-06 已实测：
 
 ```text
-1 COMMAND
-→ 1 Fast Wake
-→ 同 command_id RECEIPT
-→ 回复用户
+Harbor-Cat OAuth                         ✅
+Harbor-Cat life_query                    ✅
+Harbor-Cat life_mutate                   ✅
+Harbor-Cat ChatGPT 图片 → meal + photo   ✅
+Harbor-Fish OAuth                        ✅
+Harbor-Fish life_query                   ✅
+Harbor-Fish life_mutate                  ✅
+Cat / Fish token-bound identity          ✅
+ChatGPT 写入 → Supabase → 网页自动刷新   ✅
+网页删除 → Supabase                      ✅
 ```
 
-当前原则：
+因此 Harbor 正常请求不再创建 COMMAND、不等待 RECEIPT、不触发 Fast Wake。
 
-- 普通业务不先 `life_capabilities`；
-- 不扫描整张 RECEIPTS；
-- `locked / processing / receiptReady=false` 不重复 Wake；
-- Fast Wake 200 不等于业务成功；
-- 正式结果只认同 command_id RECEIPT。
+## 5. Google Bridge 当前定位
 
-## 5. R11.5 饮食交互
+旧路径：
+
+```text
+COMMAND
+→ Fast Wake
+→ RECEIPT
+→ life_query / life_mutate
+```
+
+当前仅作为短期回滚兼容能力保留。
+
+原则：
+
+- 正常 Harbor 业务不再使用 Bridge；
+- `STATE_*` 不作为事实源；
+- 不主动扫描 RECEIPTS；
+- 不主动触发 Fast Wake；
+- 只有 MCP 明确不可用且用户要求兼容通道时才考虑 Bridge；
+- 暂不物理删除后端代码/资源，待一段真实使用稳定后再决定清理。
+
+## 6. R11.5 饮食交互
 
 新的 meal：
 
@@ -97,7 +149,7 @@ Google Sheet / Drive Bridge 的 COMMANDS、RECEIPTS、STATE_* 只是兼容传输
 
 身份、权限、删除、高风险覆盖、幂等等真正安全边界继续由服务端保证。
 
-## 6. R11.5 实际摄入与营养
+## 7. R11.5 实际摄入与营养
 
 默认优先级：
 
@@ -125,7 +177,7 @@ total calories
 
 UI 手动编辑已有 AI meal 时，现有重量、宏量营养、calorie range 等必须 round-trip 保留，除非用户真正修改相关字段。
 
-## 7. R11.5 餐食照片
+## 8. R11.5 餐食照片
 
 当前正式 meal 仍绑定 1 张展示照片。
 
@@ -146,6 +198,8 @@ EXIF normalize
 → photo_path
 ```
 
+ChatGPT Custom MCP 当前已验收可从 OpenAI 临时文件地址获取图片并写入 Supabase Storage。
+
 新增显示元数据：
 
 ```text
@@ -163,7 +217,29 @@ photo_scale            = 0.60 .. 1.00
 
 真实照片统一 `object-contain + 留白`，用户设成竖向时不强裁切内容。
 
-## 8. 数据库状态
+## 9. 无感加载 / 数据同步
+
+当前网页策略：
+
+```text
+先显示 Cat/Fish scope 下的本地 stale cache
+→ 页面挂载后后台强制校验最新数据
+→ focus / visibilitychange 后后台强制刷新
+→ online 后后台强制刷新
+```
+
+目标是：
+
+```text
+不白屏
+不出现显式刷新条
+不整页闪烁
+同时不长期停留在旧数据
+```
+
+2026-09-06 已通过真实验收：ChatGPT 写入 1 分钟活动后，从 ChatGPT 切回网页，无手动刷新即可自动出现；网页删除后 Supabase 立即软删除。
+
+## 10. 数据库状态
 
 R11.5 migration：
 
@@ -187,41 +263,19 @@ NULL = 未估算
 0    = 确实为 0
 ```
 
-## 9. 测试状态
-
-PR #84 最终合并：
-
-```text
-merge commit: 1aa0dcad94674061f10d4735192383d01209d8c8
-CI #452:
-Test  ✅
-Lint  ✅
-Build ✅
-```
-
-覆盖包括：
-
-- AI 软确认 contract；
-- MCP 营养字段 guidance；
-- EXIF / portrait 默认旋转；
-- photo rotation / scale 解析；
-- `MealPhotoFrame` contain + 留白；
-- 编辑器照片控件；
-- 手动编辑不吞掉 AI 营养数据。
-
-## 10. 当前 Production
+## 11. 当前 Production
 
 Primary domain：
 
 `https://couple-better-game.vercel.app`
 
-本次文档同步与 R11.5 当前代码重新受控部署：
+当前已部署版本包含前台恢复自动校验：
 
 ```text
-deployment: dpl_C4BzUmM5AkV2PmNz5AgT31TPQaxb
+deployment: dpl_VNd6Emg1xe1GZGcv9QgjfNBAdLQA
 state: READY
 target: production
-source commit: c2b2c2ecd0499eeb3e2a7202ea906df7bec446d0
+source commit: 0a293a2e1994f82b256564326350f62396f10cb4
 ```
 
 部署完成后自动部署已恢复关闭。
@@ -236,31 +290,33 @@ source commit: c2b2c2ecd0499eeb3e2a7202ea906df7bec446d0
 }
 ```
 
-## 11. 已知边界
+## 12. 已知边界
 
 当前仍存在的明确边界：
 
+- `mood` 当前只有 `upsert`，还没有正式 `delete`；
 - 一个 meal 只能正式绑定 1 张展示照片；
 - 餐前 / 餐后可以一起用于 AI 分析，但还没有多图持久化模型；
 - Server-side vision recognizer 没有配置付费 key 时会安全跳过识别，不影响照片保存；
 - RikkaHub / 某些 MCP 客户端不透传图片字节时需要 browser recovery；
 - 内置网页 AI 当前单次附件能力与 ChatGPT Project 多图会话能力不完全相同；
+- Google Bridge 仍存在代码与资源，但已不属于默认 Harbor 流程；
 - Production 自动部署长期保持关闭。
 
-## 12. 下一步候选
+## 13. 下一步候选
 
 优先级按真实使用需求决定，不自动开发：
 
 ```text
-1. 实机验证照片默认方向 / 旋转 / 大小持久化
-2. 实机验证“确认后失败 → 再试一次”不重复确认
-3. 实机验证餐前 / 餐后差分草稿与完整营养写入
-4. 如确实需要，再设计 meal 多图持久化模型
-5. 调研可长期使用的免费 / 免费额度视觉识别 provider
+1. 给 mood 增加正式 delete 能力
+2. 做一次 Cat / Fish “我 / Ta / both”完整权限回归
+3. 持续真实使用 Harbor-Cat / Harbor-Fish，稳定后再物理退役 Bridge
+4. 实机验证餐前 / 餐后差分草稿与完整营养写入
+5. 如确实需要，再设计 meal 多图持久化模型
 6. 后续新增 cycle 等生活 domain 时复用 AI Access Core
 ```
 
-## 13. 部署纪律
+## 14. 部署纪律
 
 任何新的 Production deployment 都必须获得用户当次明确授权。
 
