@@ -14,6 +14,7 @@ import {
 
 const RESOURCE = "https://couple-better-game.vercel.app/mcp";
 const REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect";
+const RIKKAHUB_REDIRECT = "http://127.0.0.1:52134/oauth/callback";
 const VERIFIER = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abc";
 
 let previousSecret: string | undefined;
@@ -34,6 +35,14 @@ describe("life MCP OAuth helpers", () => {
     const client = resolveRegisteredClient(clientId);
     expect(client?.redirectUris).toEqual([REDIRECT]);
     expect(client?.clientName).toBe("ChatGPT");
+  });
+
+  it("accepts RikkaHub's native loopback callback and rejects remote plaintext HTTP", () => {
+    const clientId = createRegisteredClient({ redirectUris: [RIKKAHUB_REDIRECT], clientName: "RikkaHub" });
+    expect(resolveRegisteredClient(clientId)?.redirectUris).toEqual([RIKKAHUB_REDIRECT]);
+    expect(() =>
+      createRegisteredClient({ redirectUris: ["http://example.com/oauth/callback"], clientName: "unsafe" }),
+    ).toThrow("INVALID_REDIRECT_URIS");
   });
 
   it("rejects tampered client identifiers", () => {
