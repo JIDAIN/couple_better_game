@@ -21,10 +21,23 @@ const DEFAULT_MEAL_ART: Record<string, string> = { breakfast: "/illustrations/me
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
 
-type ItemDraft = { key: string; rawName: string; portionDescription: string; caloriesKcal: string; carbsG: string; proteinG: string; fatG: string };
+type ItemDraft = {
+  key: string;
+  foodId: string | null;
+  rawName: string;
+  displayName: string;
+  portionDescription: string;
+  estimatedWeightG: string;
+  caloriesKcal: string;
+  calorieMinKcal: number | null;
+  calorieMaxKcal: number | null;
+  carbsG: string;
+  proteinG: string;
+  fatG: string;
+};
 function draftKey() { return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; }
-function emptyItem(): ItemDraft { return { key: draftKey(), rawName: "", portionDescription: "", caloriesKcal: "", carbsG: "", proteinG: "", fatG: "" }; }
-function fromItem(item: MealItemRecord): ItemDraft { return { key: item.id, rawName: item.rawName, portionDescription: item.portionDescription ?? "", caloriesKcal: item.caloriesKcal == null ? "" : String(item.caloriesKcal), carbsG: item.carbsG == null ? "" : String(item.carbsG), proteinG: item.proteinG == null ? "" : String(item.proteinG), fatG: item.fatG == null ? "" : String(item.fatG) }; }
+function emptyItem(): ItemDraft { return { key: draftKey(), foodId: null, rawName: "", displayName: "", portionDescription: "", estimatedWeightG: "", caloriesKcal: "", calorieMinKcal: null, calorieMaxKcal: null, carbsG: "", proteinG: "", fatG: "" }; }
+function fromItem(item: MealItemRecord): ItemDraft { return { key: item.id, foodId: item.foodId, rawName: item.rawName, displayName: item.displayName, portionDescription: item.portionDescription ?? "", estimatedWeightG: item.estimatedWeightG == null ? "" : String(item.estimatedWeightG), caloriesKcal: item.caloriesKcal == null ? "" : String(item.caloriesKcal), calorieMinKcal: item.calorieMinKcal, calorieMaxKcal: item.calorieMaxKcal, carbsG: item.carbsG == null ? "" : String(item.carbsG), proteinG: item.proteinG == null ? "" : String(item.proteinG), fatG: item.fatG == null ? "" : String(item.fatG) }; }
 function numberOrNull(value: string) { const text = value.trim(); if (!text) return null; const number = Number(text); return Number.isFinite(number) && number >= 0 ? number : NaN; }
 function dateTimeWithLocalOffset(mealDate: string, time: string) { if (!time) return null; const local = new Date(`${mealDate}T${time}:00`); return Number.isNaN(local.getTime()) ? null : local.toISOString(); }
 function validMealType(value: string | null): MealType { return value === "breakfast" || value === "lunch" || value === "dinner" || value === "snack" ? value : "lunch"; }
@@ -57,6 +70,7 @@ export function LifeMealEditorPage() {
   const [time, setTime] = useState(cachedMeal?.eatenAt ? new Date(cachedMeal.eatenAt).toTimeString().slice(0, 5) : "");
   const [note, setNote] = useState(cachedMeal?.note ?? "");
   const [items, setItems] = useState<ItemDraft[]>(cachedMeal?.items.length ? cachedMeal.items.map(fromItem) : [emptyItem()]);
+  const [calorieDataTouched, setCalorieDataTouched] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
@@ -76,7 +90,7 @@ export function LifeMealEditorPage() {
       if (cancelled) return;
       const found = records.find((record) => record.id === mealId && record.deletedAt == null) ?? null;
       if (!found) throw new Error("没有找到这餐记录");
-      setMeal(found); setDate(found.mealDate); setMealType(found.mealType); setSnackPeriod(found.mealType === "snack" ? found.snackPeriod : null); setTime(found.eatenAt ? new Date(found.eatenAt).toTimeString().slice(0, 5) : ""); setNote(found.note ?? ""); setItems(found.items.length ? found.items.map(fromItem) : [emptyItem()]); setPhotoRotationDegrees(found.photoRotationDegrees ?? 0); setPhotoScale(found.photoScale ?? 1); setPhotoTransformTouched(false); photoTransformTouchedRef.current = false;
+      setMeal(found); setDate(found.mealDate); setMealType(found.mealType); setSnackPeriod(found.mealType === "snack" ? found.snackPeriod : null); setTime(found.eatenAt ? new Date(found.eatenAt).toTimeString().slice(0, 5) : ""); setNote(found.note ?? ""); setItems(found.items.length ? found.items.map(fromItem) : [emptyItem()]); setCalorieDataTouched(false); setPhotoRotationDegrees(found.photoRotationDegrees ?? 0); setPhotoScale(found.photoScale ?? 1); setPhotoTransformTouched(false); photoTransformTouchedRef.current = false;
     }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "读取这餐失败")).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [cachedMeal, canEdit, initialDate, mealId, partnerKey]);
@@ -88,7 +102,22 @@ export function LifeMealEditorPage() {
   const title = mealType === "snack" ? (SNACK_LABELS[snackPeriod ?? "afternoon"] ?? "加餐") : MEAL_LABELS[mealType];
 
   function markPhotoTransformTouched() { photoTransformTouchedRef.current = true; setPhotoTransformTouched(true); }
-  function updateItem(itemKey: string, patch: Partial<ItemDraft>) { setItems((current) => current.map((item) => item.key === itemKey ? { ...item, ...patch } : item)); }
+  function updateItem(itemKey: string, patch: Partial<ItemDraft>, affectsCalorieEstimate = false) {
+    setItems((current) => current.map((item) => {
+      if (item.key !== itemKey) return item;
+      const next = { ...item, ...patch };
+      if (patch.rawName !== undefined) {
+        next.foodId = null;
+        next.displayName = patch.rawName;
+      }
+      if (affectsCalorieEstimate) {
+        next.calorieMinKcal = null;
+        next.calorieMaxKcal = null;
+      }
+      return next;
+    }));
+    if (affectsCalorieEstimate) setCalorieDataTouched(true);
+  }
   function choosePhoto(file: File | null) {
     setError(null); if (!file) return;
     if (!PHOTO_TYPES.has(file.type.toLowerCase())) { setError("照片仅支持 JPEG、PNG、WebP、HEIC/HEIF"); return; }
@@ -120,12 +149,29 @@ export function LifeMealEditorPage() {
     if (!items.length || items.some((item) => !item.rawName.trim())) { setError("每个食物明细都需要填写名称"); return; }
     const parsedItems: MealWritePayload["items"] = [];
     for (const item of items) {
-      const calories = numberOrNull(item.caloriesKcal); const carbs = numberOrNull(item.carbsG); const protein = numberOrNull(item.proteinG); const fat = numberOrNull(item.fatG);
-      if ([calories, carbs, protein, fat].some((value) => Number.isNaN(value))) { setError("营养数值只能填写 0 或更大的数字"); return; }
+      const weight = numberOrNull(item.estimatedWeightG); const calories = numberOrNull(item.caloriesKcal); const carbs = numberOrNull(item.carbsG); const protein = numberOrNull(item.proteinG); const fat = numberOrNull(item.fatG);
+      if ([weight, calories, carbs, protein, fat].some((value) => Number.isNaN(value))) { setError("重量和营养数值只能填写 0 或更大的数字"); return; }
       if (calories != null && !Number.isInteger(calories)) { setError("热量如果填写，需要使用整数 kcal"); return; }
-      parsedItems.push({ foodId: null, rawName: item.rawName.trim(), displayName: item.rawName.trim(), portionDescription: item.portionDescription.trim() || null, estimatedWeightG: null, caloriesKcal: calories, calorieMinKcal: null, calorieMaxKcal: null, proteinG: protein, carbsG: carbs, fatG: fat });
+      parsedItems.push({ foodId: item.foodId, rawName: item.rawName.trim(), displayName: item.displayName.trim() || item.rawName.trim(), portionDescription: item.portionDescription.trim() || null, estimatedWeightG: weight, caloriesKcal: calories, calorieMinKcal: item.calorieMinKcal, calorieMaxKcal: item.calorieMaxKcal, proteinG: protein, carbsG: carbs, fatG: fat });
     }
-    const payload: MealWritePayload = { partnerKey, mealDate: date, mealType, eatenAt: dateTimeWithLocalOffset(date, time), snackPeriod: mealType === "snack" ? snackPeriod ?? "afternoon" : null, status: "confirmed", source: meal?.source ?? "manual", totalCaloriesKcal: parsedItems.every((item) => item.caloriesKcal !== null) ? parsedItems.reduce((sum, item) => sum + (item.caloriesKcal ?? 0), 0) : null, calorieMinKcal: null, calorieMaxKcal: null, note: note.trim() || null, idempotencyKey: meal?.idempotencyKey ?? null, items: parsedItems };
+    const allCaloriesKnown = parsedItems.length > 0 && parsedItems.every((item) => item.caloriesKcal !== null);
+    const allMinimumsKnown = parsedItems.length > 0 && parsedItems.every((item) => item.calorieMinKcal !== null);
+    const allMaximumsKnown = parsedItems.length > 0 && parsedItems.every((item) => item.calorieMaxKcal !== null);
+    const payload: MealWritePayload = {
+      partnerKey,
+      mealDate: date,
+      mealType,
+      eatenAt: dateTimeWithLocalOffset(date, time),
+      snackPeriod: mealType === "snack" ? snackPeriod ?? "afternoon" : null,
+      status: "confirmed",
+      source: meal?.source ?? "manual",
+      totalCaloriesKcal: allCaloriesKnown ? parsedItems.reduce((sum, item) => sum + (item.caloriesKcal ?? 0), 0) : !calorieDataTouched ? meal?.totalCaloriesKcal ?? null : null,
+      calorieMinKcal: allMinimumsKnown ? parsedItems.reduce((sum, item) => sum + (item.calorieMinKcal ?? 0), 0) : !calorieDataTouched ? meal?.calorieMinKcal ?? null : null,
+      calorieMaxKcal: allMaximumsKnown ? parsedItems.reduce((sum, item) => sum + (item.calorieMaxKcal ?? 0), 0) : !calorieDataTouched ? meal?.calorieMaxKcal ?? null : null,
+      note: note.trim() || null,
+      idempotencyKey: meal?.idempotencyKey ?? null,
+      items: parsedItems,
+    };
     setSaving(true);
     try {
       let saved = meal ? await updateMealRecord(meal.id, payload) : await createMealRecord(payload);
@@ -196,9 +242,9 @@ export function LifeMealEditorPage() {
           </div>
         </section>
 
-        {items.map((item, index) => <section key={item.key} className="life-surface life-section-card life-food-item-editor"><div className="mb-3 flex items-center justify-between"><p className="text-sm font-extrabold text-[var(--life-text)]">食物 {index + 1}</p>{items.length > 1 ? <button type="button" onClick={() => setItems((current) => current.filter((entry) => entry.key !== item.key))} className="text-xs font-bold text-[var(--life-danger)]">移除</button> : null}</div><div className="grid gap-2.5"><AppInput placeholder="食物名称，例如：米饭、鸡胸肉" value={item.rawName} onChange={(event) => updateItem(item.key, { rawName: event.target.value })} /><AppInput placeholder="份量描述（可选）" value={item.portionDescription} onChange={(event) => updateItem(item.key, { portionDescription: event.target.value })} /><div className="grid grid-cols-2 gap-2"><AppInput inputMode="numeric" placeholder="热量 kcal（可选）" value={item.caloriesKcal} onChange={(event) => updateItem(item.key, { caloriesKcal: event.target.value })} /><AppInput inputMode="decimal" placeholder="碳水 g（可选）" value={item.carbsG} onChange={(event) => updateItem(item.key, { carbsG: event.target.value })} /><AppInput inputMode="decimal" placeholder="蛋白质 g（可选）" value={item.proteinG} onChange={(event) => updateItem(item.key, { proteinG: event.target.value })} /><AppInput inputMode="decimal" placeholder="脂肪 g（可选）" value={item.fatG} onChange={(event) => updateItem(item.key, { fatG: event.target.value })} /></div></div></section>)}
+        {items.map((item, index) => <section key={item.key} className="life-surface life-section-card life-food-item-editor"><div className="mb-3 flex items-center justify-between"><p className="text-sm font-extrabold text-[var(--life-text)]">食物 {index + 1}</p>{items.length > 1 ? <button type="button" onClick={() => { setItems((current) => current.filter((entry) => entry.key !== item.key)); setCalorieDataTouched(true); }} className="text-xs font-bold text-[var(--life-danger)]">移除</button> : null}</div><div className="grid gap-2.5"><AppInput placeholder="食物名称，例如：米饭、鸡胸肉" value={item.rawName} onChange={(event) => updateItem(item.key, { rawName: event.target.value }, true)} /><AppInput placeholder="份量描述（可选）" value={item.portionDescription} onChange={(event) => updateItem(item.key, { portionDescription: event.target.value }, true)} /><div className="grid grid-cols-2 gap-2"><AppInput inputMode="decimal" placeholder="估计重量 g（可选）" value={item.estimatedWeightG} onChange={(event) => updateItem(item.key, { estimatedWeightG: event.target.value }, true)} /><AppInput inputMode="numeric" placeholder="热量 kcal（可选）" value={item.caloriesKcal} onChange={(event) => updateItem(item.key, { caloriesKcal: event.target.value }, true)} /><AppInput inputMode="decimal" placeholder="碳水 g（可选）" value={item.carbsG} onChange={(event) => updateItem(item.key, { carbsG: event.target.value })} /><AppInput inputMode="decimal" placeholder="蛋白质 g（可选）" value={item.proteinG} onChange={(event) => updateItem(item.key, { proteinG: event.target.value })} /><AppInput inputMode="decimal" placeholder="脂肪 g（可选）" value={item.fatG} onChange={(event) => updateItem(item.key, { fatG: event.target.value })} /></div></div></section>)}
 
-        <button type="button" onClick={() => setItems((current) => [...current, emptyItem()])} className="rounded-[var(--life-radius-control)] border border-dashed border-[var(--life-mint-strong)] bg-[var(--life-surface-soft)] px-4 py-3 text-sm font-extrabold text-[var(--life-teal-strong)]">＋ 添加食物</button>
+        <button type="button" onClick={() => { setItems((current) => [...current, emptyItem()]); setCalorieDataTouched(true); }} className="rounded-[var(--life-radius-control)] border border-dashed border-[var(--life-mint-strong)] bg-[var(--life-surface-soft)] px-4 py-3 text-sm font-extrabold text-[var(--life-teal-strong)]">＋ 添加食物</button>
         <section className="life-surface life-section-card"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-extrabold text-[var(--life-text)]">补充说明</p><span className="text-xs font-bold text-[var(--life-text-muted)]">{caloriePreview == null ? "热量未完整估算" : `约 ${Math.round(caloriePreview)} kcal`}</span></div><AppTextarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="地点、口味、份量等（可选）" /></section>
         {error ? <div className="rounded-[var(--life-radius-control)] bg-[color:color-mix(in_srgb,var(--life-coral)_16%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">{error}</div> : null}
         <AppButton variant="primary" disabled={saving || loading} onClick={() => void save()}>{saving ? "保存中…" : `保存${title}`}</AppButton>
