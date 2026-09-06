@@ -2,6 +2,7 @@ import { LifeClarificationError } from "@/lib/ai/life-input-normalizer";
 import { compressMealPhoto, MEAL_PHOTO_MAX_INPUT_BYTES } from "@/lib/server/image-compression";
 import type { FixedLifeIdentity } from "@/lib/server/fixed-life-auth";
 import type { LifeMcpAccessIdentity } from "@/lib/server/life-mcp-auth";
+import { createLifeMediaRecovery } from "@/lib/server/life-mcp-media-recovery";
 import {
   executeLifeAgentTool,
   LIFE_AGENT_TOOLS,
@@ -110,8 +111,12 @@ function successResult(value: unknown): ToolResult {
   };
 }
 
-function errorResult(message: string, code: string): ToolResult {
-  const structuredContent = { ok: false, error: message, errorCode: code };
+function errorResult(
+  message: string,
+  code: string,
+  extra: Record<string, unknown> = {},
+): ToolResult {
+  const structuredContent = { ok: false, error: message, errorCode: code, ...extra };
   return {
     content: [{ type: "text", text: JSON.stringify(structuredContent) }],
     structuredContent,
@@ -252,7 +257,7 @@ function mcpToolDefinition(tool: (typeof LIFE_AGENT_TOOLS)[number]): LifeMcpTool
     properties.attachPhoto = {
       type: "boolean",
       description:
-        "meal 是否必须保存本轮原图。只有本次调用实际携带 file 或 media 图片时才能设为 true；如果客户端只给了 [Image]/OCR 文本占位而没有图片字节，不要设 true。",
+        "meal 是否必须保存本轮原图。只有本次调用实际携带 file 或 media 图片时才能直接完成；如果客户端只给了 [Image]/OCR 文本占位而没有图片字节，也可以设为 true，服务端会返回一次性 browser_upload 恢复链接。收到 MEDIA_ATTACHMENT_REQUIRED 后不要重复 create/update，也不要再试 attachPhoto；只把 recovery.uploadUrl 交给用户补传原图。",
     };
     properties.file = FILE_REFERENCE_SCHEMA;
     properties.media = MEDIA_REFERENCE_SCHEMA;
@@ -335,9 +340,29 @@ export async function callLifeMcpTool(
     }
 
     if (name === "life_mutate" && photoRequested(args) && !attachment) {
+      const recoveryArgs = { ...args };
+      delete recoveryArgs.userText;
+      delete recoveryArgs.file;
+      delete recoveryArgs.media;
+      recoveryArgs.attachPhoto = true;
+      const recovery = createLifeMediaRecovery({
+        partnerKey: identity.partnerKey,
+        args: recoveryArgs,
+        userText: latestUserText,
+        toolCallId: options.toolCallId,
+      });
       return errorResult(
-        "用户要求保存本轮图片，但当前 MCP 调用没有提供可绑定的图片字节。不要把本次操作报告为图片已保存；请让客户端提供 file/media，或明确告知用户当前客户端无法透传原图附件。",
+        "用户要求保存本轮图片，但当前 MCP 客户端没有透传原图字节。本次业务写入尚未执行。不要重复 create/update，也不要再次尝试 attachPhoto。请把 recovery.uploadUrl 直接提供给用户；用户在浏览器补传同一张照片后，服务端会使用本次已签名的身份和业务参数继续完成原操作。",
         "MEDIA_ATTACHMENT_REQUIRED",
+        {
+          retryable: false,
+          mutationExecuted: false,
+          recovery: {
+            type: "browser_upload",
+            uploadUrl: recovery.uploadUrl,
+            expiresInSeconds: recovery.expiresInSeconds,
+          },
+        },
       );
     }
 
