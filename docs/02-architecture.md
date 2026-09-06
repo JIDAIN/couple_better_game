@@ -1,269 +1,281 @@
 # 当前架构
 
+状态：2026-09-06 / R11.5。
+
 ## 1. 一句话架构
 
-项目是一个 **Next.js 一体化 Web 应用**：浏览器负责游戏 UI、饮食 UI 和本地游戏运行状态；Vercel API 负责浏览器安全边界；Supabase 负责云端持久化；ChatGPT 在用户明确确认后通过受限 meal RPC 写入餐食。
+Couple Better Game 是一个 Next.js 一体化 Web 应用：
 
 ```text
-Browser
-├─ 游戏 UI / Provider / localStorage game cache
-├─ 饮食 UI / Meal API client
-└─ 同日关联展示（只读）
-       │
-       ▼
-Next.js / Vercel
-├─ API auth
-├─ validation
-└─ Supabase RPC client
-       │
-       ▼
-Supabase PostgreSQL
-
-ChatGPT（明确确认后）
--> authorized Supabase connector
--> service-only ChatGPT meal RPC
--> meals / meal_items
+浏览器 UI
+→ Next.js / Vercel API
+→ canonical domain services / AI Access Core
+→ Supabase PostgreSQL + Private Storage
 ```
 
-## 2. 目录职责
+AI 入口与 Web 入口共享同一个业务事实层，不维护第二套数据库。
 
-### `components/home/`
-
-- 游戏业务 UI；
-- `HomeResourcesProvider`；
-- 游戏状态 / 同步编排。
-
-### `components/nutrition/`
-
-当前主要组件：
-
-```text
-DailyMealsPanel.tsx    饮食列表 + P2.5 同日关联展示
-MealEditorModal.tsx    手动新增 / 编辑餐食
-```
-
-`DailyMealsPanel` 的写入仍只走 Meal API；P2.5 只是**只读**消费 `HomeResourcesProvider.dailyRecords` 以展示同一天游戏快照。
-
-### `components/ui/`
-
-项目 UI adapter / wrapper，优先组合 `App*` 和 `animal-island-ui`，不创建第二套 Button / Card / Modal 视觉体系。
-
-### `lib/home/`
-
-```text
-types.ts                    游戏领域类型
-settlement-rules.ts         游戏纯规则
-daily-record-service.ts     每日记录状态变更
-daily-record-utils.ts       日期 / record 工具
-daily-overview-service.ts   P2.5 date + role 只读选择器
-home-stat-service.ts        钱包 / 周统计 / 回算
-home-state-service.ts       初始化 / 恢复
-app-data-store.ts           snapshot 接口
-local-storage-*             浏览器缓存
-import/export               备份 / CSV / 兼容迁移
-sync-state-service.ts       同步 guard / retry
-```
-
-### `lib/nutrition/`
-
-```text
-meal-service.ts              Meal 类型 / payload 校验
-meal-client.ts               Browser -> `/api/meals`
-chatgpt-meal-protocol.ts     ChatGPT confirmed payload / idempotency
-```
-
-### `lib/server/`
-
-- `cloud-request-auth.ts`
-- `supabase-home-sync.ts`
-- `supabase-nutrition.ts`
-
-### `supabase/migrations/`
-
-保存 production 数据库结构、函数和权限历史。
-
-## 3. 游戏本地与云端数据流
-
-本地：
-
-```text
-Home UI
--> useHomeResources()
--> HomeResourcesProvider action
--> lib/home service / rules
--> AppDataStore
--> localStorage
-```
-
-云端写入：
-
-```text
-HomeResourcesState
--> POST /api/save-data
--> cloud-session guard
--> normalize snapshot
--> replace_home_sync_snapshot RPC
--> Supabase normalized tables
-```
-
-云端读取：
-
-```text
-DataManagement
--> /data/couple-data.json [legacy compatibility URL]
--> proxy.ts
--> /api/home-data
--> export_home_sync_snapshot
--> Supabase
--> compatible snapshot
--> local state / localStorage
-```
-
-`reloadFromGitHub / syncToGitHub / /data/couple-data.json` 只是 legacy 内部名称 / shim，当前真实云端数据源是 Supabase。
-
-## 4. 饮食数据流
+## 2. 主要运行入口
 
 ### Web
 
 ```text
-DailyMealsPanel / MealEditorModal
--> meal-client
--> /api/meals or /api/meals/[id]
--> cloud request auth
--> supabase-nutrition
--> transaction RPC
--> meals + meal_items
+Browser
+→ Next.js API
+→ fixed/session identity
+→ domain service
+→ service-role RPC / Storage
+→ Supabase
 ```
 
-### ChatGPT
+### Harbor ChatGPT Project
 
 ```text
-图片 / 描述 / 估算 / 修正
--> 不写
--> 用户明确“记上”
--> create_chatgpt_meal_record
--> meals + meal_items
--> get_chatgpt_meal_record(same key)
--> 成功后确认
+Harbor Cat / Harbor Fish
+→ Google Drive / Sheet Bridge
+→ COMMAND + Fast Wake
+→ /api/drive-bridge/*
+→ life_query / life_mutate
+→ AI Access Core
+→ Supabase
 ```
 
-当前角色映射：
+### MCP
 
 ```text
-用户自己的饮食聊天 -> cat（猫猫）
-鱼鱼的饮食聊天     -> fish（鱼鱼）
+MCP client
+→ /mcp
+→ life_query / life_mutate
+→ AI Access Core
+→ Supabase
 ```
 
-## 5. P2.5 同日关联架构（已上线）
-
-关联键：
+### 程序内置 AI
 
 ```text
-partnerKey + date
+/life AI UI
+→ /api/ai/chat
+→ Vercel AI Gateway
+→ life-agent-registry
+→ AI Access Core
 ```
 
-当前实现不新增数据库、不新增 API：
+## 3. Source of Truth
+
+正式生活数据事实源始终是 Supabase。
+
+Google Sheet / Drive Bridge 的：
 
 ```text
-DailyMealsPanel
-├─ Meal API
-│  -> meals / meal_items
-│  -> 当天餐数 / 总摄入 / 可用总区间
-│
-└─ useHomeResources().dailyRecords
-   -> selectDailyGameOverview(records, date, role)
-   -> deficit / exercise / game weight snapshot
-        ↓
-LinkedDailySummary AppCard
+COMMANDS
+RECEIPTS
+STATE_*
+META
 ```
 
-行为：
+只是 AI 兼容传输 / 镜像层，不是数据库。
 
-- Meal API 加载成功且有餐食 → 展示总摄入；
-- 所有餐都有 min/max → 展示当天总摄入区间；
-- 无 meals → 摄入显示“未记录”；
-- Meal API 失败 → 摄入显示“暂未加载”，不伪装成 0；
-- 无该日 `DailyRecord` → 游戏侧显示“当天游戏记录未填写”；
-- 有该日 `DailyRecord` → 展示该角色已有 deficit / minutes / weightKg；
-- 不根据 intake 写回 deficit；
-- 不为了 UI 完整自动创建 daily record。
+浏览器 stale cache、Service Worker cache、STATE_* 都属于可重建读模型。
 
-### 已知模型限制
+## 4. 领域边界
 
-旧 `DailyRecord` 没有“某一侧是否主动填写过 0”的 presence 标记。
-
-所以：
+主要 V2 领域：
 
 ```text
-日期无 DailyRecord -> 可以确定整天游戏记录不存在
-日期有 DailyRecord -> 只能展示该角色保存下来的当前值，包括 0
+meal
+weight
+mood
+sleep
+activity
+medicine
+mailbox
+settings
 ```
 
-前端不能可靠推断某个 0 到底是“主动填写 0”还是旧模型在另一角色补录时留下的零值。若未来需要区分，应该新增明确 schema 语义，而不是写启发式判断。
+Legacy Game 保持独立：
 
-## 6. 数据域边界
+```text
+daily_records / daily_record_sides
+wallet / exchange / settlement
+```
+
+核心关系：
 
 ```text
 intake ≠ deficit ≠ weight ≠ exercise
 ```
 
-- intake：`meals / meal_items`
-- deficit：`daily_record_sides.deficit_kcal`
-- weight：真实趋势用 `weight_measurements`，游戏快照用 `daily_record_sides.weight_kg`
-- exercise：`daily_record_sides.exercise_minutes`
+Meal calories 不自动生成 deficit，不自动修改金币、宝石、钱包或 heatmap。
 
-P2.5 只是展示层关联。
+## 5. 饮食数据流
 
-## 7. UI 场景边界
-
-主导航仍固定：
+### Web
 
 ```text
-今日 / 地图 / 兑换 / 小窝
+LifeFoodPage / LifeMealEditorPage
+→ meal-client
+→ /api/meals + /api/meals/:id/photo
+→ auth
+→ supabase-nutrition
+→ canonical RPC / Storage
+→ meals + meal_items
 ```
 
-饮食和 P2.5 都位于 `#today` notice-board 的 `AppSectionPanel「饮食小记」` 内。
-
-“当天合在一起看”使用现有 `AppCard`、`AppRoleAvatar`、文本 token 和圆角层级，不新增视觉 primitive。
-
-## 8. 数据库与安全边界
-
-Web：
+### AI
 
 ```text
-Browser                无 Supabase secret
-Next.js server         持有 server secret
-Supabase tables        RLS enabled
-anon/authenticated     无当前业务 policy
-service role           经 API / RPC 使用
+用户文字 / 图片
+→ AI 先分析并在聊天里给草稿
+→ 用户修改 / 确认
+→ life_mutate
+→ meal adapter
+→ canonical meal service
+→ Supabase
 ```
 
-ChatGPT：
+饮食草稿不是后台对象。服务端不通过确认关键词判断 meal create 是否允许执行。
+
+## 6. 餐前 / 餐后与图片持久化
+
+AI 可以同时利用餐前、餐后多图分析：
 
 ```text
-普通聊天文本           不包含 secret
-authorized connector   用户授权能力
-ChatGPT meal RPC       service-only
-anon/authenticated     无 execute
+实际摄入 = 餐前估计量 - 餐后剩余可食量
 ```
 
-P2.5 没有新增数据库权限面。
+用户文字优先于视觉差分。
 
-## 9. Migration 规则
+当前正式 meal 仍只绑定一张 `photo_path`：
 
-- production schema / function / view / grant / RLS 变化必须新增 migration；
-- 已执行 migration 不回头修改；
-- migration 保存在 `supabase/migrations/`；
-- migration 不等于 production 数据备份。
+```text
+多图参与分析
+→ 默认正式保存餐前图
+→ 餐后图默认只用于估算
+```
 
-## 10. 当前技术债
+用户明确指定时可以改存餐后图。当前不支持同一 meal 永久绑定两张图片。
 
-- Provider 内仍有 GitHub legacy 命名和兼容 URL；
-- cloud-session helper 仍有部分重复；
-- sync metadata/password 仍有旧 localStorage 直接访问；
-- 游戏结算仍不是 server-authoritative；
-- 当前共享 password/session 不是完整用户身份模型；
-- ChatGPT 首版只专门支持新增 meal，已保存餐食更新/删除仍通过 Web UI；
-- `DailyRecord` 缺少每一侧独立 input-presence 语义。
+## 7. 餐食照片架构
 
-这些债务不要在无关功能中顺手重构。
+```text
+原图
+→ EXIF normalize
+→ 600px WebP compression
+→ Private Storage meal-photos
+→ meals.photo_path
+```
+
+R11.5 新增非破坏性显示元数据：
+
+```text
+photo_rotation_degrees
+photo_scale
+```
+
+竖图上传后默认显示旋转 90°；用户可在 UI 左右旋转并调 60%–100% 大小。
+
+真实照片使用 `MealPhotoFrame + object-contain`，留白优先于裁切。
+
+## 8. AI 写入架构
+
+稳定工具：
+
+```text
+life_capabilities
+life_query
+life_mutate
+```
+
+普通已知业务 query/mutate 不先调用 `life_capabilities`。
+
+AI Access Core 负责：
+
+- actor identity；
+- permission；
+- natural-language normalization；
+- canonical resource dispatch；
+- idempotency；
+- media recovery；
+- domain service 调用。
+
+模型负责对话语义和草稿交互，但不能替代服务端权限。
+
+## 9. Harbor Fast Path
+
+普通 Harbor 请求：
+
+```text
+1 COMMAND
+→ 1 Fast Wake
+→ 同 command_id RECEIPT
+→ 回复
+```
+
+真正业务结果只认 RECEIPT，不认 Wake HTTP 200。
+
+同一个正式动作不能因为 processing / timeout 就生成多个 command id。
+
+## 10. 图片恢复路径
+
+MCP / 客户端不能传真实图片字节时：
+
+```text
+life_mutate attachPhoto=true
+→ MEDIA_ATTACHMENT_REQUIRED
+→ recovery.uploadUrl
+→ browser upload
+→ 服务端完成原操作
+```
+
+恢复后仍进入相同 canonical meal/storage 路径。
+
+## 11. 目录职责
+
+### `components/life/`
+
+生活系统页面与 Pattern，包括：
+
+```text
+LifeFoodPage
+LifeMealEditorPage
+MealPhotoFrame
+```
+
+### `lib/nutrition/`
+
+```text
+meal-service.ts
+meal-client.ts
+chatgpt-meal-protocol.ts
+```
+
+### `lib/server/`
+
+```text
+life-agent-registry.ts
+life-agent-executor.ts
+life-ai-gateway.ts
+life-mcp-tools.ts
+supabase-nutrition.ts
+image-compression.ts
+```
+
+### `lib/ai/`
+
+保存自然语言输入规范与 AI 行为 contract，例如 `meal-draft-contract.ts`。
+
+### `supabase/migrations/`
+
+保存生产 schema / RPC / grant 的不可回写历史。
+
+## 12. Migration 与 Production
+
+数据库结构变化必须新增 migration，已执行 migration 不回改。
+
+R11.5：
+
+`20260906160000_add_meal_photo_display_transform.sql`
+
+已在 Production Supabase 执行。
+
+Vercel Git 自动部署保持默认关闭。每次 Production deployment 都必须获得用户当次明确授权，完成后立即恢复 `deploymentEnabled=false`。
