@@ -1,6 +1,6 @@
 # R11 — MCP 主链路接入 AI Access Core
 
-> 状态：开发分支阶段；未部署 Production。
+> 状态：代码已合并 main，CI Test / Lint / Build 全绿；未部署 Production。
 
 ## 目标
 
@@ -21,7 +21,7 @@ Harbor Sheet / Apps Script / Fast Wake 不进入 MCP 主链路。
 
 ## 核验结论
 
-R11 开始前，Production 仓库中已经存在：
+R11 开始前，仓库已经存在：
 
 - `/mcp` JSON-RPC endpoint；
 - OAuth / PKCE / dynamic client registration；
@@ -148,14 +148,54 @@ MCP 不自行定义新的图片业务规则。
 - Harbor 继续作为当前 Plus 环境下的兼容入口；
 - 本阶段不部署 Production。
 
-## 验收计划
+## 代码与 CI 验收
 
-开发分支需要通过：
+PR #73：`R11: route MCP through AI Access Core`
 
-1. MCP source contract tests；
-2. existing AI Access Core tests；
-3. Test / Lint / Build CI；
-4. PR diff review；
-5. Production deployment 之前再次确认 OAuth metadata、tool discovery 和真实 read/write smoke plan。
+合并 commit：
+
+```text
+96cee880a523e5186fc924ffc6b56a7cb376bfde
+```
+
+CI run #395：
+
+- Test ✅
+- Lint ✅
+- Build ✅
+
+第一次 CI build 曾捕获一个 TypeScript union schema typing 问题；修正为先把 tool parameters 归一成 `Record<string, unknown>` 后重新运行，最终三项全绿。
+
+新增测试：
+
+```text
+tests/server/life-mcp-core-adapter-source.test.ts
+```
+
+固定以下边界：
+
+- MCP 必须调用 `life-agent-executor`，不能重新维护第二套业务实现；
+- 公开 contract 为 `life_query / life_mutate`；
+- mutation 必须把当前 `userText` 交给 Core；
+- OAuth read/write scope 和固定身份绑定保留；
+- 图片复用现有 compression/media boundary；
+- clarification 保留结构化问题；
+- JSON-RPC id 进入 Core toolCallId。
+
+## Production 前剩余验收
+
+代码层已经 ready，但还没有对 Production `/mcp` 做真实 smoke test，因为本轮没有获得新的 Production deployment 授权。
+
+Production 部署后需要验证：
+
+1. OAuth protected-resource / authorization metadata；
+2. `initialize`；
+3. `tools/list` 只出现 `life_capabilities / life_query / life_mutate`；
+4. Cat 身份 `life_query` 真实读取；
+5. `life_mutate` clarification；
+6. 真实 create / partial update / delete；
+7. meal file parameter；
+8. Fish 身份隔离；
+9. latency 与 Harbor Drive bridge 对照。
 
 任何 Production deployment 仍需用户当次明确授权。
