@@ -30,6 +30,12 @@ type FileReference = {
   file_name?: string;
 };
 
+type InlineImageReference = {
+  data_base64: string;
+  mime_type: string;
+  file_name?: string;
+};
+
 type CallOptions = {
   toolCallId?: string;
 };
@@ -44,6 +50,29 @@ const FILE_REFERENCE_SCHEMA = {
     file_name: { type: "string" },
   },
   required: ["download_url", "file_id"],
+};
+
+const INLINE_IMAGE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    data_base64: {
+      type: "string",
+      description: "图片原始字节的 base64（不要包含 data: 前缀）",
+    },
+    mime_type: {
+      type: "string",
+      description: "图片 MIME，例如 image/jpeg、image/png、image/webp",
+    },
+    file_name: { type: "string" },
+  },
+  required: ["data_base64", "mime_type"],
+};
+
+const MEDIA_REFERENCE_SCHEMA = {
+  description:
+    "跨 MCP 客户端的图片输入。客户端能读取聊天附件字节时可使用 inline base64；OpenAI/ChatGPT 文件绑定继续优先使用 file。",
+  oneOf: [INLINE_IMAGE_SCHEMA],
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -110,6 +139,11 @@ function isFileReference(value: unknown): value is FileReference {
   return typeof item.download_url === "string" && typeof item.file_id === "string";
 }
 
+function isInlineImageReference(value: unknown): value is InlineImageReference {
+  const item = record(value);
+  return typeof item.data_base64 === "string" && typeof item.mime_type === "string";
+}
+
 function allowedOpenAiFileUrl(value: string) {
   try {
     const url = new URL(value);
@@ -160,9 +194,21 @@ async function downloadProvidedFile(file: FileReference) {
   };
 }
 
-async function prepareAttachment(file: FileReference): Promise<LifeAgentAttachment> {
-  const downloaded = await downloadProvidedFile(file);
-  const compressed = await compressMealPhoto(downloaded.buffer, downloaded.contentType);
+function decodeInlineImage(media: InlineImageReference) {
+  const mimeType = media.mime_type.trim().toLowerCase();
+  if (!mimeType.startsWith("image/")) throw new Error("INVALID_IMAGE_MIME_TYPE");
+  const encoded = media.data_base64.replace(/\s+/g, "");
+  if (!encoded || !/^[a-z0-9+/]*={0,2}$/i.test(encoded) || encoded.length % 4 !== 0) {
+    throw new Error("INVALID_IMAGE_BASE64");
+  }
+  const buffer = Buffer.from(encoded, "base64");
+  if (!buffer.byteLength) throw new Error("INVALID_IMAGE_BASE64");
+  if (buffer.byteLength > MEAL_PHOTO_MAX_INPUT_BYTES) throw new Error("PHOTO_TOO_LARGE");
+  return { buffer, contentType: mimeType };
+}
+
+async function compressAttachment(buffer: Buffer, contentType: string): Promise<LifeAgentAttachment> {
+  const compressed = await compressMealPhoto(buffer, contentType);
   return {
     bytes: compressed.bytes,
     contentType: "image/webp",
@@ -171,6 +217,20 @@ async function prepareAttachment(file: FileReference): Promise<LifeAgentAttachme
     height: compressed.height,
     outputBytes: compressed.outputBytes,
   };
+}
+
+async function prepareFileAttachment(file: FileReference): Promise<LifeAgentAttachment> {
+  const downloaded = await downloadProvidedFile(file);
+  return compressAttachment(downloaded.buffer, downloaded.contentType);
+}
+
+async function prepareInlineAttachment(media: InlineImageReference): Promise<LifeAgentAttachment> {
+  const decoded = decodeInlineImage(media);
+  return compressAttachment(decoded.buffer, decoded.contentType);
+}
+
+function photoRequested(args: Record<string, unknown>) {
+  return args.attachPhoto === true;
 }
 
 function mcpToolDefinition(tool: (typeof LIFE_AGENT_TOOLS)[number]): LifeMcpToolDefinition {
@@ -189,7 +249,13 @@ function mcpToolDefinition(tool: (typeof LIFE_AGENT_TOOLS)[number]): LifeMcpTool
   };
 
   if (name === "life_mutate") {
+    properties.attachPhoto = {
+      type: "boolean",
+      description:
+        "meal 是否必须保存本轮原图。只有本次调用实际携带 file 或 media 图片时才能设为 true；如果客户端只给了 [Image]/OCR 文本占位而没有图片字节，不要设 true。",
+    };
     properties.file = FILE_REFERENCE_SCHEMA;
+    properties.media = MEDIA_REFERENCE_SCHEMA;
   }
 
   const required = Array.isArray(parameters.required)
@@ -251,16 +317,34 @@ export async function callLifeMcpTool(
       return errorResult("life_mutate 必须提供当前用户原始消息 userText", "USER_TEXT_REQUIRED");
     }
 
+    if (args.file != null && args.media != null) {
+      return errorResult("一次调用只能提供一种图片附件来源", "MULTIPLE_MEDIA_INPUTS");
+    }
+
     let attachment: LifeAgentAttachment | null = null;
     if (args.file != null) {
       if (name !== "life_mutate") return errorResult("只有 life_mutate 支持文件附件", "FILE_NOT_ALLOWED");
       if (!isFileReference(args.file)) return errorResult("照片文件引用格式不正确", "INVALID_FILE_REFERENCE");
-      attachment = await prepareAttachment(args.file);
+      attachment = await prepareFileAttachment(args.file);
+    } else if (args.media != null) {
+      if (name !== "life_mutate") return errorResult("只有 life_mutate 支持媒体附件", "MEDIA_NOT_ALLOWED");
+      if (!isInlineImageReference(args.media)) {
+        return errorResult("图片媒体引用格式不正确", "INVALID_MEDIA_REFERENCE");
+      }
+      attachment = await prepareInlineAttachment(args.media);
+    }
+
+    if (name === "life_mutate" && photoRequested(args) && !attachment) {
+      return errorResult(
+        "用户要求保存本轮图片，但当前 MCP 调用没有提供可绑定的图片字节。不要把本次操作报告为图片已保存；请让客户端提供 file/media，或明确告知用户当前客户端无法透传原图附件。",
+        "MEDIA_ATTACHMENT_REQUIRED",
+      );
     }
 
     const forwarded = { ...args };
     delete forwarded.userText;
     delete forwarded.file;
+    delete forwarded.media;
     if (attachment && name === "life_mutate") forwarded.attachPhoto = true;
 
     const value = await executeLifeAgentTool(name, forwarded, {
