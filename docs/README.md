@@ -34,6 +34,7 @@
 | [`45-r11-5-meal-nutrition-photo-display.md`](45-r11-5-meal-nutrition-photo-display.md) | 当前营养字段、照片展示与单图持久化细节 |
 | [`46-harbor-mcp-project-instructions.md`](46-harbor-mcp-project-instructions.md) | Harbor Cat / Fish 当前 MCP Project Instructions |
 | [`47-harbor-instructions-maintenance.md`](47-harbor-instructions-maintenance.md) | Project Instructions 的维护规则 |
+| [`48-life-legacy-game-data-boundary.md`](48-life-legacy-game-data-boundary.md) | Island Life 与旧版“变瘦变美大作战”游戏子项目的数据隔离与维护边界 |
 
 ## 文档事实优先级
 

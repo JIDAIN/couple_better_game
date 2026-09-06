@@ -1,3 +1,5 @@
+import { assertIsolatedLifeImportPayload } from "./life-data-domains";
+
 const DEFAULT_SUPABASE_URL = "https://bfhntnzngozdqsmgfvjk.supabase.co";
 const DEFAULT_SPACE_SLUG = "couple-better-game";
 
@@ -114,6 +116,11 @@ export function restoreLifeBackupSnapshot(snapshotId: string, actor: "cat" | "fi
 }
 
 export function importLifeFullData(payload: Record<string, unknown>, actor: "cat" | "fish") {
+  // The current Island Life product and the archived slimming/beauty game share
+  // one application, but they are separate data domains. A Life import must not
+  // smuggle Legacy Game rows into a generic restore path.
+  assertIsolatedLifeImportPayload(payload);
+
   return callRpc<Record<string, unknown>>("import_life_full_data", {
     p_payload: payload,
     p_created_by: actor,
