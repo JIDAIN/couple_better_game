@@ -93,17 +93,20 @@ function normalizeAction(resource: string, value: unknown, id: unknown) {
 function normalizeResource(value: unknown, mode: "query" | "mutate") {
   const raw = text(value).toLowerCase();
   const common: Record<string, string> = {
-    心情: mode === "query" ? "day" : "mood",
-    情绪: mode === "query" ? "day" : "mood",
-    睡眠: mode === "query" ? "day" : "sleep",
-    活动: mode === "query" ? "day" : "activity",
+    心情: "mood",
+    情绪: "mood",
+    睡眠: "sleep",
+    活动: "activity",
     三餐: "meal", 餐食: "meal", 饮食: "meal", 吃饭: "meal",
     体重: "weight",
     药箱: "medicine", 药品: "medicine", 药物: "medicine",
     信箱: "mailbox", 小信箱: "mailbox", 信件: "mailbox",
     设置: "settings",
+    今日: "day", 日汇总: "day", 生活记录: "day",
   };
-  return common[raw] || raw;
+  const normalized = common[raw] || raw;
+  if (mode === "mutate" && normalized === "day") return raw;
+  return normalized;
 }
 
 function parseNumber(value: unknown) {
@@ -200,7 +203,7 @@ export function normalizeLifeQueryArgs(args: unknown, context: NormalizeContext)
   const resource = normalizeResource(row.resource, "query");
   const now = context.now || new Date();
   const out: JsonRecord = { ...row, resource };
-  if (resource === "day" || resource === "meal") {
+  if (["day", "mood", "sleep", "activity", "meal"].includes(resource)) {
     out.date = inferDate(first(row, ["date", "mealDate", "moodDate", "sleepDate", "activityDate"]), context.latestUserText, now);
   }
   if (resource === "month") {
@@ -209,8 +212,20 @@ export function normalizeLifeQueryArgs(args: unknown, context: NormalizeContext)
       ? explicit
       : `${dateInShanghai(now).slice(0, 7)}-01`;
   }
-  if (resource === "meal") out.person = normalizePerson(first(row, ["person", "owner", "who"]), true);
-  if (resource === "weight") out.person = normalizePerson(first(row, ["person", "owner", "who"]), false);
+  if (["day", "mood", "sleep", "activity", "meal"].includes(resource)) {
+    out.person = normalizePerson(first(row, ["person", "owner", "who"]), true);
+  }
+  if (resource === "weight") {
+    out.person = normalizePerson(first(row, ["person", "owner", "who"]), false);
+    const explicitDate = text(first(row, ["date", "measurementDate"]));
+    if (explicitDate || /今天|昨天|昨日|前天/.test(context.latestUserText)) {
+      out.date = inferDate(explicitDate, context.latestUserText, now);
+    }
+    const dateFrom = text(first(row, ["dateFrom", "from", "startDate"]));
+    const dateTo = text(first(row, ["dateTo", "to", "endDate"]));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) out.dateFrom = dateFrom;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) out.dateTo = dateTo;
+  }
   if (resource === "medicine") {
     const name = text(first(row, ["name", "query", "keyword", "medicineName", "drugName"]));
     if (name) out.name = name;
@@ -268,9 +283,11 @@ export function normalizeLifeMutationArgs(args: unknown, context: NormalizeConte
     data.text = text(first(sourceData, ["text", "name", "title", "description", "content", "activity"])) || data.text;
     if (!text(data.text)) throw new LifeClarificationError("想记录什么活动？", ["activity"]);
     const scopeRaw = text(first(sourceData, ["participantScope", "person", "who", "participants"])).toLowerCase();
-    if (["me", "我", "自己", "本人"].includes(scopeRaw)) data.participantScope = context.actor;
-    else if (["ta", "她", "他", "对象", "伴侣"].includes(scopeRaw)) data.participantScope = context.actor === "cat" ? "fish" : "cat";
-    else if (["all", "both", "双方", "我们", "一起", "两个人"].includes(scopeRaw) || !scopeRaw) data.participantScope = "both";
+    if (!scopeRaw || ["me", "我", "自己", "本人"].includes(scopeRaw)) data.participantScope = context.actor;
+    else if (["all", "both", "双方", "我们", "一起", "两个人"].includes(scopeRaw)) data.participantScope = "both";
+    else if (["ta", "她", "他", "对象", "伴侣"].includes(scopeRaw) || scopeRaw === (context.actor === "cat" ? "fish" : "cat")) {
+      throw new Error("个人活动不能以当前账号替 Ta 写入；共同活动请明确使用 both/我们");
+    }
     const duration = parseDurationMinutes(first(sourceData, ["durationMinutes", "duration", "minutes", "timeSpent"]));
     if (duration !== undefined) data.durationMinutes = duration;
   }
