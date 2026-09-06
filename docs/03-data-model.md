@@ -1,5 +1,7 @@
 # 数据模型与 Source of Truth
 
+状态：2026-09-06。
+
 ## 1. 核心原则
 
 ```text
@@ -9,13 +11,11 @@
 UI 可以很轻，数据结构不能贫瘠
 ```
 
-当前项目同时存在 legacy game 和新 V2 life system。二者可以按日期展示在一起，但不混成同一个事实字段。
+Supabase 是正式生活数据 Source of Truth。Legacy Game 和 V2 Life 可以按日期一起展示，但不能混成同一个事实字段。
 
-## 2. 领域划分
+## 2. 主要事实域
 
-### 2.1 饮食摄入
-
-真相源：
+### 饮食摄入
 
 ```text
 meals
@@ -24,9 +24,27 @@ meal_items
 
 可选知识层：`foods / food_aliases`。
 
-### 2.2 Legacy Game
+### 真实体重
 
-真相源：
+```text
+weight_measurements
+```
+
+与旧游戏 `daily_record_sides.weight_kg` 不是同一事实。
+
+### 心情 / 睡眠 / 活动
+
+```text
+mood_entries
+sleep_records
+activity_entries
+```
+
+### 药箱 / 信箱 / 设置
+
+各自保持独立 domain，不塞入一个通用 life 大表。
+
+### Legacy Game
 
 ```text
 daily_records
@@ -35,45 +53,112 @@ exchange_records
 wallet_ledger
 ```
 
-`daily_record_sides.deficit_kcal / exercise_minutes / weight_kg` 仍属于旧游戏语义。
+其中 deficit / 游戏运动 / 游戏体重快照继续属于旧游戏语义。
 
-### 2.3 真实体重
+## 3. `meals`
 
-真相源：
-
-```text
-weight_measurements
-```
-
-它与旧游戏 `daily_record_sides.weight_kg` 不是同一个事实。
-
-### 2.4 V2 Life
-
-V2-P1 新事实域：
+当前核心字段：
 
 ```text
-mood_entries
-sleep_records
-activity_entries
+id
+couple_space_id
+partner_key
+meal_date
+meal_type
+eaten_at
+snack_period
+status
+source
+total_calories_kcal nullable
+calorie_min_kcal nullable
+calorie_max_kcal nullable
+note
+idempotency_key nullable
+photo_path nullable
+photo_rotation_degrees
+photo_scale
+created_at
+updated_at
+deleted_at
 ```
 
-首页未来只消费这三个轻量领域。
+### 热量语义
 
-### 2.5 Future Medicine
+当前 Production 已允许 kcal 为 nullable：
 
-家庭药箱将是独立 domain，不塞进 life entry 大表。最终 schema 等真实 Excel 字段确认后建立。
+```text
+NULL = 未估算 / 不知道
+0    = 确实为 0 kcal
+```
 
-## 3. `mood_entries`
+禁止把 unknown 自动写成 0。
+
+### 照片显示字段
+
+R11.5 新增：
+
+```text
+photo_rotation_degrees smallint  0 / 90 / 180 / 270
+photo_scale            numeric   0.60 .. 1.00
+```
+
+这两个字段是显示元数据，不表示图片像素已经被再次旋转或缩放编码。
+
+当前正式 meal 仍只有一个 `photo_path`，即每顿只绑定 1 张正式展示图。
+
+## 4. `meal_items`
+
+```text
+id
+meal_id
+food_id nullable
+raw_name
+display_name
+portion_description nullable
+estimated_weight_g nullable
+calories_kcal nullable
+calorie_min_kcal nullable
+calorie_max_kcal nullable
+protein_g nullable
+carbs_g nullable
+fat_g nullable
+sort_order
+created_at
+updated_at
+```
+
+AI 记录时在能合理判断的情况下应尽量一次补全实际摄入量、重量和宏量营养，但数据库不会为了“完整”强制未知字段非空。
+
+手动编辑已有 AI meal 时，必须 round-trip 保留已有 `food_id / display_name / estimated_weight_g / calorie range / macros`，除非用户实际修改相关食物或营养字段。
+
+## 5. 单图持久化 vs 多图分析
+
+聊天层可以同时分析餐前 / 餐后多张图片，但当前持久化模型为：
+
+```text
+meal -> one photo_path
+```
+
+所以：
+
+- 多图可以共同参与“实际摄入”推断；
+- 默认正式保存餐前图；
+- 餐后图默认只作为差分依据；
+- 用户指定保存餐后图时覆盖默认；
+- 当前没有 `before_photo_path / after_photo_path`；
+- 如果未来要永久保存多张图，应新增独立附件表，而不是继续向 `meals` 加第二、第三个 path 字段。
+
+## 6. `mood_entries`
 
 一天每个角色一条当前心情：
 
 ```text
 id
 couple_space_id
-partner_key       fish / cat
+partner_key
 mood_date
-mood_key          happy / calm / neutral / anxious / sad / angry / tired
-source            manual / chatgpt / import
+mood_key
+source
 created_at
 updated_at
 ```
@@ -84,13 +169,7 @@ updated_at
 couple_space_id + partner_key + mood_date
 ```
 
-不保存 `mood_score`。心情 key 是分类事实，不存在“开心分数更高”。
-
-这个结构可以直接支持后续小窝中的月度双人心情日历。
-
-## 4. `sleep_records`
-
-一天每个角色一条简单睡眠记录：
+## 7. `sleep_records`
 
 ```text
 id
@@ -106,17 +185,9 @@ updated_at
 
 约束：`woke_at > fell_asleep_at`。
 
-睡眠时长是派生值：
+睡眠时长为派生值，不额外保存评分。
 
-```text
-woke_at - fell_asleep_at
-```
-
-数据库不保存“睡眠评分 / 达标 / 早睡成功”。
-
-## 5. `activity_entries`
-
-活动是一对多事件流：
+## 8. `activity_entries`
 
 ```text
 id
@@ -124,7 +195,7 @@ couple_space_id
 activity_date
 occurred_at nullable
 text
-participant_scope   both / fish / cat
+participant_scope
 activity_type nullable
 duration_minutes nullable
 source
@@ -133,89 +204,9 @@ updated_at
 deleted_at
 ```
 
-产品首版只要求用户写一句 `text`；`participant_scope` 默认 `both`。
+活动是一对多事件流，删除使用 soft delete。
 
-`activity_type / duration_minutes / occurred_at` 是可选结构化字段，未来 AI 在事实明确时可以补充，但 UI 不强迫用户选择“学习 / 运动 / 散步”等分类。
-
-删除活动使用 soft delete。
-
-## 6. `record_write_receipts`
-
-V2-P1 新增跨领域外部写入回执：
-
-```text
-id
-couple_space_id
-source            chatgpt / import
-domain            meal / mood / sleep / activity / weight / medicine
-idempotency_key
-entity_id
-created_at
-```
-
-唯一键：
-
-```text
-couple_space_id + idempotency_key
-```
-
-它不是生活事实，而是写入控制事实，解决两个问题：
-
-1. ChatGPT / import 重试需要稳定幂等；
-2. 实体后来被手动编辑后，不能因为实体自身 idempotency 字段被覆盖而忘记“某次外部写入已经执行过”。
-
-当前 meal 已经有自己的 `meals.idempotency_key`，暂时不强行迁移。未来新的 AI domain 优先复用 receipt 模式。
-
-`entity_id` 不设跨表 FK，因为它可能指向不同 domain 的实体；domain-specific service 负责解释。
-
-## 7. 营养表
-
-### `meals`
-
-```text
-partner_key
-meal_date
-meal_type
-eaten_at
-snack_period
-status
-source
-total_calories_kcal
-calorie_min_kcal
-calorie_max_kcal
-note
-idempotency_key
-deleted_at
-```
-
-### `meal_items`
-
-```text
-meal_id
-food_id nullable
-raw_name
-display_name
-portion_description
-estimated_weight_g
-calories_kcal
-calorie_min_kcal
-calorie_max_kcal
-protein_g
-carbs_g
-fat_g
-sort_order
-```
-
-当前 production kcal 仍为必填。后续单独 migration 改为 nullable，必须保持：
-
-```text
-NULL = 未估算
-0 = 确实为 0 kcal
-```
-
-## 8. 体重表
-
-### `weight_measurements`
+## 9. `weight_measurements`
 
 ```text
 partner_key
@@ -229,65 +220,38 @@ linked_daily_record_side_id nullable
 idempotency_key nullable
 ```
 
-未来 AI 记体重必须写这里，不自动覆盖旧游戏体重快照。
+AI 记体重写这里，不自动覆盖旧游戏体重快照。
 
-## 9. 游戏核心表
+## 10. 外部写入与 Bridge ledger
 
-继续保留：
+跨域 AI / import 写入使用稳定幂等边界；Harbor Bridge 额外使用：
 
 ```text
-couple_spaces
-partner_profiles
-app_configs
-daily_records
-daily_record_sides
-exchange_categories
-exchange_records
-wallets
-wallet_ledger
+life_drive_bridge_commands
 ```
 
-兑换机制、金币宝石和历史数据都继续属于 legacy game module。
+按 `(actor, command_id)` 防止同一身份重复执行正式命令。
 
-## 10. Views
+`record_write_receipts` 仍可用于部分外部写入回执语义。
 
-production 当前已有：
+这些表不是生活事实本身，而是写入控制事实。
 
-```text
-daily_nutrition_summary
-daily_weight_summary
-partner_daily_overview
-```
+## 11. 主要 Meal RPC
 
-V2-P1 的 Life 日读取先使用 `get_life_day` RPC，不急着增加额外 view。
-
-## 11. RPC
-
-### Existing Game / Nutrition
+当前 Meal 相关 canonical RPC 包括：
 
 ```text
-export_home_sync_snapshot
-replace_home_sync_snapshot
 list_meals
 create_meal_record
 update_meal_record
 delete_meal_record
 create_chatgpt_meal_record
 get_chatgpt_meal_record
+replace_meal_photo_state
+update_meal_photo_display
 ```
 
-### V2 Life
-
-```text
-get_life_day
-upsert_mood_record
-upsert_sleep_record
-create_activity_record
-update_activity_record
-delete_activity_record
-```
-
-Life RPC 和私有 JSON helper 均只开放给 service-role 路径，不授权 `anon / authenticated`。
+R11.5 的照片函数只授权 service-role 路径。
 
 ## 12. Source / AI 写入
 
@@ -299,61 +263,53 @@ chatgpt
 import
 ```
 
-AI 写入 domain 统一预留：
+AI 入口不获得任意 SQL。
+
+通用 AI Access Core 负责：
 
 ```text
-meal
-mood
-sleep
-activity
-weight
-medicine
+identity / permission
+natural-language normalization
+idempotency
+media boundary
+canonical domain dispatch
 ```
 
-通用层只负责：
+各 domain service 负责具体字段验证与业务规则。
 
-```text
-source
-idempotency key
-confirmation boundary
-write receipt
-```
-
-具体字段验证仍由各 domain service 负责。不存在一个可以任意修改所有表的“AI 数据表”或“AI SQL API”。
+饮食“先草稿、后确认”属于 AI 对话层规则，不对应数据库 draft 表，也不由数据层匹配确认关键词。
 
 ## 13. Fact vs Derived
 
-### 事实
+事实：
 
-- daily record 原始游戏输入；
-- exchange history；
 - meal / meal item；
 - weight measurement；
-- mood entry；
-- sleep record；
-- activity entry；
+- mood / sleep / activity；
+- medicine / mailbox 事实；
+- daily record 原始游戏输入；
+- exchange history；
 - wallet ledger 事件；
-- external write receipt。
+- 外部写入控制记录。
 
-### 派生 / 快照
+派生 / 快照：
 
 - wallet current balance；
-- heatmap overrides；
-- week totals / streak；
-- today / yesterday 游戏奖励汇总；
+- heatmap / week totals / streak；
 - nutrition / weight daily summary；
 - sleep duration；
-- 月度心情展示。
+- 月度心情展示；
+- UI stale cache / STATE_* 镜像。
 
-## 14. 权限与迁移
+## 14. Migration 规则
 
-所有新表：
+- production schema / function / view / grant / RLS 变化必须新增 migration；
+- 已执行 migration 不回改；
+- migration 保存在 `supabase/migrations/`；
+- migration 不等于真实数据备份。
 
-- RLS enabled；
-- `anon / authenticated` 不直接获得表权限；
-- Browser 必须经过 Next.js API；
-- service-role 才能执行 canonical RPC；
-- 新 DDL 必须新增 migration；
-- 已执行历史 migration 不回改。
+R11.5 migration：
 
-V2-P1 schema 对现有 production 表是 additive，不修改旧游戏和现有 meal/weight 数据。
+`supabase/migrations/20260906160000_add_meal_photo_display_transform.sql`
+
+已在 Production Supabase 执行成功。
