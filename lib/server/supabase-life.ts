@@ -136,6 +136,19 @@ export async function upsertMood(payload: MoodWritePayload) {
   return withMoodLabel(mood);
 }
 
+export async function deleteMood(moodId: string, partnerKey: "cat" | "fish") {
+  const mood = await callRpc<MoodRecord>(
+    "delete_mood_record",
+    {
+      p_mood_id: moodId,
+      p_partner_key: partnerKey,
+      p_space_slug: coupleSpaceSlug(),
+    },
+    "write",
+  );
+  return withMoodLabel(mood);
+}
+
 export async function upsertSleep(payload: SleepWritePayload) {
   return callRpc<SleepRecord>(
     "upsert_sleep_record",
