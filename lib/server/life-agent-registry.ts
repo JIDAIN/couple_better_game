@@ -48,11 +48,11 @@ import {
   updateWeight,
 } from "./supabase-weight";
 import {
-  createMailboxLetter,
-  deleteMailboxLetter,
-  getMailboxSender,
-  listMailboxLetters,
-  updateMailboxLetter,
+  createMailboxItem,
+  deleteMailboxDraft,
+  listMailboxItems,
+  sendMailboxDraft,
+  updateMailboxDraft,
 } from "./supabase-mailbox";
 import { getLifeExport, getLifeSettings, updateLifeSettings } from "./life-data-management";
 import { loadHomeSyncSnapshot, saveHomeSyncSnapshot } from "./supabase-home-sync";
@@ -225,7 +225,7 @@ export const LIFE_AGENT_TOOLS = [
         properties: {
           resource: {
             type: "string",
-            description: "day/mood/sleep/activity/month/meal/weight/medicine/mailbox/settings/life_export/legacy_home；也接受对应中文别名。",
+            description: "day/mood/sleep/activity/month/meal/weight/medicine/mailbox/settings/life_export/legacy_home；也接受对应中文别名。mailbox 返回当前账号可见的收信、已寄出和自己的待寄出草稿。",
           },
           date: { type: "string", description: "可选 YYYY-MM-DD；day/mood/sleep/activity/meal 默认今天；weight 有 date 时只返回该日" },
           dateFrom: { type: "string", description: "weight 可选起始日期 YYYY-MM-DD" },
@@ -244,7 +244,7 @@ export const LIFE_AGENT_TOOLS = [
     type: "function",
     function: {
       name: "life_mutate",
-      description: "新增、修改或删除生活记录。个人资源只能写当前 OAuth 账号；共同活动使用 participantScope=both。AI Access Core 会归一化常见别名并对短时间网络重试做幂等保护。",
+      description: "新增、修改或删除生活记录。个人资源只能写当前 OAuth 账号；共同活动使用 participantScope=both。mailbox：用户只是让你写/起草时 create + data.status=draft；只有用户明确要求寄出/发送时才使用 data.status=sent。已有草稿可 update；要寄出已有草稿时 update 同一 id 并把 data.status 设为 sent。sent 一旦寄出永久只读，不能 update/delete。AI Access Core 会归一化常见别名并对短时间网络重试做幂等保护。",
       parameters: {
         type: "object",
         properties: {
@@ -252,12 +252,12 @@ export const LIFE_AGENT_TOOLS = [
             type: "string",
             description: "mood/sleep/activity/meal/weight/medicine/mailbox/settings/legacy_home；也接受对应中文别名。",
           },
-          action: { type: "string", description: "可选。记录/新增=create，修改=update，删除=delete；mood/sleep 默认 upsert，settings 默认 update。" },
+          action: { type: "string", description: "可选。记录/新增=create，修改=update，删除=delete；mood/sleep 默认 upsert，settings 默认 update。mailbox 寄出已有草稿使用 update + data.status=sent。" },
           id: { type: "string", description: "update/delete 的记录 UUID；禁止猜测，不知道时先查询" },
           attachPhoto: { type: "boolean", description: "meal 是否绑定本轮图片" },
           data: {
             type: "object",
-            description: "自然业务字段。活动：participantScope=me 表示本人，both 表示双方共同活动；不要用 ta 创建个人活动。",
+            description: "自然业务字段。活动：participantScope=me 表示本人，both 表示双方共同活动；不要用 ta 创建个人活动。mailbox：status=draft/sent；draft 只有当前账号可见可编辑，sent 寄出后双方可见且不可编辑。",
             additionalProperties: true,
           },
         },
@@ -283,6 +283,7 @@ function capabilities(identity: FixedLifeIdentity) {
         "未给 person 时默认 me；day/mood/sleep/activity/meal 可显式 all",
         "medicine 新增未给数量时默认 1",
         "meal 的 name/foodName/rawName 都会归一为 rawName",
+        "mailbox 未明确要求发送时优先保存为 draft；只有明确寄出/发送才使用 sent",
       ],
     },
     query: {
@@ -294,7 +295,7 @@ function capabilities(identity: FixedLifeIdentity) {
       meal: "按日期与 me/ta/all 查询餐食；日期默认今天",
       weight: "按 me/ta 查询体重；支持 date/dateFrom/dateTo/limit",
       medicine: "家庭药箱，可按药名/关键词过滤",
-      mailbox: "小信箱，可用 limit 取最近 N 封",
+      mailbox: "当前账号可见的小信箱：自己的 draft + 双方相关的 sent；可用 limit 取最近 N 条",
       settings: "周年日、当前两人的目标体重",
       life_export: "V2 生活数据完整导出",
       legacy_home: "旧 /game 完整同步快照",
@@ -306,7 +307,7 @@ function capabilities(identity: FixedLifeIdentity) {
       meal: "create/update/delete；只写当前 OAuth 账号；可 attachPhoto",
       weight: "create/update/delete；只写当前 OAuth 账号；缺体重数值时向用户确认",
       medicine: "create/update/delete；medicineName/drugName/name 均可；数量缺省为 1",
-      mailbox: "create/update/delete；body/content/text/message 均可；发件人/收件人由服务端固定",
+      mailbox: "create draft/sent；update/delete 仅限自己的 draft；update draft + status=sent 表示寄出；sent 永久只读",
       settings: "update；支持 anniversary/anniversaryDate、targetWeight/targetWeightKg",
       legacy_home: "replace；仍要求用户当前消息明确包含“确认覆盖游戏数据”",
     },
@@ -314,6 +315,7 @@ function capabilities(identity: FixedLifeIdentity) {
       "没有任意 SQL 或任意 URL 工具",
       "删除只在用户当前消息明确要求删除时执行",
       "个人数据写入显式指定 Ta 会被服务端拒绝",
+      "mailbox draft 只对寄件人可见；sent 一旦寄出服务端拒绝修改和删除",
       "短时间内相同 activity/meal create 的网络重试使用语义幂等键去重",
       "update/delete 的记录 ID 不允许自动猜测",
     ],
@@ -367,7 +369,7 @@ async function queryLife(args: JsonRecord, context: LifeAgentExecutionContext) {
       return name ? medicines.filter((item) => item.name.toLowerCase().includes(name)) : medicines;
     }
     case "mailbox": {
-      const rows = await listMailboxLetters();
+      const rows = await listMailboxItems(context.identity.partnerKey);
       const limit = Math.max(1, Math.min(1000, Number(args.limit ?? rows.length) || rows.length));
       return rows.slice(0, limit);
     }
@@ -420,7 +422,7 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
       return upsertSleep(parsed.value);
     }
     case "activity": {
-      if (action === "delete") return deleteActivity(requireId(args));
+      if (action === "delete") return deleteActivity(requireId(args), actor);
       if (action !== "create" && action !== "update") throw new Error("activity 只支持 create/update/delete");
       const date = stringValue(data.activityDate);
       const parsed = parseActivityWritePayload({
@@ -429,7 +431,9 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
         idempotencyKey: idempotencyKey("activity", context, date, data, action === "create"),
       });
       if (!parsed.ok) throw new Error(parsed.reason);
-      return action === "create" ? createActivity(parsed.value) : updateActivity(requireId(args), parsed.value);
+      return action === "create"
+        ? createActivity(parsed.value, actor)
+        : updateActivity(requireId(args), parsed.value, actor);
     }
     case "meal": {
       requireOwnMutationTarget(args, data, context);
@@ -470,7 +474,7 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
         const id = requireId(args);
         const ownRows = await listWeights(actor, 1000);
         if (!ownRows.some((row) => row.id === id)) throw new Error("只能删除当前账号自己的体重记录");
-        return deleteWeight(id);
+        return deleteWeight(id, actor);
       }
       if (action !== "create" && action !== "update") throw new Error("weight 只支持 create/update/delete");
       const parsed = parseWeightWritePayload({ ...data, partnerKey: actor });
@@ -479,9 +483,9 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
         const id = requireId(args);
         const ownRows = await listWeights(actor, 1000);
         if (!ownRows.some((row) => row.id === id)) throw new Error("只能修改当前账号自己的体重记录");
-        return updateWeight(id, parsed.value);
+        return updateWeight(id, parsed.value, actor);
       }
-      return createWeight(parsed.value);
+      return createWeight(parsed.value, actor);
     }
     case "medicine": {
       if (action === "delete") return deleteMedicine(requireId(args));
@@ -492,19 +496,33 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
     }
     case "mailbox": {
       if (action === "delete") {
-        const id = requireId(args);
-        if ((await getMailboxSender(id)) !== actor) throw new Error("只能删除当前账号自己发出的信");
-        return deleteMailboxLetter(id);
+        return deleteMailboxDraft(actor, requireId(args));
       }
-      if (action !== "create" && action !== "update") throw new Error("mailbox 只支持 create/update/delete");
-      const parsed = parseMailboxPayload({ ...data, senderKey: actor, recipientKey: ta });
+      if (action !== "create" && action !== "update") {
+        throw new Error("mailbox 只支持 create/update/delete；寄出已有草稿使用 update + status=sent");
+      }
+
+      const statusRaw = stringValue(data.status).toLowerCase();
+      const status = statusRaw === "sent" ? "sent" : "draft";
+      const parsed = parseMailboxPayload({
+        ...data,
+        senderKey: actor,
+        recipientKey: ta,
+        status,
+        sentAt: null,
+      });
       if (!parsed.ok) throw new Error(parsed.reason);
-      if (action === "update") {
-        const id = requireId(args);
-        if ((await getMailboxSender(id)) !== actor) throw new Error("只能修改当前账号自己发出的信");
-        return updateMailboxLetter(id, parsed.value);
+
+      if (action === "create") {
+        return createMailboxItem(actor, parsed.value, status, "chatgpt");
       }
-      return createMailboxLetter(parsed.value);
+
+      const id = requireId(args);
+      if (status === "sent") {
+        await updateMailboxDraft(actor, id, parsed.value, "chatgpt");
+        return sendMailboxDraft(actor, id, "chatgpt");
+      }
+      return updateMailboxDraft(actor, id, parsed.value, "chatgpt");
     }
     case "settings": {
       if (action !== "update") throw new Error("settings 只支持 update");
