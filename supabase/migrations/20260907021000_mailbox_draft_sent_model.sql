@@ -11,10 +11,8 @@ alter table public.mailbox_letters
   alter column sent_at drop not null;
 
 update public.mailbox_letters
-set status = 'sent',
-    sent_at = coalesce(sent_at, created_at)
-where status is distinct from 'sent'
-   or sent_at is null;
+set sent_at = coalesce(sent_at, created_at)
+where status = 'sent' and sent_at is null;
 
 create index if not exists mailbox_letters_space_sender_status_idx
   on public.mailbox_letters(couple_space_id, sender_key, status, updated_at desc)
