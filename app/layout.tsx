@@ -12,6 +12,7 @@ import "./r8-2-ui-calibration.css";
 import "./r8-2-mailbox.css";
 import "./r8-3-visual-polish.css";
 import "./r8-3-hotfix.css";
+import "./mailbox-visual-closeout.css";
 
 export const metadata: Metadata = {
   applicationName: "岛屿生活",
