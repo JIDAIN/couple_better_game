@@ -41,16 +41,19 @@ describe("relative me / Ta identity", () => {
     expect(me).not.toContain("router.refresh()");
   });
 
-  it("uses larger unframed moods and filtered mailbox previews", () => {
+  it("uses larger unframed moods and actor-filtered three-box mailbox previews", () => {
     const today = source("components/life/today/TodayMoodCard.tsx");
     const mailbox = source("components/life/LifeMailboxPage.tsx");
     const css = source("app/island-life-refactor.css");
     expect(today).toContain('className="life-person-state-orb"');
     expect(css).toContain(".life-person-state-orb { width: 5.4rem; height: 5.4rem;");
     expect(css).toContain(".life-calendar-mood { width: 2.35rem; height: 2.35rem;");
+    expect(mailbox).toContain('type Tab = "inbox" | "sent" | "draft"');
     expect(mailbox).toContain('value === "all" ? "所有"');
     expect(mailbox).toContain("life-letter-preview");
-    expect(mailbox).toContain('month === "all" || monthKey(letter.sentAt) === month');
+    expect(mailbox).toContain('monthKey(item.sentAt) === month');
+    expect(mailbox).toContain('item.status === "draft" && item.senderKey === mePartnerKey');
+    expect(mailbox).toContain('item.status === "sent" && item.recipientKey === mePartnerKey');
   });
 
   it("uses relative identity on key life pages", () => {
