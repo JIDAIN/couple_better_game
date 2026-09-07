@@ -22,10 +22,13 @@ ChatGPT MCP 临时文件直传                   ✅ Production / 已验收
 R11.5 AI 饮食草稿软确认                    ✅ Production
 R11.5 营养字段完整化                       ✅ Production
 R11.5 照片旋转 / 大小 / 无裁切显示          ✅ Production
-提醒中心 / Reminder Engine                ✅ Production
+提醒中心 / Reminder Engine 核心            ✅ Production
+Reminder Center V1 数据层收尾              ✅ Supabase
+Reminder Center V1 UI 收尾                🟡 GitHub main，待下一次授权部署
 PushPlus Cat                              ✅ 已绑定 / 实机自动提醒验收通过
 PushPlus Fish                             ⏳ 待绑定
-药箱自动到期提醒                           ✅ Supabase / Reminder Engine
+药箱自动到期提醒                           ✅ Reminder Engine
+纪念日提醒进入 Reminder Center             ✅ Supabase
 mood delete RPC                           ✅ Supabase
 mood delete Web/API/MCP                   🟡 GitHub 已完成，待下一次授权部署
 ```
@@ -70,8 +73,6 @@ Supabase
 
 Supabase 是正式生活数据事实源。
 
-旧 `/api/drive-bridge/*` 已从 Production 删除，不再属于可用 AI 入口。
-
 ## 4. Harbor MCP 已完成验收
 
 ```text
@@ -103,16 +104,27 @@ life_reminder_rules / life_reminder_instances
 Cat / Fish
 ```
 
-现有能力：
+V1 当前能力：
 
 ```text
 自定义提醒                               ✅
-完成 / 忽略 / 稍后提醒                   ✅
-药箱 30 / 7 / 1 / 0 天到期提醒           ✅
-PushPlus 云端 5 分钟调度                  ✅
+完成 / 忽略 / 1 小时后                  ✅
+药箱到期提醒                             ✅
+药箱提醒开关 / 提前天数                  ✅ Supabase + GitHub UI
+纪念日提醒进入 Reminder Center           ✅
+首页最近 3 条提醒                        🟡 GitHub main，待部署
+今天 / 即将到来 / 已完成                🟡 GitHub main，待部署
+PushPlus 状态整合到提醒设置              🟡 GitHub main，待部署
+PushPlus 云端 5 分钟调度                 ✅
 Cat 微信自动提醒                         ✅ 实机验收
 Fish 微信自动提醒                        ⏳ 待绑定验收
 ```
+
+额外修正：已修复“提醒成功推送后再点稍后提醒不会再次推送”的问题。snooze 现在会重置 `notified_at`，并按新的 effective due time 生成新的 delivery dedupe key。
+
+每日未记录提醒继续作为低噪音 system nudge 即时判断，不进入长期 Reminder Center 列表。
+
+提醒完整说明见 `docs/14-wechat-reminders.md`。
 
 ## 6. 饮食交互
 
@@ -171,7 +183,9 @@ target: production
 source commit: 9f306e93a6a524eb7a2735829367f63b3a9b62eb
 ```
 
-提醒中心 `/me/reminders` 已在该 Production 验证 200 正常。
+该 Production 已包含 Reminder Center 初版并验证 `/me/reminders` 200 正常。
+
+2026-09-07 后续 reminder V1 UI closeout、mood delete Web/API/MCP 仍只在 GitHub `main`，尚未获得新的 Production 部署授权。
 
 当前 `vercel.json` 保持：
 
@@ -183,7 +197,24 @@ source commit: 9f306e93a6a524eb7a2735829367f63b3a9b62eb
 }
 ```
 
-## 11. 安全与数据库状态
+## 11. Supabase 当前提醒状态
+
+已执行 `reminder_center_v1_closeout` migration：
+
+```text
+Cat medicine settings                    ✅ enabled / [30,7,1,0]
+Fish medicine settings                   ✅ enabled / [30,7,1,0]
+Cat PushPlus                             ✅ configured
+Fish PushPlus                            ⏳ not configured
+Anniversary instances                    ✅ Cat 3 / Fish 3 pending
+Medicine instances                       ✅ Cat 12 / Fish 12 pending（当前数据）
+life-reminder-materialize-v1             ✅ daily
+life-pushplus-reminders-v1               ✅ every 5 minutes
+```
+
+实例数量会随药箱、纪念日、完成/忽略状态变化，上述数字只是 2026-09-07 收尾时的现场验证。
+
+## 12. 安全与数据库状态
 
 生活数据表继续采用：
 
@@ -197,9 +228,11 @@ Supabase Advisor 的 `RLS enabled no policy` 在当前服务端封闭架构下�
 
 已补齐此前缺失的外键索引，以及 Reminder Center 新增外键索引。
 
-## 12. 已知边界
+## 13. 已知边界
 
 - mood delete 的 Supabase RPC 已生效；Web/API/MCP 代码已在 GitHub，等待下一次明确 Production 部署授权；
+- Reminder Center V1 完整 UI 已在 GitHub，等待下一次明确 Production 部署授权；
+- Fish 尚未绑定 PushPlus，所以 Fish / both 的真实微信投递还未做最终实机验收；
 - 一个 meal 只能正式绑定 1 张展示照片；
 - 餐前 / 餐后可以一起用于 AI 分析，但还没有多图持久化模型；
 - Server-side vision recognizer 没有配置付费 key 时会安全跳过识别，不影响照片保存；
@@ -209,17 +242,18 @@ Supabase Advisor 的 `RLS enabled no policy` 在当前服务端封闭架构下�
 - `drive-bridge-staging` 仍有一个空 bucket 待通过 Storage API / Dashboard 删除；
 - Production 自动部署长期保持关闭。
 
-## 13. 下一步候选
+## 14. 下一步候选
 
 ```text
-1. 完成 Cat / Fish “我 / Ta / both”权限回归
-2. 升级 mailbox 为 draft / sent 状态模型，再实现三箱 UI 与寄出后只读
-3. Fish 绑定 PushPlus，并验收 Fish / both 推送
-4. 实机验证餐前 / 餐后差分草稿与完整营养写入
-5. 如确实需要，再设计 meal 多图持久化模型
-6. 后续新增 cycle 等生活 domain 时复用 AI Access Core + Reminder Engine
+1. 下一次获授权时部署 Reminder Center V1 UI closeout + mood delete Web/API/MCP
+2. 完成 Cat / Fish “我 / Ta / both”权限回归
+3. 升级 mailbox 为 draft / sent 状态模型，再实现三箱 UI 与寄出后只读
+4. Fish 绑定 PushPlus，并验收 Fish / both 推送
+5. 实机验证餐前 / 餐后差分草稿与完整营养写入
+6. 如确实需要，再设计 meal 多图持久化模型
+7. 后续新增 cycle 等生活 domain 时复用 AI Access Core + Reminder Engine
 ```
 
-## 14. 部署纪律
+## 15. 部署纪律
 
 任何新的 Production deployment 都必须获得用户当次明确授权。一次“允许部署”只授权当前一次部署；完成后必须恢复 `git.deploymentEnabled=false`。
