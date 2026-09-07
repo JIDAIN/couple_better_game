@@ -1,0 +1,812 @@
+/* Mailbox visual closeout — follows the approved stationery / postcard design reference. */
+
+.life-page-header:has(.life-mailbox-header-title) {
+  position: relative;
+  min-height: 2.8rem;
+  align-items: center !important;
+  padding-bottom: .15rem;
+}
+.life-page-header:has(.life-mailbox-header-title) .life-page-title {
+  width: 100%;
+}
+.life-mailbox-header-title {
+  display: flex;
+  width: 100%;
+  min-height: 2.35rem;
+  align-items: center;
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+}
+.life-mailbox-header-title > span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: #464139;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+.life-mailbox-back {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  color: #554f47;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 1.9rem;
+  font-weight: 300;
+  line-height: 1;
+}
+.life-mailbox-compose-top {
+  position: relative;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #695e51;
+}
+.life-mailbox-compose-top svg { width: 1.28rem; height: 1.28rem; }
+.life-mailbox-compose-top::after {
+  content: "";
+  position: absolute;
+  right: .2rem;
+  top: .2rem;
+  width: .34rem;
+  height: .34rem;
+  border-radius: 50%;
+  background: #e77b60;
+  box-shadow: 0 0 0 2px #fffdf7;
+}
+
+.life-mailbox-toolbar-v3 {
+  margin: .1rem -.1rem 0;
+  padding: 0 .1rem .85rem;
+  border-bottom: 1px solid color-mix(in srgb, #cfc4b4 42%, transparent);
+  background:
+    radial-gradient(circle at 0 92%, rgb(172 198 143 / .18), transparent 17%),
+    radial-gradient(circle at 100% 95%, rgb(184 202 149 / .2), transparent 16%);
+}
+.life-mailbox-tabs-v3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .2rem;
+}
+.life-mailbox-tabs-v3 button {
+  position: relative;
+  display: grid;
+  min-height: 4.65rem;
+  place-items: center;
+  align-content: center;
+  gap: .16rem;
+  border: 0;
+  background: transparent;
+  color: #867d70;
+  padding: .22rem .2rem .55rem;
+}
+.life-mailbox-tabs-v3 button::after {
+  content: "";
+  position: absolute;
+  left: 25%;
+  right: 25%;
+  bottom: .1rem;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transform: scaleX(.55);
+  transition: transform .18s ease, background .18s ease;
+}
+.life-mailbox-tabs-v3 button.is-active {
+  color: #5f4b3a;
+}
+.life-mailbox-tabs-v3 button.is-active::after {
+  background: #8d6749;
+  transform: scaleX(1);
+}
+.life-mailbox-tabs-v3 button > span {
+  font-size: .67rem;
+  font-weight: 820;
+  letter-spacing: .02em;
+}
+.life-mailbox-tab-art {
+  width: 3.25rem;
+  height: 2.55rem;
+  overflow: visible;
+  filter: drop-shadow(0 2px 2px rgb(99 77 58 / .06));
+}
+
+.life-mailbox-controls-v3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .62rem;
+  margin-top: .72rem;
+}
+.life-mailbox-format-filter {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .38rem !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.life-mailbox-format-filter button {
+  min-height: 2.05rem;
+  border: 1px solid #eee6d9 !important;
+  border-radius: 9px !important;
+  background: rgb(255 255 255 / .58) !important;
+  color: #8c8377 !important;
+  padding: .4rem .55rem !important;
+  box-shadow: none !important;
+  font-size: .66rem !important;
+  font-weight: 780 !important;
+}
+.life-mailbox-format-filter button.is-active {
+  border-color: #9f8b70 !important;
+  background: linear-gradient(180deg, #9b8a72, #8c775f) !important;
+  color: #fffaf1 !important;
+  box-shadow: 0 3px 8px rgb(98 77 55 / .14) !important;
+}
+.life-mailbox-month-trigger {
+  display: inline-flex;
+  min-height: 2.05rem;
+  align-items: center;
+  justify-content: center;
+  gap: .42rem;
+  border: 1px solid #e6ddd0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / .66);
+  color: #756a5e;
+  padding: .4rem .7rem;
+  font-size: .63rem;
+  font-weight: 780;
+  white-space: nowrap;
+}
+.life-mailbox-month-trigger span { margin-top: -.1rem; font-size: .72rem; }
+.life-mailbox-draft-note {
+  color: #9a9084;
+  font-size: .59rem;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
+.life-mailbox-feedback {
+  margin-top: .7rem;
+  border: 1px solid #e6ded0;
+  border-radius: 12px;
+  background: #fffaf2;
+  padding: .55rem .72rem;
+  color: #6f8267;
+  font-size: .65rem;
+  font-weight: 760;
+}
+.life-mailbox-feedback.is-error {
+  border-color: #f0d6d0;
+  background: #fff4f1;
+  color: #ad6658;
+}
+
+.life-mailbox-list-v3 {
+  display: grid;
+  gap: .95rem;
+  margin-top: .9rem;
+}
+.life-mailbox-month-group { display: grid; gap: .45rem; }
+.life-mailbox-month-group > h2 {
+  color: #5f594f;
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+  font-size: .78rem;
+  font-weight: 820;
+  letter-spacing: .03em;
+}
+.life-mailbox-month-group > div {
+  display: grid;
+  gap: .55rem;
+}
+.life-letter-preview {
+  position: relative;
+  height: auto !important;
+  min-height: 5.25rem !important;
+  overflow: visible !important;
+  border: 1px solid #ebe1d3 !important;
+  border-radius: 15px !important;
+  background: rgb(255 252 246 / .78) !important;
+  box-shadow: 0 3px 12px rgb(105 87 68 / .07) !important;
+}
+.life-letter-preview.theme-forest,
+.life-letter-preview.theme-sea,
+.life-letter-preview.theme-sunset,
+.life-letter-preview.theme-cream {
+  background: rgb(255 252 246 / .82) !important;
+}
+.life-letter-preview-main {
+  display: grid !important;
+  width: 100%;
+  height: auto !important;
+  min-height: 5.25rem;
+  grid-template-columns: 3.55rem minmax(0, 1fr) 1rem;
+  align-items: center;
+  gap: .72rem;
+  padding: .55rem .7rem !important;
+  text-align: left;
+}
+.life-mailbox-preview-thumb {
+  display: grid;
+  width: 3.55rem;
+  height: 3.65rem;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fffdf8, #faf0df);
+  box-shadow: inset 0 0 0 1px rgb(207 185 155 / .2);
+}
+.life-mailbox-preview-svg { width: 3.2rem; height: 2.75rem; }
+.life-mailbox-preview-copy {
+  display: grid;
+  min-width: 0;
+  gap: .42rem;
+}
+.life-mailbox-preview-copy > strong {
+  overflow: hidden;
+  color: #504b43;
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+  font-size: .78rem;
+  font-weight: 820;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.life-mailbox-preview-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: .36rem;
+  color: #948a7c;
+  font-size: .54rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.life-mailbox-preview-meta em {
+  border-radius: 5px;
+  background: #f7e4b9;
+  color: #9a7044;
+  padding: .17rem .34rem;
+  font-style: normal;
+  font-weight: 820;
+}
+.life-mailbox-preview-meta em.is-postcard { background: #dcecf3; color: #64859c; }
+.life-mailbox-preview-meta em.is-draft { background: #ffe0d1; color: #c46c4c; }
+.life-mailbox-preview-meta time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.life-mailbox-preview-chevron {
+  color: #8c8175;
+  font-size: 1.3rem;
+  font-weight: 300;
+}
+.life-letter-read-hint,
+.life-letter-stamp { display: none !important; }
+.life-letter-preview-actions {
+  position: static !important;
+  display: flex;
+  justify-content: flex-end;
+  gap: .55rem !important;
+  border-top: 1px dashed #eadfd0;
+  padding: .35rem .62rem .4rem;
+}
+.life-letter-preview-actions button {
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #7b7867 !important;
+  padding: .16rem .12rem !important;
+  font-size: .58rem !important;
+  font-weight: 780 !important;
+}
+.life-letter-preview-actions button:nth-child(2) { color: #7b946d !important; }
+.life-letter-preview-actions button:last-child { color: #b97868 !important; }
+
+.life-mailbox-empty-v3 {
+  display: grid;
+  min-height: 10rem;
+  place-items: center;
+  align-content: center;
+  gap: .4rem;
+  border: 1px dashed #e6dccc;
+  border-radius: 18px;
+  background: rgb(255 253 248 / .56);
+  color: #91877b;
+  text-align: center;
+}
+.life-mailbox-empty-v3 .life-mailbox-tab-art { width: 4rem; height: 3.1rem; }
+.life-mailbox-empty-v3 p { font-size: .72rem; font-weight: 760; }
+.life-mailbox-empty-v3 button { color: #79916c; font-size: .64rem; font-weight: 820; }
+
+.life-mailbox-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(44 40 35 / .28);
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+.life-mailbox-month-sheet {
+  width: min(100%, 24rem);
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / .75);
+  border-radius: 20px;
+  background: #fffdf8;
+  box-shadow: 0 18px 40px rgb(61 49 37 / .18);
+}
+.life-mailbox-month-sheet button {
+  display: flex;
+  width: 100%;
+  min-height: 3.15rem;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee6da;
+  color: #5f5a52;
+  padding: .75rem 1rem;
+  font-size: .72rem;
+  font-weight: 760;
+  text-align: left;
+}
+.life-mailbox-month-sheet button strong { color: #5d7254; font-size: .85rem; }
+.life-mailbox-month-sheet button small { color: #9a9085; font-size: .62rem; font-weight: 680; }
+.life-mailbox-month-sheet button.is-selected { color: #4f5548; font-weight: 850; }
+.life-mailbox-month-sheet button.is-cancel {
+  justify-content: center;
+  border-bottom: 0;
+  color: #7f776d;
+}
+
+.life-mailbox-reader-backdrop,
+.life-mailbox-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(42 39 35 / .55);
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+.life-mailbox-reader-close {
+  position: fixed;
+  top: max(1rem, env(safe-area-inset-top));
+  right: 1rem;
+  z-index: 83;
+  display: grid;
+  width: 2.05rem;
+  height: 2.05rem;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / .92);
+  color: #4e4a45;
+  box-shadow: 0 4px 14px rgb(31 27 23 / .15);
+  font-size: 1.25rem;
+  font-weight: 350;
+}
+
+.life-letter-reader.life-letter-paper-modal,
+.life-letter-reader.life-letter-compose-paper {
+  position: relative;
+  width: min(92vw, 25rem) !important;
+  max-height: min(84vh, 39rem) !important;
+  overflow: hidden !important;
+  border: 1px solid #e7d5b8 !important;
+  border-radius: 20px !important;
+  background-color: #fffaf0 !important;
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 31px, rgb(210 185 145 / .18) 31px 32px),
+    linear-gradient(145deg, rgb(255 255 255 / .68), rgb(252 241 221 / .55)) !important;
+  padding: 1.45rem 1.45rem 1.05rem !important;
+  box-shadow: 0 22px 55px rgb(51 42 32 / .24) !important;
+}
+.life-letter-reader.life-letter-paper-modal.theme-forest,
+.life-letter-reader.life-letter-paper-modal.theme-sea,
+.life-letter-reader.life-letter-paper-modal.theme-sunset,
+.life-letter-reader.life-letter-compose-paper.theme-forest,
+.life-letter-reader.life-letter-compose-paper.theme-sea,
+.life-letter-reader.life-letter-compose-paper.theme-sunset {
+  background-color: #fffaf0 !important;
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 31px, rgb(210 185 145 / .18) 31px 32px),
+    linear-gradient(145deg, rgb(255 255 255 / .68), rgb(252 241 221 / .55)) !important;
+}
+.life-letter-corner-art {
+  position: absolute;
+  z-index: 0;
+  width: 8rem;
+  pointer-events: none;
+  opacity: .9;
+}
+.life-letter-corner-art.is-top { top: -.35rem; right: -.8rem; transform: rotate(7deg); }
+.life-letter-corner-art.is-bottom { left: -.9rem; bottom: -.2rem; transform: rotate(188deg); }
+.life-letter-paper-modal > *,
+.life-letter-compose-paper > * { position: relative; z-index: 1; }
+.life-letter-paper-header {
+  min-height: 5.5rem;
+  padding: .5rem 2.4rem .7rem 0;
+}
+.life-letter-paper-header h2 {
+  color: #4b4741;
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+  font-size: 1.08rem;
+  font-weight: 850;
+  letter-spacing: .035em;
+  line-height: 1.35;
+}
+.life-letter-paper-header p {
+  margin-top: .48rem;
+  color: #928879;
+  font-size: .58rem;
+  font-weight: 680;
+}
+.life-letter-reader-body.life-letter-paper-body {
+  min-height: 20rem !important;
+  max-height: calc(min(84vh, 39rem) - 10rem);
+  overflow-y: auto;
+  padding: .2rem .15rem .5rem;
+  color: #555047;
+  font-family: ui-serif, "Songti SC", "STSong", serif !important;
+  font-size: .82rem !important;
+  line-height: 2.35 !important;
+  letter-spacing: .03em !important;
+  white-space: pre-wrap;
+}
+.life-letter-page-footer {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr 2.6rem;
+  align-items: center;
+  margin-top: .55rem;
+  border-top: 1px solid rgb(207 185 151 / .32);
+  padding-top: .5rem;
+  text-align: center;
+}
+.life-letter-page-footer button {
+  display: grid;
+  height: 2rem;
+  place-items: center;
+  color: #655b50;
+  font-size: 1.55rem;
+  font-weight: 300;
+}
+.life-letter-page-footer button:disabled { opacity: .2; }
+.life-letter-page-footer span { color: #756e63; font-size: .62rem; font-weight: 760; }
+.life-letter-draft-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1.1rem;
+  margin-top: .5rem;
+  color: #708967;
+  font-size: .62rem;
+  font-weight: 820;
+}
+
+.life-postcard-modal,
+.life-postcard-compose {
+  position: relative;
+  display: grid;
+  width: min(93vw, 42rem);
+  aspect-ratio: 1.62 / 1;
+  min-height: 15rem;
+  grid-template-columns: 58% 42%;
+  overflow: hidden;
+  border: 1px solid #e5d2b7;
+  border-radius: 18px;
+  background: #fffaf0 !important;
+  box-shadow: 0 22px 55px rgb(51 42 32 / .25);
+}
+.life-postcard-modal.theme-forest,
+.life-postcard-modal.theme-sea,
+.life-postcard-modal.theme-sunset,
+.life-postcard-compose.theme-forest,
+.life-postcard-compose.theme-sea,
+.life-postcard-compose.theme-sunset { background: #fffaf0 !important; }
+.life-postcard-message-side {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid #d8c7af;
+  padding: 1rem 1rem 4.8rem;
+}
+.life-postcard-kicker {
+  color: #a07f64;
+  font-size: .56rem;
+  font-weight: 900;
+  letter-spacing: .18em;
+}
+.life-postcard-meta {
+  margin-top: .32rem;
+  color: #9a9082;
+  font-size: .52rem;
+  font-weight: 680;
+}
+.life-postcard-message {
+  position: relative;
+  z-index: 2;
+  margin-top: .8rem;
+  color: #544f46;
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+  font-size: .8rem;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+.life-postcard-scene {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 5.2rem;
+}
+.life-postcard-address-side {
+  position: relative;
+  min-width: 0;
+  padding: 1rem .85rem;
+}
+.life-postcard-stamp {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  min-height: 4rem;
+}
+.life-postcard-stamp svg { width: 2.2rem; height: 2.7rem; }
+.life-postcard-postmark {
+  position: absolute;
+  right: 1.6rem;
+  top: .45rem;
+  width: 2.7rem;
+  height: 2.7rem;
+  border: 1px solid rgb(132 121 105 / .45);
+  border-radius: 50%;
+}
+.life-postcard-postmark::before,
+.life-postcard-postmark::after {
+  content: "";
+  position: absolute;
+  right: 2rem;
+  width: 2.8rem;
+  height: 1px;
+  background: rgb(132 121 105 / .35);
+}
+.life-postcard-postmark::before { top: .9rem; }
+.life-postcard-postmark::after { top: 1.5rem; }
+.life-postcard-address-lines {
+  display: grid;
+  gap: .62rem;
+  margin-top: 1.2rem;
+}
+.life-postcard-address-lines span {
+  display: block;
+  height: 1px;
+  background: #d9c9b4;
+}
+.life-postcard-address-side > p {
+  position: absolute;
+  left: .85rem;
+  bottom: 1rem;
+  color: #948777;
+  font-size: .56rem;
+  font-weight: 780;
+  letter-spacing: .08em;
+}
+.life-postcard-draft-actions {
+  position: absolute;
+  left: 1rem;
+  bottom: .55rem;
+  z-index: 3;
+  display: flex;
+  gap: .8rem;
+  color: #627b5d;
+  font-size: .58rem;
+  font-weight: 820;
+}
+
+.life-mailbox-editor-backdrop {
+  align-items: center;
+  padding: max(.75rem, env(safe-area-inset-top)) .75rem max(.75rem, env(safe-area-inset-bottom));
+}
+.life-mailbox-editor-panel {
+  width: min(100%, 34rem);
+  max-height: 95vh;
+  overflow-y: auto;
+  border: 1px solid rgb(255 255 255 / .76);
+  border-radius: 22px;
+  background: #f7f3ea;
+  padding: .75rem;
+  box-shadow: 0 22px 55px rgb(50 42 34 / .25);
+}
+.life-mailbox-editor-header {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr 3rem;
+  align-items: center;
+  gap: .3rem;
+  padding: .1rem .1rem .55rem;
+}
+.life-mailbox-editor-header strong {
+  color: #4c4841;
+  font-size: .76rem;
+  font-weight: 820;
+  text-align: center;
+}
+.life-mailbox-editor-close {
+  color: #4f4b46;
+  font-size: 1.25rem;
+  font-weight: 350;
+  text-align: left;
+}
+.life-mailbox-editor-done {
+  color: #6f9a70;
+  font-size: .7rem;
+  font-weight: 850;
+  text-align: right;
+}
+.life-mailbox-editor-type-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .35rem;
+  margin: 0 auto .65rem;
+  border-radius: 11px;
+  background: #ece7dc;
+  padding: .2rem;
+}
+.life-mailbox-editor-type-switch button {
+  border-radius: 9px;
+  color: #948a7f;
+  padding: .4rem;
+  font-size: .62rem;
+  font-weight: 780;
+}
+.life-mailbox-editor-type-switch button.is-active {
+  background: #fffdf8;
+  color: #65584c;
+  box-shadow: 0 2px 7px rgb(80 66 51 / .08);
+}
+.life-letter-reader.life-letter-compose-paper {
+  width: min(100%, 25rem) !important;
+  min-height: 31rem;
+  margin: 0 auto;
+  padding-top: 2.1rem !important;
+}
+.life-letter-compose-title {
+  display: block;
+  width: calc(100% - 2rem);
+  border: 0;
+  border-bottom: 1px solid rgb(197 173 138 / .32);
+  background: transparent;
+  color: #4b4741;
+  padding: .25rem .05rem .45rem;
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+  font-size: .98rem;
+  font-weight: 820;
+  outline: none;
+}
+.life-letter-compose-title::placeholder { color: #aaa093; font-weight: 600; }
+.life-letter-compose-meta {
+  margin-top: .45rem;
+  color: #988d7f;
+  font-size: .55rem;
+  font-weight: 680;
+}
+.life-letter-compose-textarea {
+  display: block;
+  width: 100%;
+  min-height: 20rem;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: #555047;
+  padding: .45rem .05rem 0;
+  font-family: ui-serif, "Songti SC", "STSong", serif !important;
+  font-size: .78rem !important;
+  line-height: 2.45 !important;
+  letter-spacing: .025em;
+  outline: none;
+}
+.life-letter-page-footer.is-editor { margin-top: .1rem; }
+.life-letter-editor-page-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: .4rem;
+  width: min(100%, 25rem);
+  margin: .45rem auto .7rem;
+  color: #7b746a;
+}
+.life-letter-editor-page-tools button { font-size: .61rem; font-weight: 780; }
+.life-letter-editor-page-tools button:nth-child(2) { color: #b47a68; }
+.life-letter-editor-page-tools small { color: #9d9387; font-size: .55rem; }
+.life-postcard-compose {
+  width: 100%;
+  min-height: 15rem;
+  margin: 0 auto .7rem;
+  box-shadow: 0 8px 24px rgb(66 53 39 / .1);
+}
+.life-postcard-compose-textarea {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 8.2rem;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: #554f46;
+  margin-top: .6rem;
+  font-family: ui-serif, "Songti SC", "STSong", serif;
+  font-size: .76rem;
+  line-height: 1.85;
+  outline: none;
+}
+.life-mailbox-editor-actions {
+  display: grid;
+  grid-template-columns: .8fr 1fr 1.05fr;
+  gap: .48rem;
+  margin-top: .45rem;
+}
+.life-mailbox-editor-actions button {
+  min-height: 2.45rem;
+  border: 1px solid #e6ded1;
+  border-radius: 11px;
+  background: #fffdf9;
+  color: #71695f;
+  font-size: .66rem;
+  font-weight: 820;
+}
+.life-mailbox-editor-actions button:nth-child(2) { color: #71866a; }
+.life-mailbox-editor-actions button.is-send {
+  border-color: #6ba36f;
+  background: linear-gradient(180deg, #78b17d, #659b69);
+  color: white;
+  box-shadow: 0 4px 10px rgb(78 132 80 / .16);
+}
+.life-mailbox-editor-actions button:disabled { opacity: .45; }
+.life-mailbox-editor-lock-note {
+  margin-top: .5rem;
+  color: #9a9084;
+  font-size: .54rem;
+  font-weight: 680;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .life-mailbox-picker-backdrop { align-items: center; }
+  .life-mailbox-month-sheet { border-radius: 22px; }
+}
+
+@media (max-width: 430px) {
+  .life-mailbox-controls-v3 { grid-template-columns: minmax(0, 1fr) auto; gap: .45rem; }
+  .life-mailbox-format-filter button { padding-inline: .3rem !important; }
+  .life-mailbox-month-trigger { padding-inline: .5rem; }
+  .life-mailbox-preview-meta > span { display: none; }
+  .life-letter-reader.life-letter-paper-modal { width: 94vw !important; max-height: 86vh !important; padding-inline: 1.2rem !important; }
+  .life-letter-reader-body.life-letter-paper-body { min-height: 18rem !important; }
+  .life-postcard-modal { width: 95vw; min-height: 13.5rem; }
+  .life-postcard-message-side { padding: .8rem .72rem 4.3rem; }
+  .life-postcard-message { font-size: .68rem; line-height: 1.75; }
+  .life-postcard-address-side { padding: .8rem .65rem; }
+  .life-postcard-address-lines { margin-top: .8rem; gap: .48rem; }
+  .life-postcard-stamp svg { width: 1.8rem; height: 2.2rem; }
+  .life-postcard-postmark { right: 1.25rem; width: 2.2rem; height: 2.2rem; }
+  .life-postcard-postmark::before,
+  .life-postcard-postmark::after { right: 1.6rem; width: 2.1rem; }
+  .life-postcard-postmark::before { top: .72rem; }
+  .life-postcard-postmark::after { top: 1.2rem; }
+  .life-postcard-address-side > p { left: .65rem; bottom: .7rem; font-size: .5rem; }
+  .life-mailbox-editor-panel { border-radius: 18px; }
+}
+
+@media (max-width: 360px) {
+  .life-mailbox-tabs-v3 button { min-height: 4.25rem; }
+  .life-mailbox-tab-art { width: 2.9rem; height: 2.3rem; }
+  .life-mailbox-controls-v3 { grid-template-columns: 1fr; }
+  .life-mailbox-month-trigger { width: fit-content; }
+  .life-mailbox-draft-note { justify-self: start; }
+  .life-letter-preview-main { grid-template-columns: 3.15rem minmax(0, 1fr) .8rem; gap: .52rem; }
+  .life-mailbox-preview-thumb { width: 3.15rem; }
+  .life-mailbox-preview-svg { width: 2.85rem; }
+}
