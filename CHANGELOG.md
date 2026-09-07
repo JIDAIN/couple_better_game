@@ -2,6 +2,18 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-07 — Reminder Center V1 收尾（Supabase 已生效，UI 待 Production 部署）
+
+- 在既有 PushPlus 通知层上完成统一 Reminder Engine：`life_reminder_rules / life_reminder_instances` 作为规则与具体提醒实例，`life_notification_deliveries` 继续只负责投递状态。
+- 自定义提醒、药箱到期提醒、纪念日提醒统一进入 Reminder Center；纪念日不再走旧的独立直发分支。
+- 药箱提醒按 Cat / Fish 分别支持开关与提前天数，默认 `[30,7,1,0]`，范围 0～90 天；只物化未来约 90 天内实例。
+- 修复 snooze 语义：成功推送后点击“1 小时后”会重置 `notified_at`，新的 effective due time 使用新的 delivery dedupe key，可合法再次提醒且不产生网络重试重复推送。
+- 新 Reminder Center UI 已进入 GitHub `main`：`今天 / 即将到来 / 已完成`、完整已完成历史、药箱设置、PushPlus 状态、关闭药箱提醒。
+- 今日首页新增“接下来”轻量卡片，只展示最近 3 条提醒并跳转完整提醒中心。
+- Cat PushPlus 已绑定且真实自动提醒链路已验收；Fish 尚未绑定，因此 Fish / both 的真实微信投递等待后续验收。
+- Supabase 已验证 Cat/Fish reminder settings、药箱实例、纪念日实例与两个 cron 任务；此次 UI 代码未获得新的 Production 部署授权，因此线上仍为上一版 Reminder Center UI。
+- 同批同步更新 `docs/03-data-model.md`、`docs/09-status-roadmap.md`、`docs/14-wechat-reminders.md` 和文档索引。
+
 ## 2026-09-04 — R8.8 缓存竞态收口与首屏无闪烁（PR #58）
 
 - 为 stale-query 增加 request revision barrier：早于本地/read-back 写入启动的旧请求不再有资格覆盖新缓存；途中 invalidate 会从 mutation 之后重新读取。
