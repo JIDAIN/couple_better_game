@@ -101,7 +101,10 @@ async function loadExistingUpdateBase(
     const row = asRows(user.activity_entries)
       .map(camelizeDbRow)
       .find((item) => item.id === id && !item.deletedAt);
-    return row ? pickActivityUpdateBase(row) : null;
+    if (!row) return null;
+    const scope = stringValue(row.participantScope);
+    if (scope !== actor && scope !== "both") return null;
+    return pickActivityUpdateBase(row);
   }
 
   if (resource === "meal") {
@@ -118,6 +121,21 @@ async function loadExistingUpdateBase(
   }
 
   return null;
+}
+
+function assertActivityScope(
+  scopeValue: unknown,
+  actor: "cat" | "fish",
+  existingScope?: string,
+) {
+  const scope = stringValue(scopeValue).toLowerCase();
+  if (!scope || scope === "both" || scope === "me" || scope === actor || ["我", "自己", "本人"].includes(scope)) {
+    if (existingScope === "both" && scope && scope !== "both") {
+      throw new Error("双方共同活动不能由一方改成单方活动");
+    }
+    return;
+  }
+  throw new Error("个人活动只能写当前 OAuth 账号，不能指定 Ta");
 }
 
 async function hydratePartialUpdateArgs(args: unknown, context: LifeAgentExecutionContext) {
@@ -138,16 +156,47 @@ async function hydratePartialUpdateArgs(args: unknown, context: LifeAgentExecuti
   }
 
   const patch = canonicalizeLifeUpdatePatch(resource, row.data);
+  const merged = {
+    ...existing,
+    ...patch,
+  };
+  if (resource === "activity") {
+    assertActivityScope(
+      merged.participantScope,
+      context.identity.partnerKey,
+      stringValue(existing.participantScope),
+    );
+  }
   return {
     ...row,
     resource,
     action: "update",
     id,
-    data: {
-      ...existing,
-      ...patch,
-    },
+    data: merged,
   };
+}
+
+async function assertActivityMutationBoundary(
+  args: unknown,
+  context: LifeAgentExecutionContext,
+) {
+  const row = asRecord(args);
+  if (canonicalResource(row.resource) !== "activity") return;
+
+  if (isDeleteAction(row.action)) {
+    const id = stringValue(row.id ?? row.recordId);
+    if (!isUuid(id)) {
+      throw new Error("删除活动需要有效的记录 ID；请先查询并定位唯一记录，不要猜测 ID");
+    }
+    const existing = await loadExistingUpdateBase("activity", id, context.identity.partnerKey);
+    if (!existing) {
+      throw new Error("没有找到可删除的活动，或当前账号无权删除该记录");
+    }
+    return;
+  }
+
+  const data = asRecord(row.data);
+  assertActivityScope(data.participantScope, context.identity.partnerKey);
 }
 
 export { LIFE_AGENT_TOOLS };
@@ -161,5 +210,8 @@ export async function executeLifeAgentTool(
   const prepared = name === "life_mutate"
     ? await hydratePartialUpdateArgs(args, context)
     : args;
+  if (name === "life_mutate") {
+    await assertActivityMutationBoundary(prepared, context);
+  }
   return executeCanonicalLifeAgentTool(name, prepared, context);
 }
