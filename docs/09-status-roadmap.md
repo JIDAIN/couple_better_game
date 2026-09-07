@@ -1,33 +1,33 @@
 # 当前状态与 Roadmap
 
 **状态日期：2026-09-07**  
-**当前结论：本轮核心改造已达到可收尾、可正式上线状态。**
+**当前结论：本轮核心改造已收尾并进入 Production。**
 
 Harbor 当前 Project 指令模板：`docs/46-harbor-mcp-project-instructions.md`。
 
 ## 1. 当前收尾结论
 
-这轮不再存在需要阻止 Production 发布的核心功能缺口。
+这轮不再存在需要阻止 Production 使用的核心功能缺口。
 
 已经完成并通过代码 / 数据库 / 实机或 CI 验收的主线包括：
 
 ```text
-Island Life 主页面与双人生活记录              ✅
-无感加载 / stale cache / 前台恢复校验          ✅
-Meal CRUD / 营养 / 照片 / AI 草稿确认          ✅
-Harbor Cat / Fish direct MCP + AI Access Core  ✅
-Cat / Fish 服务端身份与写权限边界              ✅
-Reminder Center V1 + Reminder Engine            ✅
-PushPlus 双身份投递链路                         ✅
-药箱 / 纪念日提醒                               ✅
-小信箱 V2 draft / sent 数据模型与权限           ✅
-小信箱三箱 UI / 信纸分页 / 横向明信片            ✅
-mood delete Web/API/MCP                         ✅
-activity / weight actor-aware 权限               ✅
-Legacy Game 保留与生活域隔离                    ✅
+Island Life 主页面与双人生活记录              ✅ Production
+无感加载 / stale cache / 前台恢复校验          ✅ Production
+Meal CRUD / 营养 / 照片 / AI 草稿确认          ✅ Production
+Harbor Cat / Fish direct MCP + AI Access Core  ✅ Production
+Cat / Fish 服务端身份与写权限边界              ✅ Production
+Reminder Center V1 + Reminder Engine            ✅ Production
+PushPlus 双身份投递链路                         ✅ 已验收
+药箱 / 纪念日提醒                               ✅ Production
+小信箱 V2 draft / sent 数据模型与权限           ✅ Production
+小信箱三箱 UI / 信纸分页 / 横向明信片            ✅ Production
+mood delete Web/API/MCP                         ✅ Production
+activity / weight actor-aware 权限               ✅ Production
+Legacy Game 保留与生活域隔离                    ✅ Production
 ```
 
-当前 `main` 已作为本轮 **Production release candidate**。发布前最后一轮 CI：
+本轮发布前最后一轮代码 CI：
 
 ```text
 Test  ✅
@@ -35,7 +35,7 @@ Lint  ✅
 Build ✅
 ```
 
-2026-09-07 用户已明确授权本次 Production deployment。该授权只覆盖本次发布；发布完成后自动部署继续保持关闭。
+2026-09-07 本次 Production deployment 已完成；对应一次性部署授权已经消耗，后续如需再次发布必须重新获得明确授权。
 
 ## 2. 产品与固定身份
 
@@ -269,11 +269,18 @@ reminder instance mutation             ✅
 
 详细说明见 `docs/48-life-legacy-game-data-boundary.md`。
 
-## 11. 当前 Production / 本次发布
+## 11. 当前 Production
 
 Primary domain：`https://couple-better-game.vercel.app`
 
-本次发布前线上仍是上一版 Production。当前 `main` 已包含：
+```text
+deployment: dpl_GC1Ut3u64w5rpZ8iwzRp5nyyvWmm
+state: READY
+target: production
+source commit: 7196c2fc843a0ca8d3aae00ed5ea87257a2ff5cf
+```
+
+本次 Production 已包含：
 
 ```text
 Reminder Center V1 UI closeout
@@ -281,19 +288,23 @@ mood delete Web/API/MCP
 Cat / Fish activity + weight 权限加固
 Mailbox V2 Web/API/AI
 Mailbox 最终纸张 / 横向明信片视觉
-当前文档收尾
+本轮收尾文档基线
 ```
 
-本轮用户已明确授权部署。部署完成后，本节只需回写：
+发布后冒烟：
 
 ```text
-deployment id
-state
-source commit
-HTTP / runtime smoke result
+/                         HTTP 200
+/me/reminders             HTTP 200
+/nest/mailbox             HTTP 200
+最近 30 分钟 runtime error  0
 ```
 
-`vercel.json` 必须长期保持：
+构建日志确认 Next.js 16.2.6 Production Build 成功，`/api/life/reminders`、`/api/life/mailbox`、`/mcp` 等正式路由均进入构建产物。
+
+发布完成后已经提交 relock：`c951d062f2b9631a34f5811774e792505498e9fa`。后续文档提交不会触发新的 Production。
+
+当前 `vercel.json`：
 
 ```json
 {
