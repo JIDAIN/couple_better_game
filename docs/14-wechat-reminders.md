@@ -270,14 +270,14 @@ life-pushplus-reminders-v1
 ## 9. 当前验收状态
 
 ```text
-Reminder Engine / 数据模型               ✅
-自定义提醒                               ✅
-药箱自动提醒                             ✅
-纪念日进入 Reminder Center               ✅
-完成 / 忽略 / snooze                     ✅
-首页最近 3 条                            ✅ GitHub main
-今天 / 即将到来 / 已完成                 ✅ GitHub main
-提醒设置                                 ✅ GitHub main
+Reminder Engine / 数据模型               ✅ Production
+自定义提醒                               ✅ Production
+药箱自动提醒                             ✅ Production
+纪念日进入 Reminder Center               ✅ Production
+完成 / 忽略 / snooze                     ✅ Production
+首页最近 3 条                            ✅ Production
+今天 / 即将到来 / 已完成                 ✅ Production
+提醒设置                                 ✅ Production
 PushPlus 云端 5 分钟调度                  ✅
 Cat PushPlus                             ✅
 Fish PushPlus                            ✅
@@ -289,7 +289,7 @@ Cat / Fish 双端微信实收                  ✅
 
 2026-09-07 双端验收：`recipient_scope=both` 会物化为 Cat / Fish 两条独立实例，两条 delivery 分别使用各自 Vault token；验收时均为 `accepted`、失败数为 0，双方均确认微信实际收到。测试 rule / instance 已清理，残留为 0。
 
-Reminder Center V1 UI closeout 已进入本轮 Production release candidate，并已获得用户本次明确部署授权。
+Reminder Center V1 UI closeout 已随 Production deployment `dpl_GC1Ut3u64w5rpZ8iwzRp5nyyvWmm` 正式上线；`/me/reminders` 发布后 HTTP 200，最近 30 分钟未发现 runtime error。
 
 ## 10. 后续扩展原则
 
