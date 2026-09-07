@@ -70,7 +70,7 @@ export function canonicalizeLifeUpdatePatch(resource: string, input: unknown): J
       setIfDefined(out, "format", first(row, ["format", "type", "mailType"]));
       setIfDefined(out, "title", first(row, ["title", "subject"]));
       setIfDefined(out, "themeKey", first(row, ["themeKey", "theme"]));
-      setIfDefined(out, "sentAt", first(row, ["sentAt", "time"]));
+      setIfDefined(out, "status", first(row, ["status", "state"]));
       break;
     default:
       return { ...row };
@@ -129,7 +129,7 @@ export function pickMailboxUpdateBase(row: JsonRecord): JsonRecord {
     format: row.format,
     title: row.title,
     themeKey: row.themeKey,
-    sentAt: row.sentAt,
+    status: row.status,
   };
 }
 
