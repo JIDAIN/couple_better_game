@@ -1,6 +1,6 @@
 # 当前状态与 Roadmap
 
-**状态日期：2026-09-06**
+**状态日期：2026-09-07**
 
 Harbor 当前 Project 指令模板：`docs/46-harbor-mcp-project-instructions.md`。
 
@@ -22,6 +22,12 @@ ChatGPT MCP 临时文件直传                   ✅ Production / 已验收
 R11.5 AI 饮食草稿软确认                    ✅ Production
 R11.5 营养字段完整化                       ✅ Production
 R11.5 照片旋转 / 大小 / 无裁切显示          ✅ Production
+提醒中心 / Reminder Engine                ✅ Production
+PushPlus Cat                              ✅ 已绑定 / 实机自动提醒验收通过
+PushPlus Fish                             ⏳ 待绑定
+药箱自动到期提醒                           ✅ Supabase / Reminder Engine
+mood delete RPC                           ✅ Supabase
+mood delete Web/API/MCP                   🟡 GitHub 已完成，待下一次授权部署
 ```
 
 ## 2. 固定身份
@@ -81,7 +87,34 @@ ChatGPT 写入 → Supabase → 网页自动刷新   ✅
 网页删除 → Supabase                      ✅
 ```
 
-## 5. 饮食交互
+## 5. 提醒层
+
+当前结构：
+
+```text
+生活模块 / 自定义提醒
+        ↓
+Reminder Engine
+        ↓
+life_reminder_rules / life_reminder_instances
+        ↓
+网页提醒中心 + PushPlus
+        ↓
+Cat / Fish
+```
+
+现有能力：
+
+```text
+自定义提醒                               ✅
+完成 / 忽略 / 稍后提醒                   ✅
+药箱 30 / 7 / 1 / 0 天到期提醒           ✅
+PushPlus 云端 5 分钟调度                  ✅
+Cat 微信自动提醒                         ✅ 实机验收
+Fish 微信自动提醒                        ⏳ 待绑定验收
+```
+
+## 6. 饮食交互
 
 ```text
 图片 / 文字
@@ -93,7 +126,7 @@ ChatGPT 写入 → Supabase → 网页自动刷新   ✅
 
 草稿状态属于聊天上下文。身份、权限、删除、高风险覆盖、幂等等真正安全边界由服务端保证。
 
-## 6. 实际摄入与营养
+## 7. 实际摄入与营养
 
 默认优先级：
 
@@ -103,7 +136,7 @@ ChatGPT 写入 → Supabase → 网页自动刷新   ✅
 
 能合理判断时尽量一次填写 portion、estimated weight、calories、protein、carbs、fat；未知字段允许 `null`。
 
-## 7. 餐食照片
+## 8. 餐食照片
 
 当前正式 meal 绑定 1 张展示照片。多图可参与 AI 差分；未特别指定时保存餐前图。
 
@@ -116,7 +149,7 @@ EXIF normalize
 
 ChatGPT Custom MCP 已验收可从 OpenAI 临时文件地址获取图片并写入 Supabase Storage。
 
-## 8. 无感加载 / 数据同步
+## 9. 无感加载 / 数据同步
 
 ```text
 先显示 Cat/Fish scope 下的本地 stale cache
@@ -127,33 +160,18 @@ ChatGPT Custom MCP 已验收可从 OpenAI 临时文件地址获取图片并写�
 
 真实验收已通过：ChatGPT 写入后，从 ChatGPT 切回网页无需手动刷新即可自动出现；网页删除后 Supabase 立即软删除。
 
-## 9. 当前 Production
+## 10. 当前 Production
 
 Primary domain：`https://couple-better-game.vercel.app`
 
 ```text
-deployment: dpl_39mzvsqqqrEtE14nu5Li9tB6NmL3
+deployment: dpl_3NiisiVSyodYX2m9CvbeDVC2sVom
 state: READY
 target: production
-source commit: 543da4fd9654c448bd33be3c099536de6efcd620
+source commit: 9f306e93a6a524eb7a2735829367f63b3a9b62eb
 ```
 
-本次 Production 已包含旧 Harbor Google Drive / Sheet Bridge runtime 删除：
-
-```text
-/api/drive-bridge/*                      → 404
-/mcp（无 OAuth token）                   → 401 OAuth required
-```
-
-Supabase 已执行 `remove_drive_bridge_runtime` migration：
-
-```text
-life_drive_bridge_commands               → 已删除
-life_drive_bridge_configs                → 已删除
-pair_life_drive_bridge_worker(...)       → 已删除
-```
-
-`drive-bridge-staging` 当前为空，但 Supabase 禁止直接 SQL 删除 Storage bucket；它只剩一个空的历史 bucket，后续通过 Storage API / Dashboard 删除即可，不影响运行。
+提醒中心 `/me/reminders` 已在该 Production 验证 200 正常。
 
 当前 `vercel.json` 保持：
 
@@ -165,29 +183,43 @@ pair_life_drive_bridge_worker(...)       → 已删除
 }
 ```
 
-## 10. 已知边界
+## 11. 安全与数据库状态
 
-- `mood` 当前只有 `upsert`，还没有正式 `delete`；
+生活数据表继续采用：
+
+```text
+RLS enabled
++ anon/authenticated 无直接表权限
++ service_role / canonical RPC 访问
+```
+
+Supabase Advisor 的 `RLS enabled no policy` 在当前服务端封闭架构下属于 INFO，不为消除提示而开放客户端 policy。
+
+已补齐此前缺失的外键索引，以及 Reminder Center 新增外键索引。
+
+## 12. 已知边界
+
+- mood delete 的 Supabase RPC 已生效；Web/API/MCP 代码已在 GitHub，等待下一次明确 Production 部署授权；
 - 一个 meal 只能正式绑定 1 张展示照片；
 - 餐前 / 餐后可以一起用于 AI 分析，但还没有多图持久化模型；
 - Server-side vision recognizer 没有配置付费 key 时会安全跳过识别，不影响照片保存；
 - 某些 MCP 客户端不透传图片字节时需要 browser recovery；
 - 内置网页 AI 当前单次附件能力与 ChatGPT Project 多图会话能力不完全相同；
+- 小信箱当前底层仍只有已寄出记录模型；要实现“收信箱 / 已寄出 / 待寄出、待寄出可编辑、寄出后不可编辑”，必须先升级 mailbox 状态模型，再收口 UI；
 - `drive-bridge-staging` 仍有一个空 bucket 待通过 Storage API / Dashboard 删除；
 - Production 自动部署长期保持关闭。
 
-## 11. 下一步候选
+## 13. 下一步候选
 
 ```text
-1. 将 Harbor Cat / Harbor Fish ChatGPT Project Instructions 替换为纯 MCP 当前模板
-2. 删除空的 drive-bridge-staging Storage bucket
-3. 给 mood 增加正式 delete 能力
-4. 做一次 Cat / Fish “我 / Ta / both”完整权限回归
-5. 实机验证餐前 / 餐后差分草稿与完整营养写入
-6. 如确实需要，再设计 meal 多图持久化模型
-7. 后续新增 cycle 等生活 domain 时复用 AI Access Core
+1. 完成 Cat / Fish “我 / Ta / both”权限回归
+2. 升级 mailbox 为 draft / sent 状态模型，再实现三箱 UI 与寄出后只读
+3. Fish 绑定 PushPlus，并验收 Fish / both 推送
+4. 实机验证餐前 / 餐后差分草稿与完整营养写入
+5. 如确实需要，再设计 meal 多图持久化模型
+6. 后续新增 cycle 等生活 domain 时复用 AI Access Core + Reminder Engine
 ```
 
-## 12. 部署纪律
+## 14. 部署纪律
 
 任何新的 Production deployment 都必须获得用户当次明确授权。一次“允许部署”只授权当前一次部署；完成后必须恢复 `git.deploymentEnabled=false`。
