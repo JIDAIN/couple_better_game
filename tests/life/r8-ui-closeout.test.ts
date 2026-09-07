@@ -118,12 +118,23 @@ describe("R8.3 visual polish and interaction closeout", () => {
     expect(weight).toContain("慢慢看见自己的变化");
   });
 
-  it("uses 手札 and 明信片 as the two mailbox formats", () => {
+  it("uses a three-box mailbox with immutable sent items and paged letter paper", () => {
     const mailbox = source("components/life/LifeMailboxPage.tsx");
+    const route = source("app/api/life/mailbox/[id]/route.ts");
+    expect(mailbox).toContain("收信箱");
+    expect(mailbox).toContain("已寄出");
+    expect(mailbox).toContain("待寄出");
+    expect(mailbox).toContain("MailboxTabIcon");
     expect(mailbox).toContain('value === "letter" ? "手札" : "明信片"');
     expect(mailbox).toContain("手札需要一个标题");
-    expect(mailbox).toContain("📖 手札");
-    expect(mailbox).toContain("长长的手札，短短的明信片");
+    expect(mailbox).toContain("LETTER_PAGE_CHARS");
+    expect(mailbox).toContain("＋ 新一页");
+    expect(mailbox).toContain("第 {activeReaderPage + 1} / {readerPages.length} 页");
+    expect(mailbox).toContain("aspect-[1.62/1]");
+    expect(mailbox).toContain('item.status === "draft"');
+    expect(mailbox).toContain("寄出后将不能再编辑");
+    expect(route).toContain("MAILBOX_IMMUTABLE");
+    expect(route).toContain("sendMailboxDraft");
     expect(mailbox).not.toContain("✉️ 信纸");
   });
 
