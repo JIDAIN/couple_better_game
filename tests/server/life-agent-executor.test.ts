@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   getLifeExport: vi.fn(),
   listMedicines: vi.fn(),
   listWeights: vi.fn(),
-  listMailboxLetters: vi.fn(),
+  listMailboxItems: vi.fn(),
 }));
 
 vi.mock("../../lib/server/life-agent-registry", () => ({
@@ -26,7 +26,7 @@ vi.mock("../../lib/server/supabase-weight", () => ({
 }));
 
 vi.mock("../../lib/server/supabase-mailbox", () => ({
-  listMailboxLetters: mocks.listMailboxLetters,
+  listMailboxItems: mocks.listMailboxItems,
 }));
 
 import { executeLifeAgentTool } from "../../lib/server/life-agent-executor";
@@ -126,6 +126,75 @@ describe("AI partial update hydration", () => {
       }),
       expect.any(Object),
     );
+  });
+
+  it("hydrates an owned mailbox draft before editing or sending", async () => {
+    mocks.listMailboxItems.mockResolvedValue([
+      {
+        id: ID,
+        senderKey: "cat",
+        recipientKey: "fish",
+        format: "letter",
+        title: "旧标题",
+        themeKey: "cream",
+        body: "原来的内容",
+        status: "draft",
+        sentAt: null,
+        source: "manual",
+        createdAt: "2026-09-07T00:00:00Z",
+        updatedAt: "2026-09-07T00:00:00Z",
+      },
+    ]);
+
+    await executeLifeAgentTool(
+      "life_mutate",
+      { resource: "mailbox", action: "update", id: ID, data: { status: "sent" } },
+      { identity: CAT, latestUserText: "把这份草稿寄出去" },
+    );
+
+    expect(mocks.listMailboxItems).toHaveBeenCalledWith("cat");
+    expect(mocks.canonicalExecute).toHaveBeenCalledWith(
+      "life_mutate",
+      expect.objectContaining({
+        resource: "mailbox",
+        action: "update",
+        id: ID,
+        data: expect.objectContaining({
+          body: "原来的内容",
+          title: "旧标题",
+          status: "sent",
+        }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("refuses to hydrate an already-sent mailbox item for editing", async () => {
+    mocks.listMailboxItems.mockResolvedValue([
+      {
+        id: ID,
+        senderKey: "cat",
+        recipientKey: "fish",
+        format: "letter",
+        title: "已经寄出",
+        themeKey: "cream",
+        body: "不能再改",
+        status: "sent",
+        sentAt: "2026-09-07T00:00:00Z",
+        source: "manual",
+        createdAt: "2026-09-07T00:00:00Z",
+        updatedAt: "2026-09-07T00:00:00Z",
+      },
+    ]);
+
+    await expect(
+      executeLifeAgentTool(
+        "life_mutate",
+        { resource: "mailbox", action: "update", id: ID, data: { body: "试图修改" } },
+        { identity: CAT, latestUserText: "把寄出的信改一下" },
+      ),
+    ).rejects.toThrow("当前账号无权修改");
+    expect(mocks.canonicalExecute).not.toHaveBeenCalled();
   });
 
   it("does not hydrate deletes", async () => {
