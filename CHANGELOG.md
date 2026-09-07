@@ -2,6 +2,19 @@
 
 只记录对理解产品状态有价值的里程碑，不记录每一次样式微调。
 
+## 2026-09-07 — Island Life 本轮收尾正式上线
+
+- 将本轮 GitHub `main` 的核心改造统一发布到 Production：Reminder Center V1 UI closeout、mood delete Web/API/MCP、Cat / Fish activity + weight 权限加固、Mailbox V2 Web/API/AI 与最终小信箱视觉。
+- 小信箱正式切换为 `draft / sent` 模型：待寄出只有寄件人可见可改；寄出后双方可见且永久只读。UI 使用收信箱 / 已寄出 / 待寄出三箱、手札 / 明信片筛选、月份归档、整页信纸翻页和始终水平横向的明信片。
+- Reminder Center V1 正式上线完整 `今天 / 即将到来 / 已完成 / 提醒设置` 体验与首页最近 3 条提醒；Reminder Engine、药箱、纪念日、snooze 与 PushPlus 云端调度继续复用既有 Supabase 数据层。
+- Cat / Fish 的 Web session、MCP token 与 actor-aware RPC 权限边界进入同一 Production 版本；AI 昵称和前端自称不参与鉴权。
+- 根目录 `README.md`、`docs/09-status-roadmap.md`、`docs/14-wechat-reminders.md` 同步更新为当前 Island Life 架构与正式状态。
+- 发布前代码 CI：Test / Lint / Build 全部通过。
+- Production deployment `dpl_GC1Ut3u64w5rpZ8iwzRp5nyyvWmm` READY，source commit `7196c2fc843a0ca8d3aae00ed5ea87257a2ff5cf`。
+- 发布后 `/`、`/me/reminders`、`/nest/mailbox` 均返回 HTTP 200；Vercel 最近 30 分钟 runtime error 为 0。
+- 一次性部署授权已消耗；`vercel.json` 已恢复 `git.deploymentEnabled=false`，后续普通提交不会自动触发 Production。
+- 当前版本进入“正常使用 + 小步迭代”阶段，后续生理期等新生活 domain 继续复用 AI Access Core + Reminder Engine，而不是重做基础设施。
+
 ## 2026-09-07 — Reminder Center V1 收尾（Supabase 已生效，UI 待 Production 部署）
 
 - 在既有 PushPlus 通知层上完成统一 Reminder Engine：`life_reminder_rules / life_reminder_instances` 作为规则与具体提醒实例，`life_notification_deliveries` 继续只负责投递状态。
