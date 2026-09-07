@@ -326,9 +326,13 @@ Reminder Engine / 数据模型              ✅
 PushPlus 云端 5 分钟调度                 ✅
 Cat PushPlus                             ✅ 已绑定
 Cat 自动提醒实机链路                     ✅ 已验收
-Fish PushPlus                            ⏳ 待绑定
-Fish / both 实机推送                     ⏳ 待 Fish 绑定后验收
+Fish PushPlus                            ✅ 已绑定
+Fish 单独 PushPlus 测试                  ✅ 实机验收
+both 双人 Reminder Engine 投递           ✅ Cat / Fish 各自独立实例与 token
+Cat / Fish 双端微信实收                  ✅ 已验收
 ```
+
+2026-09-07 最终双端验收：Fish 单独测试由 PushPlus 正常接受；`recipient_scope=both` 的系统验收提醒物化为 Cat / Fish 两条独立实例，两条 delivery 均为 `accepted`、失败数为 0，并分别使用各自 Vault token。Cat 与 Fish 随后均确认微信实际收到。测试提醒的 rule / instance 已清理，残留为 0。
 
 2026-09-07 V1 UI closeout 代码已进入 GitHub `main`，包括首页最近 3 条、三分区完整提醒中心与轻量设置；按项目部署纪律，需要下一次明确 Production 授权后才会替换当前线上 UI。
 
