@@ -7,7 +7,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function cloudError(error: WeightCloudError) {
-  return lifeJsonError(error.message, error.errorCode === "SERVER_CONFIG" ? 500 : 502, error.errorCode);
+  const status = error.errorCode === "SERVER_CONFIG" ? 500 : error.message.includes("OWN_RECORD_ONLY") ? 403 : 502;
+  return lifeJsonError(
+    error.message.includes("OWN_RECORD_ONLY") ? "只能保存自己的体重记录" : error.message,
+    status,
+    error.message.includes("OWN_RECORD_ONLY") ? "OWN_RECORD_ONLY" : error.errorCode,
+  );
 }
 
 export async function GET(request: Request) {
@@ -32,7 +37,7 @@ export async function POST(request: Request) {
   const auth = await authorizePersonalPartnerWrite(request, parsed.value.partnerKey);
   if (auth) return auth;
   try {
-    const weight = await createWeight(parsed.value);
+    const weight = await createWeight(parsed.value, parsed.value.partnerKey);
     return NextResponse.json({ ok: true, weight }, { status: 201, headers: LIFE_NO_STORE_HEADERS });
   } catch (error) {
     if (error instanceof WeightCloudError) return cloudError(error);
