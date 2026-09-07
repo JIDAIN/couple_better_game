@@ -16,7 +16,7 @@ import {
 import { getLifeExport } from "./life-data-management";
 import { listMedicines } from "./supabase-medicine";
 import { listWeights } from "./supabase-weight";
-import { listMailboxLetters } from "./supabase-mailbox";
+import { listMailboxItems } from "./supabase-mailbox";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -92,8 +92,9 @@ async function loadExistingUpdateBase(
   }
 
   if (resource === "mailbox") {
-    const row = (await listMailboxLetters()).find((item) => item.id === id);
-    return row ? pickMailboxUpdateBase(row as unknown as JsonRecord) : null;
+    const row = (await listMailboxItems(actor)).find((item) => item.id === id);
+    if (!row || row.senderKey !== actor || row.status !== "draft") return null;
+    return pickMailboxUpdateBase(row as unknown as JsonRecord);
   }
 
   if (resource === "activity") {
