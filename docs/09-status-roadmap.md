@@ -25,6 +25,8 @@ R11.5 照片旋转 / 大小 / 无裁切显示          ✅ Production
 提醒中心 / Reminder Engine 核心            ✅ Production
 Reminder Center V1 数据层收尾              ✅ Supabase
 Reminder Center V1 UI 收尾                🟡 GitHub main，待下一次授权部署
+Cat / Fish 权限加固 RPC                    ✅ Supabase
+Cat / Fish 权限 Web + AI Access Core       🟡 GitHub main / CI 通过，待部署
 PushPlus Cat                              ✅ 已绑定 / 实机自动提醒验收通过
 PushPlus Fish                             ⏳ 待绑定
 药箱自动到期提醒                           ✅ Reminder Engine
@@ -73,7 +75,7 @@ Supabase
 
 Supabase 是正式生活数据事实源。
 
-## 4. Harbor MCP 已完成验收
+## 4. Harbor MCP 与身份边界
 
 ```text
 Harbor-Cat OAuth                         ✅
@@ -87,6 +89,18 @@ Cat / Fish token-bound identity          ✅
 ChatGPT 写入 → Supabase → 网页自动刷新   ✅
 网页删除 → Supabase                      ✅
 ```
+
+2026-09-07 权限回归额外确认：
+
+- Web session 使用 HMAC 签名 `partnerKey`，不能靠客户端自称切换身份；
+- MCP authorization code / access token / refresh token 都绑定签名后的 `partnerKey`；
+- mood / sleep / meal / weight 等个人数据遵守 owner-only 写入；
+- medicine、纪念日等明确属于 couple-space 共享数据；
+- mailbox 发件人由当前身份固定，旧模型中只有发件人可以修改 / 删除；
+- reminder instance 操作绑定当前 actor，PushPlus token 也按 actor 独立；
+- activity 新增 actor-aware 权限：单方活动只能本人写，共同活动双方可维护，但不能由一方改成单方。
+
+详细矩阵见 `docs/17-auth-and-pairing.md`。
 
 ## 5. 提醒层
 
@@ -185,7 +199,9 @@ source commit: 9f306e93a6a524eb7a2735829367f63b3a9b62eb
 
 该 Production 已包含 Reminder Center 初版并验证 `/me/reminders` 200 正常。
 
-2026-09-07 后续 reminder V1 UI closeout、mood delete Web/API/MCP 仍只在 GitHub `main`，尚未获得新的 Production 部署授权。
+2026-09-07 后续 Reminder Center V1 UI closeout、mood delete Web/API/MCP、Cat/Fish activity + weight Web/AI 权限加固仍只在 GitHub `main`，尚未获得新的 Production 部署授权。
+
+因此当前线上页面仍运行旧 activity / weight Web route；新 actor-aware Supabase RPC 已存在，但只有下一次授权部署后的新服务端代码才会调用它们。不要把“Supabase migration 已执行”误写成“线上 Web 权限修复已生效”。
 
 当前 `vercel.json` 保持：
 
@@ -199,15 +215,15 @@ source commit: 9f306e93a6a524eb7a2735829367f63b3a9b62eb
 
 ## 11. Supabase 当前提醒状态
 
-已执行 `reminder_center_v1_closeout` migration：
+已执行 Reminder Center V1 closeout migration：
 
 ```text
 Cat medicine settings                    ✅ enabled / [30,7,1,0]
 Fish medicine settings                   ✅ enabled / [30,7,1,0]
 Cat PushPlus                             ✅ configured
 Fish PushPlus                            ⏳ not configured
-Anniversary instances                    ✅ Cat 3 / Fish 3 pending
-Medicine instances                       ✅ Cat 12 / Fish 12 pending（当前数据）
+Anniversary instances                    ✅ Cat 3 / Fish 3 pending（收尾时现场值）
+Medicine instances                       ✅ Cat 12 / Fish 12 pending（收尾时现场值）
 life-reminder-materialize-v1             ✅ daily
 life-pushplus-reminders-v1               ✅ every 5 minutes
 ```
@@ -226,10 +242,37 @@ RLS enabled
 
 Supabase Advisor 的 `RLS enabled no policy` 在当前服务端封闭架构下属于 INFO，不为消除提示而开放客户端 policy。
 
-已补齐此前缺失的外键索引，以及 Reminder Center 新增外键索引。
+2026-09-07 新增 actor-aware RPC：
+
+```text
+create_activity_record_authorized
+update_activity_record_authorized
+delete_activity_record_authorized
+create_weight_measurement_authorized
+update_weight_measurement_authorized
+delete_weight_measurement_authorized
+```
+
+六个 RPC 均已验证：`anon=false / authenticated=false / service_role=true`。
+
+真实 Supabase 事务冒烟已通过：
+
+```text
+Cat create Cat-only activity             ✅
+Cat create Fish-only activity            ✅ 被拒绝
+Cat update/delete Fish-only activity     ✅ 被拒绝
+Fish update shared both activity         ✅
+shared both -> Cat-only                  ✅ 被拒绝
+Cat create/update/delete Cat weight      ✅
+Fish update/delete Cat weight            ✅ 被拒绝
+测试事务 rollback 后残留记录              ✅ 0
+```
+
+GitHub CI 针对权限加固代码：Test / Lint / Build 全部通过。
 
 ## 13. 已知边界
 
+- 当前 Production 尚未部署 activity / weight Web + AI 权限加固；上线前仍不能把线上旧 route 当成已修复；
 - mood delete 的 Supabase RPC 已生效；Web/API/MCP 代码已在 GitHub，等待下一次明确 Production 部署授权；
 - Reminder Center V1 完整 UI 已在 GitHub，等待下一次明确 Production 部署授权；
 - Fish 尚未绑定 PushPlus，所以 Fish / both 的真实微信投递还未做最终实机验收；
@@ -245,13 +288,12 @@ Supabase Advisor 的 `RLS enabled no policy` 在当前服务端封闭架构下�
 ## 14. 下一步候选
 
 ```text
-1. 下一次获授权时部署 Reminder Center V1 UI closeout + mood delete Web/API/MCP
-2. 完成 Cat / Fish “我 / Ta / both”权限回归
-3. 升级 mailbox 为 draft / sent 状态模型，再实现三箱 UI 与寄出后只读
-4. Fish 绑定 PushPlus，并验收 Fish / both 推送
-5. 实机验证餐前 / 餐后差分草稿与完整营养写入
-6. 如确实需要，再设计 meal 多图持久化模型
-7. 后续新增 cycle 等生活 domain 时复用 AI Access Core + Reminder Engine
+1. 升级 mailbox 为 draft / sent 状态模型，再实现三箱 UI 与寄出后只读
+2. Fish 绑定 PushPlus，并验收 Fish / both 推送
+3. 下一次获授权时统一部署：Reminder Center V1 UI closeout + mood delete + Cat/Fish 权限加固
+4. 实机验证餐前 / 餐后差分草稿与完整营养写入
+5. 如确实需要，再设计 meal 多图持久化模型
+6. 后续新增 cycle 等生活 domain 时复用 AI Access Core + Reminder Engine
 ```
 
 ## 15. 部署纪律
