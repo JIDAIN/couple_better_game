@@ -80,37 +80,17 @@ function ReminderItemCard({
       </div>
 
       <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onAction(item, "complete")}
-          className="text-xs font-extrabold text-[var(--life-teal-strong)] disabled:opacity-40"
-        >
+        <button type="button" disabled={busy} onClick={() => onAction(item, "complete")} className="text-xs font-extrabold text-[var(--life-teal-strong)] disabled:opacity-40">
           完成
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onAction(item, "snooze")}
-          className="text-xs font-bold text-[var(--life-text-muted)] disabled:opacity-40"
-        >
+        <button type="button" disabled={busy} onClick={() => onAction(item, "snooze")} className="text-xs font-bold text-[var(--life-text-muted)] disabled:opacity-40">
           1 小时后
         </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onAction(item, "dismiss")}
-          className="text-xs font-bold text-[var(--life-text-muted)] disabled:opacity-40"
-        >
+        <button type="button" disabled={busy} onClick={() => onAction(item, "dismiss")} className="text-xs font-bold text-[var(--life-text-muted)] disabled:opacity-40">
           忽略
         </button>
         {item.sourceKind === "medicine" ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onDisableMedicine}
-            className="text-xs font-bold text-[var(--life-danger)] disabled:opacity-40"
-          >
+          <button type="button" disabled={busy} onClick={onDisableMedicine} className="text-xs font-bold text-[var(--life-danger)] disabled:opacity-40">
             关闭药箱提醒
           </button>
         ) : null}
@@ -138,9 +118,7 @@ function ReminderSection({
     <section className="life-surface rounded-[var(--life-radius-card)] p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-extrabold text-[var(--life-text)]">{title}</p>
-        {items.length ? (
-          <span className="text-[10px] font-bold text-[var(--life-text-muted)]">{items.length} 条</span>
-        ) : null}
+        {items.length ? <span className="text-[10px] font-bold text-[var(--life-text-muted)]">{items.length} 条</span> : null}
       </div>
       <div className="mt-3 grid gap-2">
         {items.length ? (
@@ -175,21 +153,33 @@ export function LifeReminderCenterPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const load = useCallback(async () => {
-    const [nextItems, nextSettings] = await Promise.all([
-      fetchLifeReminders(),
-      fetchLifeReminderSettings(),
-    ]);
+  const applyLoadedState = useCallback((nextItems: LifeReminderItem[], nextSettings: LifeReminderSettings) => {
     setItems(nextItems);
     setSettings(nextSettings);
     setMedicineOffsets(nextSettings.medicineOffsets);
   }, []);
 
+  const load = useCallback(async () => {
+    const [nextItems, nextSettings] = await Promise.all([
+      fetchLifeReminders(),
+      fetchLifeReminderSettings(),
+    ]);
+    applyLoadedState(nextItems, nextSettings);
+  }, [applyLoadedState]);
+
   useEffect(() => {
-    void load().catch((cause) => {
-      setError(cause instanceof Error ? cause.message : "读取提醒失败");
-    });
-  }, [load]);
+    let cancelled = false;
+    Promise.all([fetchLifeReminders(), fetchLifeReminderSettings()])
+      .then(([nextItems, nextSettings]) => {
+        if (!cancelled) applyLoadedState(nextItems, nextSettings);
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : "读取提醒失败");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [applyLoadedState]);
 
   const groups = useMemo(() => {
     const today = dateKey(new Date());
@@ -235,18 +225,12 @@ export function LifeReminderCenterPage() {
     }
   }
 
-  async function act(
-    item: LifeReminderItem,
-    action: "complete" | "dismiss" | "snooze",
-  ) {
+  async function act(item: LifeReminderItem, action: "complete" | "dismiss" | "snooze") {
     setBusyId(item.id);
     setError("");
     setNotice("");
     try {
-      const snoozeUntil =
-        action === "snooze"
-          ? new Date(Date.now() + 60 * 60 * 1000).toISOString()
-          : null;
+      const snoozeUntil = action === "snooze" ? new Date(Date.now() + 60 * 60 * 1000).toISOString() : null;
       await actOnLifeReminder(item.id, action, snoozeUntil);
       await load();
     } catch (cause) {
@@ -364,9 +348,7 @@ export function LifeReminderCenterPage() {
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-extrabold text-[var(--life-text)]">已完成</p>
             {groups.completed.length ? (
-              <span className="text-[10px] font-bold text-[var(--life-text-muted)]">
-                {groups.completed.length} 条
-              </span>
+              <span className="text-[10px] font-bold text-[var(--life-text-muted)]">{groups.completed.length} 条</span>
             ) : null}
           </div>
           <div className="mt-3 grid gap-2">
@@ -405,16 +387,12 @@ export function LifeReminderCenterPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-extrabold text-[var(--life-text)]">药箱到期提醒</p>
-                    <p className="mt-1 text-[10px] text-[var(--life-text-muted)]">
-                      只影响当前账号；最多提前 90 天。
-                    </p>
+                    <p className="mt-1 text-[10px] text-[var(--life-text-muted)]">只影响当前账号；最多提前 90 天。</p>
                   </div>
                   <button
                     type="button"
                     disabled={savingSettings}
-                    onClick={() =>
-                      void saveMedicineSettings(!settings.medicineReminderEnabled)
-                    }
+                    onClick={() => void saveMedicineSettings(!settings.medicineReminderEnabled)}
                     className={`rounded-full px-3 py-2 text-xs font-extrabold ${
                       settings.medicineReminderEnabled
                         ? "bg-[var(--life-teal)] text-white"
@@ -448,11 +426,7 @@ export function LifeReminderCenterPage() {
 
                 <button
                   type="button"
-                  disabled={
-                    savingSettings ||
-                    !settings.medicineReminderEnabled ||
-                    !medicineOffsets.length
-                  }
+                  disabled={savingSettings || !settings.medicineReminderEnabled || !medicineOffsets.length}
                   onClick={() => void saveMedicineSettings(true)}
                   className="mt-3 rounded-full border border-[var(--life-border-soft)] bg-white/75 px-4 py-2 text-xs font-extrabold text-[var(--life-text)] disabled:opacity-40"
                 >
