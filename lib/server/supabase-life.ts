@@ -159,11 +159,13 @@ export async function upsertSleep(payload: SleepWritePayload) {
 
 export async function createActivity(
   payload: ActivityWritePayload,
-  actor: "cat" | "fish",
+  actor?: "cat" | "fish",
 ) {
   return callRpc<ActivityRecord>(
-    "create_activity_record_authorized",
-    { p_actor: actor, p_payload: payload, p_space_slug: coupleSpaceSlug() },
+    actor ? "create_activity_record_authorized" : "create_activity_record",
+    actor
+      ? { p_actor: actor, p_payload: payload, p_space_slug: coupleSpaceSlug() }
+      : { p_payload: payload, p_space_slug: coupleSpaceSlug() },
     "write",
   );
 }
@@ -171,27 +173,35 @@ export async function createActivity(
 export async function updateActivity(
   activityId: string,
   payload: ActivityWritePayload,
-  actor: "cat" | "fish",
+  actor?: "cat" | "fish",
 ) {
   return callRpc<ActivityRecord>(
-    "update_activity_record_authorized",
-    {
-      p_actor: actor,
-      p_activity_id: activityId,
-      p_payload: payload,
-      p_space_slug: coupleSpaceSlug(),
-    },
+    actor ? "update_activity_record_authorized" : "update_activity_record",
+    actor
+      ? {
+          p_actor: actor,
+          p_activity_id: activityId,
+          p_payload: payload,
+          p_space_slug: coupleSpaceSlug(),
+        }
+      : {
+          p_activity_id: activityId,
+          p_payload: payload,
+          p_space_slug: coupleSpaceSlug(),
+        },
     "write",
   );
 }
 
 export async function deleteActivity(
   activityId: string,
-  actor: "cat" | "fish",
+  actor?: "cat" | "fish",
 ) {
   return callRpc<ActivityRecord>(
-    "delete_activity_record_authorized",
-    { p_actor: actor, p_activity_id: activityId, p_space_slug: coupleSpaceSlug() },
+    actor ? "delete_activity_record_authorized" : "delete_activity_record",
+    actor
+      ? { p_actor: actor, p_activity_id: activityId, p_space_slug: coupleSpaceSlug() }
+      : { p_activity_id: activityId, p_space_slug: coupleSpaceSlug() },
     "write",
   );
 }
