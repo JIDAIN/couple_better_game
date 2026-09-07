@@ -1,25 +1,83 @@
 import { NextResponse } from "next/server";
-import { authorizeLifeRequest, LIFE_NO_STORE_HEADERS, lifeJsonError, readJsonBody } from "@/lib/server/life-api";
+import {
+  authorizeLifeRequest,
+  LIFE_NO_STORE_HEADERS,
+  lifeJsonError,
+  readJsonBody,
+} from "@/lib/server/life-api";
 import { resolveFixedLifeIdentity } from "@/lib/server/fixed-life-auth";
-import { createMailboxLetter, listMailboxLetters, MailboxCloudError } from "@/lib/server/supabase-mailbox";
-import { parseMailboxPayload } from "@/lib/life/mailbox-service";
+import {
+  createMailboxItem,
+  listMailboxItems,
+  MailboxCloudError,
+} from "@/lib/server/supabase-mailbox";
+import { parseMailboxPayload, type MailboxStatus } from "@/lib/life/mailbox-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const auth = await authorizeLifeRequest(request); if (auth) return auth;
-  try { return NextResponse.json({ ok: true, letters: await listMailboxLetters() }, { headers: LIFE_NO_STORE_HEADERS }); }
-  catch (error) { return lifeJsonError(error instanceof MailboxCloudError ? error.message : "读取小信箱失败", 502, "MAILBOX_READ_FAILED"); }
+function fail(error: unknown, fallback: string, code: string) {
+  return lifeJsonError(
+    error instanceof MailboxCloudError ? error.message : fallback,
+    502,
+    code,
+  );
 }
-export async function POST(request: Request) {
-  const auth = await authorizeLifeRequest(request); if (auth) return auth;
+
+export async function GET(request: Request) {
+  const auth = await authorizeLifeRequest(request);
+  if (auth) return auth;
   const identity = resolveFixedLifeIdentity(request);
   if (!identity) return lifeJsonError("请先登录", 401, "UNAUTHORIZED");
-  const body = await readJsonBody(request); if (!body.ok) return body.response;
-  const parsed = parseMailboxPayload(body.value); if (!parsed.ok) return lifeJsonError(parsed.reason, 400, "BAD_REQUEST");
-  if (parsed.value.senderKey !== identity.partnerKey) return lifeJsonError("寄件人必须是当前登录账号", 403, "OWN_RECORD_ONLY");
-  if (parsed.value.recipientKey === identity.partnerKey) return lifeJsonError("收件人必须是 Ta", 400, "BAD_REQUEST");
-  try { return NextResponse.json({ ok: true, letter: await createMailboxLetter(parsed.value) }, { headers: LIFE_NO_STORE_HEADERS }); }
-  catch (error) { return lifeJsonError(error instanceof MailboxCloudError ? error.message : "寄信失败", 502, "MAILBOX_WRITE_FAILED"); }
+
+  try {
+    return NextResponse.json(
+      { ok: true, letters: await listMailboxItems(identity.partnerKey) },
+      { headers: LIFE_NO_STORE_HEADERS },
+    );
+  } catch (error) {
+    return fail(error, "读取小信箱失败", "MAILBOX_READ_FAILED");
+  }
+}
+
+export async function POST(request: Request) {
+  const auth = await authorizeLifeRequest(request);
+  if (auth) return auth;
+  const identity = resolveFixedLifeIdentity(request);
+  if (!identity) return lifeJsonError("请先登录", 401, "UNAUTHORIZED");
+
+  const body = await readJsonBody(request);
+  if (!body.ok) return body.response;
+  const raw = body.value && typeof body.value === "object" && !Array.isArray(body.value)
+    ? body.value
+    : {};
+  const status = raw.status;
+  if (status !== "draft" && status !== "sent") {
+    return lifeJsonError("请选择保存为待寄出或立即寄出", 400, "INVALID_MAILBOX_STATUS");
+  }
+
+  const ta = identity.partnerKey === "cat" ? "fish" : "cat";
+  const parsed = parseMailboxPayload({
+    ...raw,
+    senderKey: identity.partnerKey,
+    recipientKey: ta,
+    status,
+    sentAt: null,
+  });
+  if (!parsed.ok) return lifeJsonError(parsed.reason, 400, "BAD_REQUEST");
+
+  try {
+    const letter = await createMailboxItem(
+      identity.partnerKey,
+      parsed.value,
+      status as MailboxStatus,
+      "manual",
+    );
+    return NextResponse.json(
+      { ok: true, letter },
+      { status: 201, headers: LIFE_NO_STORE_HEADERS },
+    );
+  } catch (error) {
+    return fail(error, status === "sent" ? "寄信失败" : "保存草稿失败", "MAILBOX_WRITE_FAILED");
+  }
 }
