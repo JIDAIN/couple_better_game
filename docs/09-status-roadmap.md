@@ -10,7 +10,7 @@ Harbor 当前 Project 指令模板：`docs/46-harbor-mcp-project-instructions.md
 今日 / 心情 / 睡眠 / 活动                ✅ Production
 饮食 + Meal CRUD + 私有照片              ✅ Production
 日历 + 双人心情                           ✅ Production
-小窝 / 体重 / 家庭药箱 / 小信箱 / 游戏机   ✅ Production
+小窝 / 体重 / 家庭药箱 / 小信箱 / 游戏机   ✅ Production（旧版小信箱仍在线）
 Legacy Game                              ✅ 保留
 MCP / AI Access Core                     ✅ Production
 Harbor-Cat direct MCP                    ✅ Production / 已验收
@@ -27,6 +27,9 @@ Reminder Center V1 数据层收尾              ✅ Supabase
 Reminder Center V1 UI 收尾                🟡 GitHub main，待下一次授权部署
 Cat / Fish 权限加固 RPC                    ✅ Supabase
 Cat / Fish 权限 Web + AI Access Core       🟡 GitHub main / CI 通过，待部署
+Mailbox draft / sent 状态模型              ✅ Supabase
+Mailbox 三箱 Web/API/AI                    🟡 GitHub main / CI 通过，待部署
+Mailbox 旧备份恢复兼容                     ✅ Supabase / 事务验收通过
 PushPlus Cat                              ✅ 已绑定 / 实机自动提醒验收通过
 PushPlus Fish                             ⏳ 待绑定
 药箱自动到期提醒                           ✅ Reminder Engine
@@ -96,7 +99,7 @@ ChatGPT 写入 → Supabase → 网页自动刷新   ✅
 - MCP authorization code / access token / refresh token 都绑定签名后的 `partnerKey`；
 - mood / sleep / meal / weight 等个人数据遵守 owner-only 写入；
 - medicine、纪念日等明确属于 couple-space 共享数据；
-- mailbox 发件人由当前身份固定，旧模型中只有发件人可以修改 / 删除；
+- mailbox sender / recipient 由 signed actor 在服务端确定；draft 只有寄件人可见可改，sent 双方可见但永久只读；
 - reminder instance 操作绑定当前 actor，PushPlus token 也按 actor 独立；
 - activity 新增 actor-aware 权限：单方活动只能本人写，共同活动双方可维护，但不能由一方改成单方。
 
@@ -140,7 +143,58 @@ Fish 微信自动提醒                        ⏳ 待绑定验收
 
 提醒完整说明见 `docs/14-wechat-reminders.md`。
 
-## 6. 饮食交互
+## 6. 小信箱 V2
+
+数据模型：
+
+```text
+mailbox_letters.status = draft | sent
+
+draft -> 只有寄件人可见，可编辑 / 删除 / 寄出，sent_at = null
+sent  -> 寄件人与收件人都可见，永久只读，sent_at = 实际寄出时间
+```
+
+Web UI 已在 GitHub `main` 完成：
+
+```text
+收信箱 / 已寄出 / 待寄出                 ✅ GitHub
+手札 / 明信片筛选                        ✅
+月份筛选（收信箱 / 已寄出）               ✅
+三箱不同时间戳语义                        ✅
+手札整页信纸编辑 + 阅读翻页                ✅
+明信片始终水平横向弹窗                     ✅
+待寄出可编辑 / 删除 / 寄出                 ✅
+寄出后不可再编辑 / 删除                    ✅ 服务端 + RPC
+线性小插画三箱入口                         ✅
+```
+
+AI / MCP 语义：
+
+```text
+“帮我写 / 起草”        -> draft
+“现在寄出 / 发给 Ta”   -> sent
+已有 draft + 明确寄出  -> 同一 id draft -> sent
+已 sent update/delete  -> 拒绝
+```
+
+真实 Supabase 事务验收：
+
+```text
+Cat 创建 draft                         ✅
+Cat 可见自己的 draft                    ✅
+Fish 看不到 Cat draft                   ✅
+Fish 修改 Cat draft                     ✅ 被拒绝
+Cat 修改自己的 draft                    ✅
+Cat draft -> sent                       ✅
+Fish 寄出后可见                         ✅
+Cat / Fish 修改 sent                    ✅ 被拒绝
+Cat / Fish 删除 sent                    ✅ 被拒绝
+事务 rollback 后测试数据残留             ✅ 0
+```
+
+旧 schemaVersion=1 备份没有 `status` 的兼容也已实测：恢复时自动按 `sent` 处理，并保留正常 `sent_at`；测试事务 rollback。
+
+## 7. 饮食交互
 
 ```text
 图片 / 文字
@@ -152,7 +206,7 @@ Fish 微信自动提醒                        ⏳ 待绑定验收
 
 草稿状态属于聊天上下文。身份、权限、删除、高风险覆盖、幂等等真正安全边界由服务端保证。
 
-## 7. 实际摄入与营养
+## 8. 实际摄入与营养
 
 默认优先级：
 
@@ -162,7 +216,7 @@ Fish 微信自动提醒                        ⏳ 待绑定验收
 
 能合理判断时尽量一次填写 portion、estimated weight、calories、protein、carbs、fat；未知字段允许 `null`。
 
-## 8. 餐食照片
+## 9. 餐食照片
 
 当前正式 meal 绑定 1 张展示照片。多图可参与 AI 差分；未特别指定时保存餐前图。
 
@@ -175,7 +229,7 @@ EXIF normalize
 
 ChatGPT Custom MCP 已验收可从 OpenAI 临时文件地址获取图片并写入 Supabase Storage。
 
-## 9. 无感加载 / 数据同步
+## 10. 无感加载 / 数据同步
 
 ```text
 先显示 Cat/Fish scope 下的本地 stale cache
@@ -186,7 +240,7 @@ ChatGPT Custom MCP 已验收可从 OpenAI 临时文件地址获取图片并写�
 
 真实验收已通过：ChatGPT 写入后，从 ChatGPT 切回网页无需手动刷新即可自动出现；网页删除后 Supabase 立即软删除。
 
-## 10. 当前 Production
+## 11. 当前 Production
 
 Primary domain：`https://couple-better-game.vercel.app`
 
@@ -199,9 +253,9 @@ source commit: 9f306e93a6a524eb7a2735829367f63b3a9b62eb
 
 该 Production 已包含 Reminder Center 初版并验证 `/me/reminders` 200 正常。
 
-2026-09-07 后续 Reminder Center V1 UI closeout、mood delete Web/API/MCP、Cat/Fish activity + weight Web/AI 权限加固仍只在 GitHub `main`，尚未获得新的 Production 部署授权。
+2026-09-07 后续 Reminder Center V1 UI closeout、mood delete Web/API/MCP、Cat/Fish activity + weight Web/AI 权限加固、Mailbox V2 Web/API/AI 仍只在 GitHub `main`，尚未获得新的 Production 部署授权。
 
-因此当前线上页面仍运行旧 activity / weight Web route；新 actor-aware Supabase RPC 已存在，但只有下一次授权部署后的新服务端代码才会调用它们。不要把“Supabase migration 已执行”误写成“线上 Web 权限修复已生效”。
+Mailbox 的新 Supabase schema / actor-aware RPC 已生效，但兼容 RPC 保证当前旧 Production 仍只读取 `sent`；所以数据库升级不会让旧线上 UI 突然读到 draft。三箱界面和新的 immutable-sent 服务端 route 只有下一次明确授权部署后才会上线。
 
 当前 `vercel.json` 保持：
 
@@ -213,7 +267,7 @@ source commit: 9f306e93a6a524eb7a2735829367f63b3a9b62eb
 }
 ```
 
-## 11. Supabase 当前提醒状态
+## 12. Supabase 当前提醒状态
 
 已执行 Reminder Center V1 closeout migration：
 
@@ -230,7 +284,7 @@ life-pushplus-reminders-v1               ✅ every 5 minutes
 
 实例数量会随药箱、纪念日、完成/忽略状态变化，上述数字只是 2026-09-07 收尾时的现场验证。
 
-## 12. 安全与数据库状态
+## 13. 安全与数据库状态
 
 生活数据表继续采用：
 
@@ -242,7 +296,7 @@ RLS enabled
 
 Supabase Advisor 的 `RLS enabled no policy` 在当前服务端封闭架构下属于 INFO，不为消除提示而开放客户端 policy。
 
-2026-09-07 新增 actor-aware RPC：
+2026-09-07 actor-aware activity / weight RPC：
 
 ```text
 create_activity_record_authorized
@@ -255,47 +309,48 @@ delete_weight_measurement_authorized
 
 六个 RPC 均已验证：`anon=false / authenticated=false / service_role=true`。
 
-真实 Supabase 事务冒烟已通过：
+Mailbox V2 actor-aware RPC：
 
 ```text
-Cat create Cat-only activity             ✅
-Cat create Fish-only activity            ✅ 被拒绝
-Cat update/delete Fish-only activity     ✅ 被拒绝
-Fish update shared both activity         ✅
-shared both -> Cat-only                  ✅ 被拒绝
-Cat create/update/delete Cat weight      ✅
-Fish update/delete Cat weight            ✅ 被拒绝
-测试事务 rollback 后残留记录              ✅ 0
+list_mailbox_items_authorized
+create_mailbox_item_authorized
+update_mailbox_draft_authorized
+send_mailbox_draft_authorized
+delete_mailbox_draft_authorized
 ```
 
-GitHub CI 针对权限加固代码：Test / Lint / Build 全部通过。
+五个 RPC 同样已验证：`anon=false / authenticated=false / service_role=true`。
 
-## 13. 已知边界
+Cat/Fish activity + weight 真实 Supabase 事务冒烟已通过；Mailbox draft/sent 权限与旧备份恢复兼容也均已通过事务级真实测试。所有测试事务均 rollback，残留测试记录为 0。
 
-- 当前 Production 尚未部署 activity / weight Web + AI 权限加固；上线前仍不能把线上旧 route 当成已修复；
+GitHub `main` 当前 Test / Lint / Build 全部通过。
+
+## 14. 已知边界
+
+- 当前 Production 尚未部署 activity / weight Web + AI 权限加固和 Mailbox V2 Web/API/AI；上线前不能把线上旧 route 当成新行为；
 - mood delete 的 Supabase RPC 已生效；Web/API/MCP 代码已在 GitHub，等待下一次明确 Production 部署授权；
 - Reminder Center V1 完整 UI 已在 GitHub，等待下一次明确 Production 部署授权；
+- Mailbox V2 当前不支持“寄出后只从寄件人自己的已寄出列表删除/归档副本”；因为一条 sent 记录同时代表寄件人与收件人。如以后需要，应增加 per-user mailbox view state，而不是删除原信；
 - Fish 尚未绑定 PushPlus，所以 Fish / both 的真实微信投递还未做最终实机验收；
 - 一个 meal 只能正式绑定 1 张展示照片；
 - 餐前 / 餐后可以一起用于 AI 分析，但还没有多图持久化模型；
 - Server-side vision recognizer 没有配置付费 key 时会安全跳过识别，不影响照片保存；
 - 某些 MCP 客户端不透传图片字节时需要 browser recovery；
 - 内置网页 AI 当前单次附件能力与 ChatGPT Project 多图会话能力不完全相同；
-- 小信箱当前底层仍只有已寄出记录模型；要实现“收信箱 / 已寄出 / 待寄出、待寄出可编辑、寄出后不可编辑”，必须先升级 mailbox 状态模型，再收口 UI；
 - `drive-bridge-staging` 仍有一个空 bucket 待通过 Storage API / Dashboard 删除；
 - Production 自动部署长期保持关闭。
 
-## 14. 下一步候选
+## 15. 下一步候选
 
 ```text
-1. 升级 mailbox 为 draft / sent 状态模型，再实现三箱 UI 与寄出后只读
-2. Fish 绑定 PushPlus，并验收 Fish / both 推送
-3. 下一次获授权时统一部署：Reminder Center V1 UI closeout + mood delete + Cat/Fish 权限加固
-4. 实机验证餐前 / 餐后差分草稿与完整营养写入
+1. Fish 绑定 PushPlus，并验收 Fish / both 推送
+2. 下一次获授权时统一部署：Reminder Center V1 UI closeout + mood delete + Cat/Fish 权限加固 + Mailbox V2
+3. 实机验证餐前 / 餐后差分草稿与完整营养写入
+4. 如确实需要，再设计 Mailbox per-user archive / sent-copy state
 5. 如确实需要，再设计 meal 多图持久化模型
 6. 后续新增 cycle 等生活 domain 时复用 AI Access Core + Reminder Engine
 ```
 
-## 15. 部署纪律
+## 16. 部署纪律
 
 任何新的 Production deployment 都必须获得用户当次明确授权。一次“允许部署”只授权当前一次部署；完成后必须恢复 `git.deploymentEnabled=false`。
