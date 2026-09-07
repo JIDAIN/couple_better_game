@@ -12,12 +12,15 @@ import {
   sendMailboxDraft,
   updateMailboxDraft,
 } from "@/lib/server/supabase-mailbox";
-import { parseMailboxPayload } from "@/lib/life/mailbox-service";
+import { parseMailboxPayload, type MailboxPartnerKey } from "@/lib/life/mailbox-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
+type ResolvedMailboxIdentity =
+  | { response: Response; actor: null; id: null }
+  | { response: null; actor: MailboxPartnerKey; id: string };
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -36,9 +39,13 @@ function fail(error: unknown, fallback: string) {
   return lifeJsonError(fallback, 502, "MAILBOX_WRITE_FAILED");
 }
 
-async function identityAndId(request: Request, context: RouteContext) {
+async function identityAndId(
+  request: Request,
+  context: RouteContext,
+): Promise<ResolvedMailboxIdentity> {
   const auth = await authorizeLifeRequest(request);
   if (auth) return { response: auth, actor: null, id: null };
+
   const identity = resolveFixedLifeIdentity(request);
   if (!identity) {
     return {
@@ -47,6 +54,7 @@ async function identityAndId(request: Request, context: RouteContext) {
       id: null,
     };
   }
+
   const { id } = await context.params;
   if (!isUuid(id)) {
     return {
@@ -55,22 +63,24 @@ async function identityAndId(request: Request, context: RouteContext) {
       id: null,
     };
   }
+
   return { response: null, actor: identity.partnerKey, id };
 }
 
 export async function PUT(request: Request, context: RouteContext) {
   const resolved = await identityAndId(request, context);
-  if (resolved.response || !resolved.actor || !resolved.id) return resolved.response;
+  if (resolved.response) return resolved.response;
+  const { actor, id } = resolved;
 
   const body = await readJsonBody(request);
   if (!body.ok) return body.response;
   const raw = body.value && typeof body.value === "object" && !Array.isArray(body.value)
     ? body.value
     : {};
-  const ta = resolved.actor === "cat" ? "fish" : "cat";
+  const ta = actor === "cat" ? "fish" : "cat";
   const parsed = parseMailboxPayload({
     ...raw,
-    senderKey: resolved.actor,
+    senderKey: actor,
     recipientKey: ta,
     status: "draft",
     sentAt: null,
@@ -78,7 +88,7 @@ export async function PUT(request: Request, context: RouteContext) {
   if (!parsed.ok) return lifeJsonError(parsed.reason, 400, "BAD_REQUEST");
 
   try {
-    const letter = await updateMailboxDraft(resolved.actor, resolved.id, parsed.value, "manual");
+    const letter = await updateMailboxDraft(actor, id, parsed.value, "manual");
     return NextResponse.json({ ok: true, letter }, { headers: LIFE_NO_STORE_HEADERS });
   } catch (error) {
     return fail(error, "保存草稿失败");
@@ -87,7 +97,8 @@ export async function PUT(request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const resolved = await identityAndId(request, context);
-  if (resolved.response || !resolved.actor || !resolved.id) return resolved.response;
+  if (resolved.response) return resolved.response;
+  const { actor, id } = resolved;
 
   const body = await readJsonBody(request);
   if (!body.ok) return body.response;
@@ -96,7 +107,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const letter = await sendMailboxDraft(resolved.actor, resolved.id, "manual");
+    const letter = await sendMailboxDraft(actor, id, "manual");
     return NextResponse.json({ ok: true, letter }, { headers: LIFE_NO_STORE_HEADERS });
   } catch (error) {
     return fail(error, "寄出失败");
@@ -105,10 +116,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(request: Request, context: RouteContext) {
   const resolved = await identityAndId(request, context);
-  if (resolved.response || !resolved.actor || !resolved.id) return resolved.response;
+  if (resolved.response) return resolved.response;
+  const { actor, id } = resolved;
 
   try {
-    const letter = await deleteMailboxDraft(resolved.actor, resolved.id);
+    const letter = await deleteMailboxDraft(actor, id);
     return NextResponse.json({ ok: true, letter }, { headers: LIFE_NO_STORE_HEADERS });
   } catch (error) {
     return fail(error, "删除草稿失败");
