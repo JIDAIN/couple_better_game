@@ -26,7 +26,7 @@
 | 文档 | 主题 |
 |---|---|
 | [`13-meal-photo-storage.md`](13-meal-photo-storage.md) | 餐食照片 Storage、压缩与绑定 |
-| [`14-wechat-reminders.md`](14-wechat-reminders.md) | Supabase → PushPlus 微信提醒 |
+| [`14-wechat-reminders.md`](14-wechat-reminders.md) | Reminder Center、Supabase 调度与 PushPlus 微信提醒 |
 | [`17-auth-and-pairing.md`](17-auth-and-pairing.md) | 固定 Cat / Fish 登录、session 与权限边界 |
 | [`26-ai-access-core-principles.md`](26-ai-access-core-principles.md) | AI Access Core 长期架构原则 |
 | [`28-ai-natural-language-contract.md`](28-ai-natural-language-contract.md) | 自然语言 normalization / clarification contract |
