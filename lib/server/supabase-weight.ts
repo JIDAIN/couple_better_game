@@ -50,27 +50,32 @@ export function listWeights(partnerKey: "fish" | "cat", limit = 365) {
   }, "read");
 }
 
-export function createWeight(payload: WeightWritePayload, actor: "cat" | "fish") {
-  return callRpc<WeightRecord>("create_weight_measurement_authorized", {
-    p_actor: actor,
-    p_payload: payload,
-    p_space_slug: coupleSpaceSlug(),
-  }, "write");
+export function createWeight(payload: WeightWritePayload, actor?: "cat" | "fish") {
+  return callRpc<WeightRecord>(
+    actor ? "create_weight_measurement_authorized" : "create_weight_measurement",
+    actor
+      ? { p_actor: actor, p_payload: payload, p_space_slug: coupleSpaceSlug() }
+      : { p_payload: payload, p_space_slug: coupleSpaceSlug() },
+    "write",
+  );
 }
 
-export function updateWeight(id: string, payload: WeightWritePayload, actor: "cat" | "fish") {
-  return callRpc<WeightRecord>("update_weight_measurement_authorized", {
-    p_actor: actor,
-    p_weight_id: id,
-    p_payload: payload,
-    p_space_slug: coupleSpaceSlug(),
-  }, "write");
+export function updateWeight(id: string, payload: WeightWritePayload, actor?: "cat" | "fish") {
+  return callRpc<WeightRecord>(
+    actor ? "update_weight_measurement_authorized" : "update_weight_measurement",
+    actor
+      ? { p_actor: actor, p_weight_id: id, p_payload: payload, p_space_slug: coupleSpaceSlug() }
+      : { p_weight_id: id, p_payload: payload, p_space_slug: coupleSpaceSlug() },
+    "write",
+  );
 }
 
-export function deleteWeight(id: string, actor: "cat" | "fish") {
-  return callRpc<WeightRecord>("delete_weight_measurement_authorized", {
-    p_actor: actor,
-    p_weight_id: id,
-    p_space_slug: coupleSpaceSlug(),
-  }, "write");
+export function deleteWeight(id: string, actor?: "cat" | "fish") {
+  return callRpc<WeightRecord>(
+    actor ? "delete_weight_measurement_authorized" : "delete_weight_measurement",
+    actor
+      ? { p_actor: actor, p_weight_id: id, p_space_slug: coupleSpaceSlug() }
+      : { p_weight_id: id, p_space_slug: coupleSpaceSlug() },
+    "write",
+  );
 }
