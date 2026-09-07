@@ -59,7 +59,10 @@ export async function PUT(request: Request) {
     medicineOffsets.length > 10 ||
     medicineOffsets.some(
       (value: unknown) =>
-        !Number.isInteger(value) || Number(value) < 0 || Number(value) > 90,
+        typeof value !== "number" ||
+        !Number.isInteger(value) ||
+        value < 0 ||
+        value > 90,
     )
   ) {
     return lifeJsonError("药箱提醒设置无效", 400, "INVALID_REMINDER_SETTINGS");
@@ -68,7 +71,7 @@ export async function PUT(request: Request) {
   try {
     const settings = await updateLifeReminderSettings(currentActor, {
       medicineReminderEnabled,
-      medicineOffsets: medicineOffsets.map(Number),
+      medicineOffsets,
     });
     return NextResponse.json(
       { ok: true, settings },
