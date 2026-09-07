@@ -17,6 +17,7 @@ import { defaultMealPhotoDisplay, parseMealWritePayload } from "../nutrition/mea
 import {
   createActivity,
   deleteActivity,
+  deleteMood,
   getLifeDay,
   getLifeMonthMoods,
   updateActivity,
@@ -299,7 +300,7 @@ function capabilities(identity: FixedLifeIdentity) {
       legacy_home: "旧 /game 完整同步快照",
     },
     mutate: {
-      mood: "upsert；只写当前 OAuth 账号",
+      mood: "upsert/delete；只操作当前 OAuth 账号",
       sleep: "upsert；只写当前 OAuth 账号；支持 bedtime/sleepTime 与 wakeTime 等别名",
       activity: "create/update/delete；participantScope=me/both；both 创建一条双方共享活动",
       meal: "create/update/delete；只写当前 OAuth 账号；可 attachPhoto",
@@ -393,7 +394,8 @@ async function mutateLife(args: JsonRecord, context: LifeAgentExecutionContext) 
   switch (resource) {
     case "mood": {
       requireOwnMutationTarget(args, data, context);
-      if (action !== "upsert") throw new Error("mood 只支持 upsert");
+      if (action === "delete") return deleteMood(requireId(args), actor);
+      if (action !== "upsert") throw new Error("mood 只支持 upsert/delete");
       const date = stringValue(data.moodDate);
       const parsed = parseMoodWritePayload({
         ...data,
