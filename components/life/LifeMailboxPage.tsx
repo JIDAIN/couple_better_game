@@ -22,44 +22,53 @@ import { useStaleQuery } from "@/lib/client/use-stale-query";
 type Tab = "inbox" | "sent" | "draft";
 type FormatFilter = "all" | MailboxFormat;
 
+type MailboxGroup = {
+  month: string;
+  items: MailboxLetter[];
+};
+
 const EMPTY_LETTERS: MailboxLetter[] = [];
 const PAGE_BREAK = "\n\f\n";
 const LETTER_PAGE_CHARS = 460;
-const THEMES = [
-  { key: "cream", label: "奶油", swatch: "🍪" },
-  { key: "forest", label: "森林", swatch: "🌿" },
-  { key: "sea", label: "海边", swatch: "🐚" },
-  { key: "sunset", label: "晚霞", swatch: "🌇" },
-] as const;
+const THEME_KEYS = ["cream", "forest", "sea", "sunset"] as const;
 
 function monthKey(value: string | null) {
   return value ? value.slice(0, 7) : "";
 }
+
 function monthText(value: string) {
   const [year, month] = value.split("-").map(Number);
   return `${year}年${month}月`;
 }
+
 function dateText(value: string | null) {
   if (!value) return "尚未寄出";
   const d = new Date(value);
-  return new Intl.DateTimeFormat("zh-CN", {
+  const date = new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
-    month: "long",
-    day: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d).replaceAll("/", ".");
+  const time = new Intl.DateTimeFormat("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   }).format(d);
+  return `${date} ${time}`;
 }
+
 function firstSentence(value: string) {
   const text = value.replaceAll(PAGE_BREAK, "\n").trim().replace(/\s+/g, " ");
   const match = text.match(/^.*?[。！？.!?](?:\s|$)/);
   return (match?.[0] ?? text).trim();
 }
+
 function themeClass(themeKey: string) {
-  return THEMES.some((theme) => theme.key === themeKey)
+  return THEME_KEYS.some((theme) => theme === themeKey)
     ? `theme-${themeKey}`
     : "theme-cream";
 }
+
 function splitLetterPages(value: string) {
   if (value.includes(PAGE_BREAK)) {
     const explicit = value.split(PAGE_BREAK);
@@ -72,9 +81,11 @@ function splitLetterPages(value: string) {
   }
   return pages.length ? pages : [""];
 }
+
 function bodyFromPages(pages: string[]) {
   return pages.join(PAGE_BREAK);
 }
+
 function readableBody(value: string) {
   return value.replaceAll(PAGE_BREAK, "\n");
 }
@@ -82,27 +93,104 @@ function readableBody(value: string) {
 function MailboxTabIcon({ tab }: { tab: Tab }) {
   if (tab === "sent") {
     return (
-      <svg viewBox="0 0 48 36" className="h-8 w-11" fill="none" aria-hidden>
-        <path d="M5 28 41 6 28 31l-7-10-16 7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="m21 21 20-15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <svg viewBox="0 0 58 46" className="life-mailbox-tab-art" fill="none" aria-hidden>
+        <path d="M10 31 45 11 36 37 27 29 10 31Z" fill="#fff9ed" stroke="#8f755d" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="m27 29 18-18" stroke="#8f755d" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="m17 33-4 5m9-4-2 6" stroke="#c79c67" strokeWidth="1.3" strokeLinecap="round" strokeDasharray="2 2" />
+        <path d="M7 39c4-4 7-5 11-4-2 4-5 6-11 4Z" fill="#a9c48f" stroke="#78916b" strokeWidth="1" />
       </svg>
     );
   }
   if (tab === "draft") {
     return (
-      <svg viewBox="0 0 48 36" className="h-8 w-11" fill="none" aria-hidden>
-        <path d="M6 10h26v19H6z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="m6 11 13 10 8-6" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-        <path d="m28 24 10-10 4 4-10 10-6 2 2-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <svg viewBox="0 0 58 46" className="life-mailbox-tab-art" fill="none" aria-hidden>
+        <rect x="13" y="7" width="27" height="31" rx="3" fill="#fffaf0" stroke="#8f755d" strokeWidth="1.4" />
+        <path d="M18 14h16M18 20h16M18 26h12" stroke="#d3bd9b" strokeWidth="1.2" strokeLinecap="round" />
+        <path d="m34 31 11-11 4 4-11 11-6 2 2-6Z" fill="#efb37b" stroke="#8f755d" strokeWidth="1.2" strokeLinejoin="round" />
+        <path d="M8 40c4-6 7-8 12-7-1 5-5 8-12 7Z" fill="#a8c78f" stroke="#78916b" strokeWidth="1" />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 48 36" className="h-8 w-11" fill="none" aria-hidden>
-      <path d="M5 12h38v19H5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="m5 13 19 13 19-13" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-      <path d="M24 3v11m0 0-5-5m5 5 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 58 46" className="life-mailbox-tab-art" fill="none" aria-hidden>
+      <path d="M15 16h30v23H15z" fill="#fff7e7" stroke="#8f755d" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="m15 18 15 12 15-12" stroke="#c68255" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M24 16v-6h12v6" stroke="#8f755d" strokeWidth="1.3" strokeLinejoin="round" />
+      <circle cx="30" cy="11" r="2.2" fill="#e88c59" />
+      <path d="M8 39c2-7 6-11 11-12 1 6-2 11-11 12Z" fill="#abc793" stroke="#78916b" strokeWidth="1" />
+      <path d="M48 38c-1-5 1-8 5-11 2 5 1 9-5 11Z" fill="#b9cf9f" stroke="#78916b" strokeWidth="1" />
     </svg>
+  );
+}
+
+function MailboxPreviewArt({ format, draft }: { format: MailboxFormat; draft: boolean }) {
+  if (format === "postcard") {
+    return (
+      <svg viewBox="0 0 64 52" className="life-mailbox-preview-svg" fill="none" aria-hidden>
+        <rect x="6" y="8" width="52" height="36" rx="4" fill="#fffaf0" stroke="#d7b68f" strokeWidth="1.2" />
+        <path d="M7 35c9-11 15-11 23-2 6-8 13-8 27 1v9H7v-8Z" fill="#aed6d2" />
+        <path d="M7 37c10-7 17-7 25 0 7-5 14-5 25 0" stroke="#6aa1a5" strokeWidth="1.2" />
+        <circle cx="46" cy="17" r="5" fill="#f5d59a" />
+        <path d="M13 17h14M13 21h11" stroke="#d4b18d" strokeWidth="1" strokeLinecap="round" />
+        {draft ? <path d="m43 38 8-8 3 3-8 8-5 1 2-4Z" fill="#ef9d67" stroke="#9b6f55" strokeWidth="1" /> : null}
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 64 52" className="life-mailbox-preview-svg" fill="none" aria-hidden>
+      <rect x="15" y="5" width="35" height="42" rx="3" fill="#fffaf0" stroke="#d7b68f" strokeWidth="1.2" />
+      <path d="M21 14h22M21 19h22M21 24h18M21 29h20M21 34h15" stroke="#d9c5a7" strokeWidth="1" strokeLinecap="round" />
+      <path d="M13 9c5 2 8 5 9 9-5 0-8-3-9-9Z" fill="#e9b38e" />
+      <path d="M46 38c4-1 7 1 9 5-5 1-8-1-9-5Z" fill="#9dbb82" />
+      {draft ? <path d="m40 38 9-9 3 3-9 9-5 1 2-4Z" fill="#ef9d67" stroke="#9b6f55" strokeWidth="1" /> : null}
+    </svg>
+  );
+}
+
+function LetterCornerArt({ position }: { position: "top" | "bottom" }) {
+  return (
+    <svg
+      viewBox="0 0 130 80"
+      className={`life-letter-corner-art is-${position}`}
+      fill="none"
+      aria-hidden
+    >
+      <path d="M4 65c24-12 29-29 34-56" stroke="#78916b" strokeWidth="2" strokeLinecap="round" />
+      <path d="M23 42c-12 0-18-6-20-15 11-2 19 3 20 15ZM29 31c1-12 7-19 17-21 2 11-4 19-17 21Z" fill="#a8c58d" />
+      <path d="M44 57c16-7 33-8 49-2" stroke="#b98a69" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="52" cy="55" r="6" fill="#efb491" />
+      <circle cx="63" cy="51" r="5" fill="#f3c4a6" />
+      <circle cx="74" cy="55" r="5.5" fill="#e9ad88" />
+      <path d="M89 56c9-11 18-15 30-15-3 10-11 16-30 15Z" fill="#c3d4a7" />
+    </svg>
+  );
+}
+
+function PostcardSceneArt() {
+  return (
+    <svg viewBox="0 0 180 92" className="life-postcard-scene" fill="none" aria-hidden>
+      <path d="M0 72c28-22 47-24 68-8 22-28 50-31 88 2l24 12v14H0V72Z" fill="#b7d9d0" />
+      <path d="M0 78c38-13 67-12 94 1 31-15 59-14 86 2v11H0V78Z" fill="#91c7ce" />
+      <path d="M12 85c36-8 72-8 108 0 18-5 38-5 60 0" stroke="#fff7e9" strokeWidth="2" />
+      <path d="m102 62 17 12H86l16-12Z" fill="#f2dfba" stroke="#9a7d63" strokeWidth="1" />
+      <path d="M102 44v19" stroke="#9a7d63" strokeWidth="1.3" />
+      <path d="m103 45 14 8h-14V45Z" fill="#e48d65" />
+      <circle cx="151" cy="22" r="10" fill="#f3d79d" opacity=".9" />
+      <path d="M16 24c14-8 26-8 39 0" stroke="#c6dfe2" strokeWidth="6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PostcardStamp() {
+  return (
+    <div className="life-postcard-stamp" aria-hidden>
+      <span className="life-postcard-postmark" />
+      <svg viewBox="0 0 48 58" fill="none">
+        <path d="M4 4h40v50H4z" fill="#d9edf0" stroke="#8ba9a7" strokeWidth="1.2" />
+        <path d="M8 42c8-10 15-12 22-4 5-6 9-6 10-4v15H8v-7Z" fill="#94c9ca" />
+        <circle cx="34" cy="15" r="6" fill="#f2d59b" />
+      </svg>
+    </div>
   );
 }
 
@@ -111,6 +199,7 @@ export function LifeMailboxPage() {
   const [tab, setTab] = useState<Tab>("inbox");
   const [month, setMonth] = useState("all");
   const [formatFilter, setFormatFilter] = useState<FormatFilter>("all");
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<MailboxLetter | null | undefined>(undefined);
@@ -131,15 +220,6 @@ export function LifeMailboxPage() {
   const letters = lettersQuery.data ?? EMPTY_LETTERS;
   const visibleError = error ?? lettersQuery.error?.message ?? null;
 
-  const counts = useMemo(() => {
-    if (!mePartnerKey) return { inbox: 0, sent: 0, draft: 0 };
-    return {
-      inbox: letters.filter((item) => item.status === "sent" && item.recipientKey === mePartnerKey).length,
-      sent: letters.filter((item) => item.status === "sent" && item.senderKey === mePartnerKey).length,
-      draft: letters.filter((item) => item.status === "draft" && item.senderKey === mePartnerKey).length,
-    };
-  }, [letters, mePartnerKey]);
-
   const tabLetters = useMemo(() => {
     if (!mePartnerKey) return [];
     if (tab === "draft") {
@@ -148,15 +228,29 @@ export function LifeMailboxPage() {
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     }
     if (tab === "sent") {
-      return letters.filter((item) => item.status === "sent" && item.senderKey === mePartnerKey);
+      return letters
+        .filter((item) => item.status === "sent" && item.senderKey === mePartnerKey)
+        .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
     }
-    return letters.filter((item) => item.status === "sent" && item.recipientKey === mePartnerKey);
+    return letters
+      .filter((item) => item.status === "sent" && item.recipientKey === mePartnerKey)
+      .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""));
   }, [letters, mePartnerKey, tab]);
 
   const months = useMemo(
     () => Array.from(new Set(tabLetters.map((item) => monthKey(item.sentAt)).filter(Boolean))).sort((a, b) => b.localeCompare(a)),
     [tabLetters],
   );
+
+  const monthCounts = useMemo(() => {
+    const result = new Map<string, number>();
+    for (const item of tabLetters) {
+      const key = monthKey(item.sentAt);
+      if (!key) continue;
+      result.set(key, (result.get(key) ?? 0) + 1);
+    }
+    return result;
+  }, [tabLetters]);
 
   const visible = useMemo(
     () => tabLetters.filter((item) => {
@@ -167,6 +261,18 @@ export function LifeMailboxPage() {
     [formatFilter, month, tab, tabLetters],
   );
 
+  const groupedVisible = useMemo<MailboxGroup[]>(() => {
+    if (tab === "draft") return [];
+    const groups: MailboxGroup[] = [];
+    for (const item of visible) {
+      const key = monthKey(item.sentAt);
+      const existing = groups.find((group) => group.month === key);
+      if (existing) existing.items.push(item);
+      else groups.push({ month: key, items: [item] });
+    }
+    return groups;
+  }, [tab, visible]);
+
   function roleLabel(key: MailboxPartnerKey) {
     return key === mePartnerKey ? "我" : "Ta";
   }
@@ -175,6 +281,7 @@ export function LifeMailboxPage() {
     setTab(value);
     setMonth("all");
     setFormatFilter("all");
+    setMonthPickerOpen(false);
     setNotice(null);
     setError(null);
   }
@@ -304,7 +411,7 @@ export function LifeMailboxPage() {
       ]);
       setEditing(undefined);
       setForm(null);
-      setNotice(mode === "sent" ? "已经寄出，之后会保持只读。" : "已保存到待寄出。 ");
+      setNotice(mode === "sent" ? "已经寄出，之后会保持只读。" : "已保存到待寄出。");
       setActiveTab(mode === "sent" ? "sent" : "draft");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : mode === "sent" ? "寄出失败" : "保存失败");
@@ -325,7 +432,7 @@ export function LifeMailboxPage() {
         ...(current ?? []).filter((row) => row.id !== item.id),
       ]);
       if (reading?.id === item.id) setReading(sent);
-      setNotice("已经寄出，内容现在只读。 ");
+      setNotice("已经寄出，内容现在只读。");
       setActiveTab("sent");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "寄出失败");
@@ -349,6 +456,41 @@ export function LifeMailboxPage() {
     }
   }
 
+  function renderPreview(item: MailboxLetter) {
+    const timestamp = tab === "draft" ? item.updatedAt : item.sentAt;
+    const timestampLabel = tab === "draft" ? "最后编辑" : tab === "inbox" ? "来自 Ta" : "寄给 Ta";
+    return (
+      <article
+        key={item.id}
+        className={`life-letter-preview ${item.format === "postcard" ? "is-postcard" : "is-letter"} ${themeClass(item.themeKey)}`}
+      >
+        <button type="button" className="life-letter-preview-main" onClick={() => openRead(item)}>
+          <span className="life-mailbox-preview-thumb">
+            <MailboxPreviewArt format={item.format} draft={item.status === "draft"} />
+          </span>
+          <span className="life-mailbox-preview-copy">
+            <strong>{item.format === "letter" ? (item.title || "没有标题的手札") : firstSentence(item.body)}</strong>
+            <span className="life-mailbox-preview-meta">
+              <em className={item.format === "postcard" ? "is-postcard" : item.status === "draft" ? "is-draft" : "is-letter"}>
+                {item.format === "postcard" ? "明信片" : item.status === "draft" ? "待寄出" : "手札"}
+              </em>
+              <span>{timestampLabel}</span>
+              <time>{dateText(timestamp)}</time>
+            </span>
+          </span>
+          <span className="life-mailbox-preview-chevron" aria-hidden>›</span>
+        </button>
+        {item.status === "draft" ? (
+          <div className="life-letter-preview-actions">
+            <button disabled={busyId === item.id} onClick={() => openEdit(item)}>编辑</button>
+            <button disabled={busyId === item.id} onClick={() => void sendDraft(item)}>寄出</button>
+            <button disabled={busyId === item.id} onClick={() => void removeDraft(item)}>删除</button>
+          </div>
+        ) : null}
+      </article>
+    );
+  }
+
   if (!mePartnerKey || !taPartnerKey) {
     return (
       <AppPageShell title="小信箱" subtitle="正在确认当前账号…">
@@ -365,12 +507,23 @@ export function LifeMailboxPage() {
   return (
     <>
       <AppPageShell
-        title="小信箱"
-        subtitle="写的时候慢一点，寄出去以后就让它好好待在那里。"
-        actions={<Link href="/nest" className="life-back-link">返回小窝</Link>}
+        title={(
+          <span className="life-mailbox-header-title">
+            <Link href="/nest" className="life-mailbox-back" aria-label="返回小窝">‹</Link>
+            <span>小信箱</span>
+          </span>
+        )}
+        actions={(
+          <button type="button" onClick={openCreate} className="life-mailbox-compose-top" aria-label="写给 Ta">
+            <svg viewBox="0 0 28 28" fill="none" aria-hidden>
+              <path d="M6 8h13v13H6z" stroke="currentColor" strokeWidth="1.6" />
+              <path d="m15 14 7-7 2 2-7 7-4 1 2-3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
       >
-        <section className="life-surface life-section-card">
-          <div className="grid grid-cols-3 gap-2">
+        <section className="life-mailbox-toolbar-v3">
+          <div className="life-mailbox-tabs-v3">
             {([
               ["inbox", "收信箱"],
               ["sent", "已寄出"],
@@ -380,197 +533,172 @@ export function LifeMailboxPage() {
                 key={value}
                 type="button"
                 onClick={() => setActiveTab(value)}
-                className={`rounded-[22px] border px-2 py-3 text-center transition ${
-                  tab === value
-                    ? "border-[var(--life-teal)] bg-white text-[var(--life-teal-strong)] shadow-[var(--life-shadow-soft)]"
-                    : "border-[var(--life-border-soft)] bg-[var(--life-surface-soft)] text-[var(--life-text-muted)]"
-                }`}
+                className={tab === value ? "is-active" : ""}
               >
-                <span className="mx-auto flex h-9 items-center justify-center"><MailboxTabIcon tab={value} /></span>
-                <span className="mt-1 block text-xs font-black">{label}</span>
-                <span className="mt-0.5 block text-[10px] font-bold opacity-70">{counts[value]} 封</span>
+                <MailboxTabIcon tab={value} />
+                <span>{label}</span>
               </button>
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={openCreate}
-            className="mt-3 w-full rounded-2xl bg-[var(--life-teal)] px-4 py-3 text-sm font-extrabold text-white"
-          >
-            写给 Ta
-          </button>
-
-          <div className="life-mailbox-format-filter mt-3 grid grid-cols-3 gap-1 rounded-full bg-[var(--life-surface-soft)] p-1">
-            {(["all", "letter", "postcard"] as FormatFilter[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setFormatFilter(value)}
-                className={formatFilter === value ? "is-active" : ""}
-              >
-                {value === "all" ? "所有" : value === "letter" ? "手札" : "明信片"}
-              </button>
-            ))}
-          </div>
-
-          {tab !== "draft" ? (
-            <div className="life-mailbox-filter mt-3 flex items-center justify-between gap-3">
-              <p className="text-xs font-extrabold text-[var(--life-text)]">时间归档</p>
-              <label className="relative shrink-0">
-                <span className="sr-only">筛选月份</span>
-                <select
-                  value={month}
-                  onChange={(event) => setMonth(event.target.value)}
-                  className="life-mailbox-month-select appearance-none rounded-full border border-[var(--life-border-soft)] bg-white/80 py-2 pl-3 pr-8 text-xs font-extrabold text-[var(--life-teal-strong)] outline-none"
+          <div className="life-mailbox-controls-v3">
+            <div className="life-mailbox-format-filter">
+              {(["all", "letter", "postcard"] as FormatFilter[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFormatFilter(value)}
+                  className={formatFilter === value ? "is-active" : ""}
                 >
-                  <option value="all">全部月份</option>
-                  {months.map((value) => <option key={value} value={value}>{monthText(value)}</option>)}
-                </select>
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[var(--life-teal-strong)]">⌄</span>
-              </label>
+                  {value === "all" ? "所有" : value === "letter" ? "手札" : "明信片"}
+                </button>
+              ))}
             </div>
-          ) : (
-            <p className="mt-3 border-t border-[var(--life-border-soft)] pt-3 text-[10px] font-bold text-[var(--life-text-muted)]">
-              待寄出按“最后编辑时间”排列；只有这里的内容可以继续修改。
-            </p>
-          )}
+
+            {tab !== "draft" ? (
+              <button type="button" className="life-mailbox-month-trigger" onClick={() => setMonthPickerOpen(true)}>
+                {month === "all" ? "全部月份" : monthText(month)}
+                <span aria-hidden>⌄</span>
+              </button>
+            ) : (
+              <span className="life-mailbox-draft-note">按最后编辑时间排列</span>
+            )}
+          </div>
         </section>
 
         {visibleError ? (
-          <div className="mt-3 rounded-2xl bg-[color:color-mix(in_srgb,var(--life-coral)_14%,white)] px-3 py-2.5 text-sm text-[var(--life-danger)]">
-            {visibleError}
-          </div>
+          <div className="life-mailbox-feedback is-error">{visibleError}</div>
         ) : null}
         {notice ? (
-          <div className="mt-3 rounded-2xl bg-[var(--life-surface-soft)] px-3 py-2.5 text-xs font-bold text-[var(--life-teal-strong)]">
-            {notice}
-          </div>
+          <div className="life-mailbox-feedback">{notice}</div>
         ) : null}
 
-        <div className="mt-3 grid gap-3">
+        <div className="life-mailbox-list-v3">
           {!lettersQuery.loading && visible.length === 0 ? (
-            <div className="life-surface life-section-card text-center">
-              <div className="mx-auto flex h-12 w-16 items-center justify-center text-[var(--life-teal-strong)]"><MailboxTabIcon tab={tab} /></div>
-              <p className="mt-2 text-sm font-bold text-[var(--life-text-body)]">
-                {tab === "inbox" ? "收信箱还是空的" : tab === "sent" ? "还没有寄出的内容" : "没有待寄出的草稿"}
-              </p>
+            <div className="life-mailbox-empty-v3">
+              <MailboxTabIcon tab={tab} />
+              <p>{tab === "inbox" ? "收信箱还是空的" : tab === "sent" ? "还没有寄出的内容" : "没有待寄出的草稿"}</p>
+              <button type="button" onClick={openCreate}>写一封给 Ta</button>
             </div>
           ) : null}
 
-          {visible.map((item) => {
-            const timestamp = tab === "draft" ? item.updatedAt : item.sentAt;
-            const timestampLabel = tab === "draft" ? "最后编辑" : tab === "inbox" ? "收到于" : "寄出于";
-            return (
-              <article
-                key={item.id}
-                className={`life-letter-preview ${item.format === "postcard" ? "is-postcard" : "is-letter"} ${themeClass(item.themeKey)}`}
-              >
-                <button type="button" className="life-letter-preview-main text-left" onClick={() => openRead(item)}>
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[10px] font-extrabold text-[var(--life-text-muted)]">
-                      {roleLabel(item.senderKey)} → {roleLabel(item.recipientKey)} · {timestampLabel} {dateText(timestamp)}
-                    </p>
-                    <span className="life-letter-stamp">{item.format === "postcard" ? "明信片" : item.status === "draft" ? "草稿手札" : "手札"}</span>
-                  </div>
-                  {item.format === "letter" ? (
-                    <>
-                      <h2 className="mt-3 line-clamp-1 text-base font-black text-[var(--life-text)]">{item.title || "没有标题的手札"}</h2>
-                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--life-text-body)]">{readableBody(item.body)}</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="mt-3 text-[10px] font-extrabold tracking-[0.14em] text-[var(--life-text-muted)]">POSTCARD</p>
-                      <h2 className="mt-2 line-clamp-2 text-base font-black leading-6 text-[var(--life-text)]">{firstSentence(item.body)}</h2>
-                    </>
-                  )}
-                  <span className="life-letter-read-hint">点开查看完整内容 <span aria-hidden>›</span></span>
-                </button>
+          {tab === "draft" && visible.length > 0 ? (
+            <section className="life-mailbox-month-group">
+              <h2>还没寄出的信</h2>
+              <div>{visible.map(renderPreview)}</div>
+            </section>
+          ) : null}
 
-                {item.status === "draft" ? (
-                  <div className="life-letter-preview-actions">
-                    <button disabled={busyId === item.id} onClick={() => openEdit(item)}>编辑</button>
-                    <button disabled={busyId === item.id} onClick={() => void sendDraft(item)}>寄出</button>
-                    <button disabled={busyId === item.id} onClick={() => void removeDraft(item)}>删除</button>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
+          {tab !== "draft" ? groupedVisible.map((group) => (
+            <section key={group.month} className="life-mailbox-month-group">
+              <h2>{monthText(group.month)}</h2>
+              <div>{group.items.map(renderPreview)}</div>
+            </section>
+          )) : null}
         </div>
       </AppPageShell>
 
+      {monthPickerOpen && tab !== "draft" ? (
+        <div className="life-mailbox-picker-backdrop" onMouseDown={() => setMonthPickerOpen(false)}>
+          <div className="life-mailbox-month-sheet" onMouseDown={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className={month === "all" ? "is-selected" : ""}
+              onClick={() => { setMonth("all"); setMonthPickerOpen(false); }}
+            >
+              <span>全部月份</span>
+              {month === "all" ? <strong>✓</strong> : null}
+            </button>
+            {months.map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={month === value ? "is-selected" : ""}
+                onClick={() => { setMonth(value); setMonthPickerOpen(false); }}
+              >
+                <span>{monthText(value)} <small>({monthCounts.get(value) ?? 0})</small></span>
+                {month === value ? <strong>✓</strong> : null}
+              </button>
+            ))}
+            <button type="button" className="is-cancel" onClick={() => setMonthPickerOpen(false)}>取消</button>
+          </div>
+        </div>
+      ) : null}
+
       {reading ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-3" onMouseDown={() => setReading(null)}>
+        <div className="life-mailbox-reader-backdrop" onMouseDown={() => setReading(null)}>
+          <button
+            type="button"
+            className="life-mailbox-reader-close"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={() => setReading(null)}
+            aria-label="关闭"
+          >
+            ×
+          </button>
+
           {reading.format === "postcard" ? (
             <article
-              className={`island-life-v2 ${themeClass(reading.themeKey)} relative aspect-[1.62/1] w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/70 bg-[var(--life-surface)] p-5 shadow-[var(--life-shadow-float)] sm:p-7`}
+              className={`island-life-v2 life-postcard-modal ${themeClass(reading.themeKey)}`}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <div className="flex h-full flex-col">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black tracking-[0.16em] text-[var(--life-text-muted)]">POSTCARD</p>
-                    <p className="mt-1 text-[10px] text-[var(--life-text-muted)]">
-                      {roleLabel(reading.senderKey)} → {roleLabel(reading.recipientKey)} · {reading.status === "draft" ? `最后编辑 ${dateText(reading.updatedAt)}` : `寄出于 ${dateText(reading.sentAt)}`}
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => setReading(null)} className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-extrabold text-[var(--life-text-body)]">关闭</button>
-                </div>
-                <div className="my-auto grid grid-cols-[1fr_auto] items-stretch gap-5">
-                  <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--life-text-body)] sm:text-base sm:leading-8">{readableBody(reading.body)}</p>
-                  <div className="w-px bg-[var(--life-border-soft)]" />
-                </div>
-                {reading.status === "draft" ? (
-                  <div className="flex gap-4 text-xs font-extrabold text-[var(--life-teal-strong)]">
-                    <button onClick={() => openEdit(reading)}>编辑草稿</button>
-                    <button onClick={() => void sendDraft(reading)}>寄出</button>
-                  </div>
-                ) : null}
+              <div className="life-postcard-message-side">
+                <p className="life-postcard-kicker">POSTCARD</p>
+                <p className="life-postcard-meta">
+                  {roleLabel(reading.senderKey)} → {roleLabel(reading.recipientKey)} · {reading.status === "draft" ? `最后编辑 ${dateText(reading.updatedAt)}` : `寄出于 ${dateText(reading.sentAt)}`}
+                </p>
+                <p className="life-postcard-message">{readableBody(reading.body)}</p>
+                <PostcardSceneArt />
               </div>
+              <div className="life-postcard-address-side">
+                <PostcardStamp />
+                <div className="life-postcard-address-lines" aria-hidden>
+                  <span /><span /><span />
+                </div>
+                <p>TO · {roleLabel(reading.recipientKey)}</p>
+              </div>
+              {reading.status === "draft" ? (
+                <div className="life-postcard-draft-actions">
+                  <button onClick={() => openEdit(reading)}>编辑草稿</button>
+                  <button onClick={() => void sendDraft(reading)}>寄出</button>
+                </div>
+              ) : null}
             </article>
           ) : (
             <article
-              className={`island-life-v2 life-letter-reader ${themeClass(reading.themeKey)}`}
+              className={`island-life-v2 life-letter-reader life-letter-paper-modal ${themeClass(reading.themeKey)}`}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-extrabold text-[var(--life-text-muted)]">{roleLabel(reading.senderKey)} 写给 {roleLabel(reading.recipientKey)}</p>
-                  <p className="mt-1 text-[10px] text-[var(--life-text-muted)]">
-                    {reading.status === "draft" ? `最后编辑 ${dateText(reading.updatedAt)}` : `寄出于 ${dateText(reading.sentAt)}`}
-                  </p>
-                </div>
-                <button type="button" onClick={() => setReading(null)} className="rounded-full bg-white/60 px-3 py-1.5 text-xs font-extrabold text-[var(--life-text-body)]">关闭</button>
-              </div>
-
-              <h2 className="mt-5 text-xl font-black text-[var(--life-text)]">{reading.title || "没有标题的手札"}</h2>
-              <div className="life-letter-reader-body mt-5 min-h-[19rem] whitespace-pre-wrap text-sm leading-8 text-[var(--life-text-body)]">
+              <LetterCornerArt position="top" />
+              <LetterCornerArt position="bottom" />
+              <header className="life-letter-paper-header">
+                <h2>{reading.title || "没有标题的手札"}</h2>
+                <p>{dateText(reading.status === "draft" ? reading.updatedAt : reading.sentAt)} · {roleLabel(reading.senderKey)} 写给 {roleLabel(reading.recipientKey)}</p>
+              </header>
+              <div className="life-letter-reader-body life-letter-paper-body">
                 {readerPages[activeReaderPage]}
               </div>
-
-              <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--life-border-soft)] pt-3">
+              <footer className="life-letter-page-footer">
                 <button
                   type="button"
                   disabled={activeReaderPage === 0}
                   onClick={() => setReaderPage((value) => Math.max(0, value - 1))}
-                  className="text-xs font-extrabold text-[var(--life-teal-strong)] disabled:opacity-30"
+                  aria-label="上一页"
                 >
-                  ← 上一页
+                  ‹
                 </button>
-                <span className="text-[10px] font-bold text-[var(--life-text-muted)]">第 {activeReaderPage + 1} / {readerPages.length} 页</span>
+                <span>{activeReaderPage + 1} / {readerPages.length}</span>
                 <button
                   type="button"
                   disabled={activeReaderPage >= readerPages.length - 1}
                   onClick={() => setReaderPage((value) => Math.min(readerPages.length - 1, value + 1))}
-                  className="text-xs font-extrabold text-[var(--life-teal-strong)] disabled:opacity-30"
+                  aria-label="下一页"
                 >
-                  下一页 →
+                  ›
                 </button>
-              </div>
-
+              </footer>
               {reading.status === "draft" ? (
-                <div className="mt-4 flex gap-4 text-xs font-extrabold text-[var(--life-teal-strong)]">
+                <div className="life-letter-draft-actions">
                   <button type="button" onClick={() => openEdit(reading)}>编辑草稿</button>
                   <button type="button" onClick={() => void sendDraft(reading)}>寄出</button>
                 </div>
@@ -581,111 +709,88 @@ export function LifeMailboxPage() {
       ) : null}
 
       {editing !== undefined && form ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center">
-          <div className="island-life-v2 max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-[28px] bg-[var(--life-surface)] p-4 shadow-[var(--life-shadow-float)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-extrabold">{editing ? "编辑待寄出" : "写给 Ta"}</h2>
-                <p className="mt-1 text-[10px] font-bold text-[var(--life-text-muted)]">寄出以后将变成只读，不能再修改。</p>
-              </div>
-              <button onClick={() => { setEditing(undefined); setForm(null); }} className="rounded-full bg-[var(--life-surface-soft)] px-3 py-1.5 text-sm">关闭</button>
+        <div className="life-mailbox-editor-backdrop">
+          <div className="island-life-v2 life-mailbox-editor-panel">
+            <header className="life-mailbox-editor-header">
+              <button
+                type="button"
+                className="life-mailbox-editor-close"
+                onClick={() => { setEditing(undefined); setForm(null); }}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+              <strong>{editing ? "编辑待寄出" : "写给 Ta"}</strong>
+              <button type="button" className="life-mailbox-editor-done" disabled={saving} onClick={() => void persist("draft")}>完成</button>
+            </header>
+
+            <div className="life-mailbox-editor-type-switch">
+              <button type="button" onClick={() => setFormat("letter")} className={form.format === "letter" ? "is-active" : ""}>手札</button>
+              <button type="button" onClick={() => setFormat("postcard")} className={form.format === "postcard" ? "is-active" : ""}>明信片</button>
             </div>
 
-            <div className="mt-4 grid gap-3">
-              <p className="rounded-2xl bg-[var(--life-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--life-text-body)]">我 → Ta</p>
-
-              <div>
-                <p className="mb-1 text-xs font-bold">样式</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setFormat("letter")} className={`rounded-2xl border px-3 py-3 text-sm font-bold ${form.format === "letter" ? "border-[var(--life-teal)] bg-[var(--life-surface-soft)]" : "border-[var(--life-border)]"}`}>手札</button>
-                  <button type="button" onClick={() => setFormat("postcard")} className={`rounded-2xl border px-3 py-3 text-sm font-bold ${form.format === "postcard" ? "border-[var(--life-teal)] bg-[var(--life-surface-soft)]" : "border-[var(--life-border)]"}`}>明信片</button>
-                </div>
-              </div>
-
-              {form.format === "letter" ? (
-                <label className="text-xs font-bold">
-                  标题
+            {form.format === "letter" ? (
+              <>
+                <div className={`life-letter-reader life-letter-compose-paper ${themeClass(form.themeKey ?? "cream")}`}>
+                  <LetterCornerArt position="top" />
+                  <LetterCornerArt position="bottom" />
                   <input
                     value={form.title ?? ""}
                     maxLength={120}
                     onChange={(event) => setForm({ ...form, title: event.target.value })}
                     placeholder="给这份手札起个名字"
-                    className="mt-1 w-full rounded-2xl border border-[var(--life-border)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--life-teal)]"
+                    className="life-letter-compose-title"
                   />
-                </label>
-              ) : null}
-
-              <div>
-                <p className="mb-1 text-xs font-bold">纸张主题</p>
-                <div className="grid grid-cols-4 gap-2">
-                  {THEMES.map((theme) => (
-                    <button
-                      key={theme.key}
-                      type="button"
-                      onClick={() => setForm({ ...form, themeKey: theme.key })}
-                      className={`life-mail-theme-choice ${form.themeKey === theme.key ? "is-active" : ""}`}
-                    >
-                      <span>{theme.swatch}</span><small>{theme.label}</small>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {form.format === "letter" ? (
-                <div className={`rounded-[26px] border border-[var(--life-border-soft)] bg-white/80 p-3 ${themeClass(form.themeKey ?? "cream")}`}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <button type="button" disabled={editorPage === 0} onClick={() => setEditorPage((value) => Math.max(0, value - 1))} className="text-xs font-extrabold text-[var(--life-teal-strong)] disabled:opacity-30">← 上一页</button>
-                    <span className="text-[10px] font-bold text-[var(--life-text-muted)]">信纸 {editorPage + 1} / {letterPages.length}</span>
-                    <button type="button" disabled={editorPage >= letterPages.length - 1} onClick={() => setEditorPage((value) => Math.min(letterPages.length - 1, value + 1))} className="text-xs font-extrabold text-[var(--life-teal-strong)] disabled:opacity-30">下一页 →</button>
-                  </div>
+                  <p className="life-letter-compose-meta">写给 Ta · 第 {editorPage + 1} 页</p>
                   <textarea
                     autoFocus
                     value={letterPages[editorPage] ?? ""}
                     maxLength={LETTER_PAGE_CHARS}
                     onChange={(event) => updateLetterPage(event.target.value)}
                     rows={12}
-                    placeholder="这一页想写什么…"
-                    className="life-letter-reader-body w-full resize-none bg-transparent px-2 py-2 text-sm leading-8 text-[var(--life-text-body)] outline-none"
+                    placeholder="在这里写下想对 Ta 说的话……"
+                    className="life-letter-reader-body life-letter-compose-textarea"
                   />
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-[10px] text-[var(--life-text-muted)]">{(letterPages[editorPage] ?? "").length}/{LETTER_PAGE_CHARS}</span>
-                    <div className="flex gap-3 text-[10px] font-extrabold text-[var(--life-teal-strong)]">
-                      <button type="button" onClick={addLetterPage}>＋ 新一页</button>
-                      {letterPages.length > 1 && !(letterPages[editorPage] ?? "").trim() ? <button type="button" onClick={removeEmptyLetterPage}>删除空页</button> : null}
-                    </div>
+                  <div className="life-letter-page-footer is-editor">
+                    <button type="button" disabled={editorPage === 0} onClick={() => setEditorPage((value) => Math.max(0, value - 1))}>‹</button>
+                    <span>{editorPage + 1} / {letterPages.length}</span>
+                    <button type="button" disabled={editorPage >= letterPages.length - 1} onClick={() => setEditorPage((value) => Math.min(letterPages.length - 1, value + 1))}>›</button>
                   </div>
                 </div>
-              ) : (
-                <div className={`aspect-[1.62/1] rounded-[26px] border border-[var(--life-border-soft)] bg-white/80 p-4 ${themeClass(form.themeKey ?? "cream")}`}>
-                  <p className="text-[10px] font-black tracking-[0.16em] text-[var(--life-text-muted)]">POSTCARD</p>
+                <div className="life-letter-editor-page-tools">
+                  <button type="button" onClick={addLetterPage}>＋ 添加一页</button>
+                  {letterPages.length > 1 && !(letterPages[editorPage] ?? "").trim() ? <button type="button" onClick={removeEmptyLetterPage}>删除空页</button> : <span />}
+                  <small>{(letterPages[editorPage] ?? "").length}/{LETTER_PAGE_CHARS}</small>
+                </div>
+              </>
+            ) : (
+              <div className={`life-postcard-compose ${themeClass(form.themeKey ?? "cream")}`}>
+                <div className="life-postcard-message-side">
+                  <p className="life-postcard-kicker">POSTCARD</p>
                   <textarea
                     autoFocus
                     value={readableBody(form.body)}
                     maxLength={800}
                     onChange={(event) => setForm({ ...form, body: event.target.value })}
-                    placeholder="把一句想说的话写在明信片上…"
-                    className="mt-3 h-[calc(100%-2rem)] w-full resize-none bg-transparent text-sm leading-7 text-[var(--life-text-body)] outline-none"
+                    placeholder="把一句想说的话写在明信片上……"
+                    className="life-postcard-compose-textarea"
                   />
+                  <PostcardSceneArt />
                 </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  disabled={saving}
-                  onClick={() => void persist("draft")}
-                  className="rounded-2xl border border-[var(--life-teal)] bg-white px-4 py-3 text-sm font-extrabold text-[var(--life-teal-strong)] disabled:opacity-50"
-                >
-                  {saving ? "处理中…" : "保存到待寄出"}
-                </button>
-                <button
-                  disabled={saving}
-                  onClick={() => void persist("sent")}
-                  className="rounded-2xl bg-[var(--life-teal)] px-4 py-3 text-sm font-extrabold text-white disabled:opacity-50"
-                >
-                  {saving ? "处理中…" : "确认寄出"}
-                </button>
+                <div className="life-postcard-address-side">
+                  <PostcardStamp />
+                  <div className="life-postcard-address-lines" aria-hidden><span /><span /><span /></div>
+                  <p>TO · Ta</p>
+                </div>
               </div>
+            )}
+
+            <div className="life-mailbox-editor-actions">
+              <button disabled={saving} onClick={() => { setEditing(undefined); setForm(null); }}>取消</button>
+              <button disabled={saving} onClick={() => void persist("draft")}>{saving ? "处理中…" : "保存草稿"}</button>
+              <button disabled={saving} className="is-send" onClick={() => void persist("sent")}>{saving ? "处理中…" : "寄出"}</button>
             </div>
+            <p className="life-mailbox-editor-lock-note">寄出后内容会永久保持只读，不能再编辑。</p>
           </div>
         </div>
       ) : null}
