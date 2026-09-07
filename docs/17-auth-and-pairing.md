@@ -126,7 +126,8 @@ current partnerKey != record owner -> 403 OWN_RECORD_ONLY
 | activity: cat / fish | 双方可按页面语义查看 | 只有 participant 对应本人可以新增、修改、删除 |
 | activity: both | 双方可查看 | 双方都可以维护；不能由单方静默改成 cat-only / fish-only |
 | medicine | 家庭共享 | 双方都可维护 |
-| mailbox | 收件 / 已寄出可查看 | 发件人由当前身份固定；只有发件人可修改/删除当前旧模型中的信件 |
+| mailbox draft | 只有寄件人可见 | 只有寄件人可创建、修改、删除、寄出 |
+| mailbox sent | 寄件人与收件人可见 | 一旦寄出永久只读；双方都不能修改或删除原记录 |
 | settings.targetWeightKg | 双方可查看 | 只修改当前账号自己的目标体重 |
 | settings.anniversaryDate | 双方共享 | 双方都可维护 |
 | reminders | 当前账号看自己的实例 | 实例操作绑定当前账号；自定义提醒可以显式选择 cat / fish / both 作为收件人 |
@@ -168,7 +169,35 @@ payload partnerKey
 
 三者必须一致。旧游戏关联的 legacy-linked weight 继续受原有“只能由 daily check-in 管理”的限制。
 
-## 10. AI / MCP 边界
+## 10. Mailbox 特殊规则
+
+`mailbox_letters.status` 只有：
+
+```text
+draft -> 待寄出
+sent  -> 已寄出 / 收信箱
+```
+
+身份和收件人都由服务端决定：
+
+```text
+sender = 当前 signed actor
+recipient = opposite actor
+```
+
+权限规则：
+
+```text
+自己的 draft -> 可见、可编辑、可删除、可寄出
+Ta 的 draft   -> 完全不可见
+sent          -> 寄件人与收件人都可见，但双方都只读
+```
+
+`send_mailbox_draft_authorized` 是唯一 draft -> sent 状态迁移；寄出时由数据库写入 `sent_at=now()`。客户端或 AI 不能把已寄出的内容重新改回草稿。
+
+当前没有“只从自己的已寄出列表删除副本”能力，因为一条 `sent` 记录同时代表寄件人的已寄出和收件人的收信箱。以后如果需要这种邮件式行为，应新增 per-user mailbox view state / archive，而不是删除原信。
+
+## 11. AI / MCP 边界
 
 MCP 与网页内置 AI 都经过 `life-agent-executor`。个人 mutation 显式指定 Ta 会被拒绝；update/delete 还会先读取真实记录 owner/scope，而不是只相信工具参数。
 
@@ -179,9 +208,16 @@ Activity 额外规则：
 - shared activity 保持 `both`：允许；
 - shared activity 改成单方：拒绝。
 
+Mailbox 额外规则：
+
+- “帮我写/起草一封信”默认写成 `draft`；
+- 只有用户明确要求“寄出/发送”才进入 `sent`；
+- 修改已有 mailbox 记录时只允许读取并 hydration 当前账号自己的 `draft`；
+- 已寄出记录即使知道 UUID，也不能通过 AI update/delete。
+
 删除操作还要求用户当前自然语言消息明确表达删除意图。
 
-## 11. 数据库权限
+## 12. 数据库权限
 
 生活数据表继续保持：
 
@@ -191,9 +227,9 @@ RLS enabled
 + service_role / canonical RPC 访问
 ```
 
-actor-aware activity / weight RPC 同样只授予 `service_role` EXECUTE；浏览器不能绕过服务器直接调用这些写接口。
+actor-aware activity / weight / mailbox RPC 同样只授予 `service_role` EXECUTE；浏览器不能绕过服务器直接调用这些写接口。
 
-## 12. 不允许重新引入的复杂流程
+## 13. 不允许重新引入的复杂流程
 
 - 登录前账号卡片选择；
 - 第二次同步密码；
@@ -201,6 +237,6 @@ actor-aware activity / weight RPC 同样只授予 `service_role` EXECUTE；浏�
 - 邀请码 / 配对流程；
 - 第三个账号。
 
-## 13. 部署规则
+## 14. 部署规则
 
 `vercel.json` 默认必须保持 `git.deploymentEnabled: false`。任何 Preview / Production 仍需单次明确授权。
