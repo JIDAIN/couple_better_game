@@ -48,14 +48,21 @@ describe("R1-R6 refactor boundaries", () => {
     expect(calendar).toContain("life-month:");
   });
 
-  it("separates Nest from My and binds mailbox sender ownership", () => {
+  it("separates Nest from My and binds mailbox writes to the signed actor", () => {
     const nest = source("components/life/LifeNestPage.tsx");
     const me = source("components/life/LifeMePage.tsx");
+    const mailbox = source("app/api/life/mailbox/route.ts");
+    const mailboxItem = source("app/api/life/mailbox/[id]/route.ts");
     expect(nest).toContain("life-nest-scene");
     expect(me).toContain("life-account-hero");
     expect(me).not.toContain('href="/calendar"');
-    expect(source("app/api/life/mailbox/route.ts")).toContain("senderKey !== identity.partnerKey");
-    expect(source("app/api/life/mailbox/[id]/route.ts")).toContain("getMailboxSender");
+    expect(mailbox).toContain("senderKey: identity.partnerKey");
+    expect(mailbox).toContain("recipientKey: ta");
+    expect(mailbox).toContain("createMailboxItem(");
+    expect(mailboxItem).toContain("updateMailboxDraft");
+    expect(mailboxItem).toContain("sendMailboxDraft");
+    expect(mailboxItem).toContain("deleteMailboxDraft");
+    expect(mailboxItem).toContain("MAILBOX_IMMUTABLE");
   });
 
   it("loads the unified visual adapters and keeps Vercel git deploy disabled", () => {
