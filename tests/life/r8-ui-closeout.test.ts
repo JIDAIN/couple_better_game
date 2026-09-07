@@ -118,21 +118,34 @@ describe("R8.3 visual polish and interaction closeout", () => {
     expect(weight).toContain("慢慢看见自己的变化");
   });
 
-  it("uses a three-box mailbox with immutable sent items and paged letter paper", () => {
+  it("uses the approved stationery mailbox visual while keeping immutable sent items", () => {
     const mailbox = source("components/life/LifeMailboxPage.tsx");
+    const css = source("app/mailbox-visual-closeout.css");
+    const layout = source("app/layout.tsx");
     const route = source("app/api/life/mailbox/[id]/route.ts");
     expect(mailbox).toContain("收信箱");
     expect(mailbox).toContain("已寄出");
     expect(mailbox).toContain("待寄出");
+    expect(mailbox).toContain("life-mailbox-tabs-v3");
     expect(mailbox).toContain("MailboxTabIcon");
+    expect(mailbox).toContain("life-mailbox-month-sheet");
+    expect(mailbox).toContain("life-mailbox-preview-thumb");
     expect(mailbox).toContain('value === "letter" ? "手札" : "明信片"');
     expect(mailbox).toContain("手札需要一个标题");
     expect(mailbox).toContain("LETTER_PAGE_CHARS");
-    expect(mailbox).toContain("＋ 新一页");
-    expect(mailbox).toContain("第 {activeReaderPage + 1} / {readerPages.length} 页");
-    expect(mailbox).toContain("aspect-[1.62/1]");
+    expect(mailbox).toContain("＋ 添加一页");
+    expect(mailbox).toContain("life-letter-paper-modal");
+    expect(mailbox).toContain("LetterCornerArt");
+    expect(mailbox).toContain("life-postcard-modal");
+    expect(mailbox).toContain("PostcardStamp");
     expect(mailbox).toContain('item.status === "draft"');
     expect(mailbox).toContain("寄出后将不能再编辑");
+    expect(mailbox).toContain("寄出后内容会永久保持只读");
+    expect(mailbox).not.toContain("纸张主题");
+    expect(css).toContain("aspect-ratio: 1.62 / 1");
+    expect(css).toContain(".life-letter-paper-modal");
+    expect(css).toContain(".life-postcard-address-lines");
+    expect(layout).toContain('import "./mailbox-visual-closeout.css"');
     expect(route).toContain("MAILBOX_IMMUTABLE");
     expect(route).toContain("sendMailboxDraft");
     expect(mailbox).not.toContain("✉️ 信纸");
