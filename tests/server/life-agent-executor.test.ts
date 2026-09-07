@@ -143,3 +143,116 @@ describe("AI partial update hydration", () => {
     );
   });
 });
+
+describe("AI Cat/Fish activity boundary", () => {
+  it("rejects Cat updating a Fish-only activity", async () => {
+    mocks.getLifeExport.mockResolvedValue({
+      user: {
+        activity_entries: [
+          {
+            id: ID,
+            activity_date: "2026-09-07",
+            text: "鱼鱼散步",
+            participant_scope: "fish",
+            source: "manual",
+            deleted_at: null,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      executeLifeAgentTool(
+        "life_mutate",
+        { resource: "activity", action: "update", id: ID, data: { text: "被越权修改" } },
+        { identity: CAT, latestUserText: "修改这条活动" },
+      ),
+    ).rejects.toThrow("当前账号无权修改");
+    expect(mocks.canonicalExecute).not.toHaveBeenCalled();
+  });
+
+  it("rejects Cat deleting a Fish-only activity", async () => {
+    mocks.getLifeExport.mockResolvedValue({
+      user: {
+        activity_entries: [
+          {
+            id: ID,
+            activity_date: "2026-09-07",
+            text: "鱼鱼散步",
+            participant_scope: "fish",
+            source: "manual",
+            deleted_at: null,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      executeLifeAgentTool(
+        "life_mutate",
+        { resource: "activity", action: "delete", id: ID, data: {} },
+        { identity: CAT, latestUserText: "删除这条活动" },
+      ),
+    ).rejects.toThrow("当前账号无权删除");
+    expect(mocks.canonicalExecute).not.toHaveBeenCalled();
+  });
+
+  it("allows a shared activity to remain shared", async () => {
+    mocks.getLifeExport.mockResolvedValue({
+      user: {
+        activity_entries: [
+          {
+            id: ID,
+            activity_date: "2026-09-07",
+            text: "一起散步",
+            participant_scope: "both",
+            source: "manual",
+            deleted_at: null,
+          },
+        ],
+      },
+    });
+
+    await executeLifeAgentTool(
+      "life_mutate",
+      { resource: "activity", action: "update", id: ID, data: { text: "一起逛公园" } },
+      { identity: CAT, latestUserText: "把这条共同活动改成一起逛公园" },
+    );
+
+    expect(mocks.canonicalExecute).toHaveBeenCalledWith(
+      "life_mutate",
+      expect.objectContaining({
+        resource: "activity",
+        action: "update",
+        data: expect.objectContaining({ participantScope: "both", text: "一起逛公园" }),
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("does not allow one actor to privatize a shared activity", async () => {
+    mocks.getLifeExport.mockResolvedValue({
+      user: {
+        activity_entries: [
+          {
+            id: ID,
+            activity_date: "2026-09-07",
+            text: "一起散步",
+            participant_scope: "both",
+            source: "manual",
+            deleted_at: null,
+          },
+        ],
+      },
+    });
+
+    await expect(
+      executeLifeAgentTool(
+        "life_mutate",
+        { resource: "activity", action: "update", id: ID, data: { participantScope: "cat" } },
+        { identity: CAT, latestUserText: "把它改成我的活动" },
+      ),
+    ).rejects.toThrow("双方共同活动不能由一方改成单方活动");
+    expect(mocks.canonicalExecute).not.toHaveBeenCalled();
+  });
+});
