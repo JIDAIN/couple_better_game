@@ -63,9 +63,11 @@ life_backup_snapshots
 life_mcp_code_redemptions
 life_notification_preferences
 life_notification_deliveries
+life_reminder_rules
+life_reminder_instances
 ```
 
-这些属于身份、配置、备份、通知或系统控制层，不能简单当成生活事实或游戏事实。
+这些属于身份、配置、备份、通知、提醒编排或系统控制层，不能简单当成生活事实或游戏事实。
 
 完整维护规则见 [`48-life-legacy-game-data-boundary.md`](48-life-legacy-game-data-boundary.md)。
 
@@ -213,13 +215,110 @@ idempotency_key nullable
 
 AI 记体重写这里，不自动覆盖旧游戏体重快照。
 
-## 11. 外部写入与幂等
+## 11. Reminder / Notification 系统模型
+
+提醒系统属于 Shared / System，不属于具体生活事实表。
+
+### `life_notification_preferences`
+
+按 Cat / Fish 分别保存通知偏好：
+
+```text
+actor
+enabled
+timezone
+daily_record_reminder_enabled
+daily_record_reminder_time
+anniversary_reminder_enabled
+anniversary_reminder_time
+anniversary_offsets
+medicine_reminder_enabled
+medicine_offsets
+```
+
+药箱设置当前约束：
+
+```text
+1～10 个提前量
+每个提前量 0～90 天（RPC 强校验）
+默认 [30,7,1,0]
+```
+
+### `life_reminder_rules`
+
+表示提醒规则 / 来源定义：
+
+```text
+created_by
+recipient_scope      cat / fish / both
+source_kind          custom / medicine / anniversary / system
+title
+content
+enabled
+schedule_type
+due_at
+metadata
+archived_at
+```
+
+自定义提醒会先建立 rule，再物化实例。
+
+### `life_reminder_instances`
+
+表示一次具体提醒：
+
+```text
+rule_id nullable
+recipient            cat / fish
+source_kind
+source_ref nullable
+title
+content nullable
+due_at
+status               pending / snoozed / completed / dismissed
+snoozed_until nullable
+notified_at nullable
+dedupe_key
+metadata
+completed_at nullable
+```
+
+`both` 不表示一条共享状态，而是物化成 Cat / Fish 各自实例，因此双方可以独立处理。
+
+### `life_notification_deliveries`
+
+表示投递尝试，不表示用户完成状态：
+
+```text
+actor
+kind                  daily_record / anniversary / reminder
+local_date
+dedupe_key
+status                reserved / accepted / failed
+attempt_count
+provider
+provider_message_id
+provider_error
+```
+
+Reminder Instance 与 Delivery 必须分离：
+
+```text
+instance completed ≠ PushPlus accepted
+PushPlus accepted ≠ 用户已读
+```
+
+snooze 后会清空 instance `notified_at`，新的 effective due time 会形成新的 delivery dedupe key，从而允许合法再次提醒一次。
+
+完整提醒架构见 [`14-wechat-reminders.md`](14-wechat-reminders.md)。
+
+## 12. 外部写入与幂等
 
 跨域 AI / import 写入使用稳定幂等边界。`record_write_receipts` 可用于部分外部写入回执语义。
 
 这些控制记录不是生活事实本身。
 
-## 12. 主要 Meal RPC
+## 13. 主要 Meal RPC
 
 ```text
 list_meals
@@ -232,7 +331,7 @@ replace_meal_photo_state
 update_meal_photo_display
 ```
 
-## 13. Source / AI 写入
+## 14. Source / AI 写入
 
 统一来源词汇：
 
@@ -248,15 +347,17 @@ AI 入口不获得任意 SQL。AI Access Core 负责 identity / permission / nor
 
 `legacy_home` 是旧版游戏兼容入口，不属于普通 Island Life resource。
 
-## 14. Fact vs Derived
+## 15. Fact vs Derived
 
 Island Life 事实包括 meal、weight、mood、sleep、activity、medicine、mailbox。
 
 Legacy Game 事实包括 daily record、exchange、wallet ledger；它们只在游戏子项目内解释。
 
+Reminder rule / instance / notification delivery 属于系统编排事实，不重新定义原始生活事实。
+
 派生 / 快照包括 wallet current balance、heatmap、nutrition summary、sleep duration、月度心情展示与 UI stale cache。
 
-## 15. Migration 规则
+## 16. Migration 规则
 
 - Production schema / function / view / grant / RLS 变化必须新增 migration；
 - 已执行 migration 不回改；
